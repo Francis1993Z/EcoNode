@@ -1,0 +1,2193 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ÉcoNodes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=B612+Mono:wght@400;700&family=Barlow:wght@400;500;600;700&family=Big+Shoulders+Display:wght@700;800&display=swap">
+<style>
+/* Layout : plan de travail CAD — cartouche en haut, espace objet (graphe de nodes) à gauche, palette de propriétés à droite */
+:root {
+  --paper: #e9edef;
+  --sheet: #f7f9fa;
+  --node: #ffffff;
+  --ink: #172027;
+  --ink-2: #51606c;
+  --ink-3: #7d8a95;
+  --rule: #c6cfd5;
+  --rule-2: #dfe5e9;
+  --grid-minor: #dfe4e7;
+  --grid-major: #cfd6db;
+  --accent: #0a7c8a;
+  --accent-soft: #d3eef1;
+  --primaire: #a87410;
+  --transfo: #2b67aa;
+  --conso: #ad2f74;
+  --money: #23804a;
+  --warn: #b85410;
+  --bad: #c22b2b;
+  --ok: #23804a;
+  --shadow: 0 1px 2px rgba(20, 32, 40, .08), 0 4px 14px rgba(20, 32, 40, .06);
+  --f-display: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-ui: "Barlow", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "B612 Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1a2027; --sheet: #212932; --node: #27303a; --ink: #dfe6eb; --ink-2: #9eacb8; --ink-3: #74828e;
+    --rule: #38444f; --rule-2: #2d3741; --grid-minor: #222a33; --grid-major: #2a333d;
+    --accent: #3cc3d0; --accent-soft: #1d3b42; --primaire: #e2b545; --transfo: #64a8ee; --conso: #e870b2;
+    --money: #5cc47e; --warn: #f0904f; --bad: #f26a6a; --ok: #5cc47e;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 18px rgba(0, 0, 0, .25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1a2027; --sheet: #212932; --node: #27303a; --ink: #dfe6eb; --ink-2: #9eacb8; --ink-3: #74828e;
+  --rule: #38444f; --rule-2: #2d3741; --grid-minor: #222a33; --grid-major: #2a333d;
+  --accent: #3cc3d0; --accent-soft: #1d3b42; --primaire: #e2b545; --transfo: #64a8ee; --conso: #e870b2;
+  --money: #5cc47e; --warn: #f0904f; --bad: #f26a6a; --ok: #5cc47e;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 18px rgba(0, 0, 0, .25);
+  color-scheme: dark;
+}
+
+html, body { height: 100%; }
+body { background: var(--paper); color: var(--ink); font: 14px/1.4 var(--f-ui); }
+* { box-sizing: border-box; }
+button, input, select { font: inherit; color: inherit; }
+.mono, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+.app { display: grid; grid-template-rows: auto auto 1fr; height: 100%; min-height: 0; }
+
+/* ---------- Cartouche */
+.bar {
+  display: flex; flex-wrap: wrap; align-items: stretch; gap: 0;
+  background: var(--sheet); border-bottom: 1px solid var(--rule);
+}
+.bar > * { padding: 8px 16px; border-right: 1px solid var(--rule-2); display: flex; align-items: center; gap: 10px; }
+.brand { flex-direction: column; align-items: flex-start !important; justify-content: center; gap: 0 !important; }
+.brand b { font: 800 22px/1 var(--f-display); letter-spacing: .02em; text-transform: uppercase; }
+.brand small { font-size: 11px; color: var(--ink-3); letter-spacing: .08em; text-transform: uppercase; }
+.daybox { flex-direction: column; align-items: flex-start !important; gap: 0 !important; min-width: 92px; }
+.daybox small { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.daybox b { font: 700 20px/1.1 var(--f-mono); }
+.transport { flex-wrap: wrap; }
+.btn {
+  border: 1px solid var(--rule); background: var(--node); border-radius: 3px; padding: 5px 10px; cursor: pointer;
+  font-weight: 600; font-size: 13px; line-height: 1.2; white-space: nowrap;
+}
+.btn:hover { border-color: var(--ink-3); }
+.btn:focus-visible, .seg button:focus-visible, .tabs button:focus-visible, input:focus-visible, select:focus-visible, .node:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--sheet); }
+.btn.danger { color: var(--bad); }
+.btn.small { padding: 3px 8px; font-size: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
+.seg button { border: 0; background: var(--node); padding: 5px 9px; cursor: pointer; font: 600 12px var(--f-mono); }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
+.bar .spacer { flex: 1; border-right: 0; padding: 0; }
+.integrity { font-size: 12px; color: var(--ink-2); }
+
+/* ---------- Bande d'indicateurs */
+.kpis {
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); background: var(--sheet); border-bottom: 1px solid var(--rule);
+}
+.kpi { padding: 6px 14px 6px; border-right: 1px solid var(--rule-2); min-width: 0; display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 0 8px; }
+.kpi:last-child { border-right: 0; }
+.kpi small { grid-column: 1 / -1; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi b { font: 700 17px/1.2 var(--f-mono); white-space: nowrap; }
+.kpi canvas { width: 72px; height: 22px; display: block; }
+.kpi .sub { font-size: 11px; color: var(--ink-3); grid-column: 1 / -1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Espace de travail */
+.work { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
+.graph {
+  position: relative; overflow: hidden; min-height: 0; cursor: grab; touch-action: none;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px), linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid-minor) 1px, transparent 1px), linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
+}
+.graph.panning { cursor: grabbing; }
+.world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#edges { position: absolute; left: -2000px; top: -2000px; width: 6000px; height: 6000px; overflow: visible; pointer-events: none; }
+#edges .e { fill: none; stroke-linecap: round; opacity: .85; }
+#edges .e.flow { stroke-dasharray: 2 9; animation: flow 1.1s linear infinite; opacity: .95; }
+#edges .e.money { stroke: var(--money); stroke-dasharray: 7 5; opacity: .7; }
+#edges .e.dim { opacity: .18; }
+#edges .lbl { font: 11px var(--f-mono); fill: var(--ink-2); paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round; }
+#edges .lbl.dim { opacity: .25; }
+#edges .lbl.money { fill: var(--money); }
+.c-primaire { stroke: var(--primaire); }
+.c-transfo { stroke: var(--transfo); }
+.c-conso { stroke: var(--conso); }
+@keyframes flow { to { stroke-dashoffset: -22; } }
+@media (prefers-reduced-motion: reduce) { #edges .e.flow { animation: none; } }
+
+.node {
+  position: absolute; width: 222px; background: var(--node); border: 1px solid var(--rule); border-radius: 3px;
+  box-shadow: var(--shadow); user-select: none; cursor: pointer;
+}
+.node.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
+.node .grip { display: none; position: absolute; width: 7px; height: 7px; background: var(--accent); border: 1px solid var(--sheet); }
+.node.sel .grip { display: block; }
+.grip.tl { left: -4px; top: -4px; } .grip.tr { right: -4px; top: -4px; } .grip.bl { left: -4px; bottom: -4px; } .grip.br { right: -4px; bottom: -4px; }
+.nh { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 9px 6px; border-bottom: 1px solid var(--rule-2); }
+.code { font: 800 13px/1 var(--f-display); letter-spacing: .04em; padding: 5px 5px 4px; border-radius: 2px; color: var(--node); min-width: 26px; text-align: center; }
+.code.s-primaire { background: var(--primaire); } .code.s-transfo { background: var(--transfo); } .code.s-conso { background: var(--conso); }
+.code.s-menages { background: var(--ink); } .code.s-etat { background: var(--money); } .code.s-ext { background: var(--ink-3); }
+.nt { min-width: 0; }
+.nt b { display: block; font-weight: 700; font-size: 13.5px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nt small { display: block; font-size: 11px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.staff { font: 700 12px var(--f-mono); text-align: right; white-space: nowrap; }
+.staff small { color: var(--ink-3); font-weight: 400; }
+.np { padding: 4px 0; }
+.port { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 2px 12px; font-size: 12.5px; }
+.port span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
+.port em { font: normal 12px var(--f-mono); font-variant-numeric: tabular-nums; }
+.port.out span { color: var(--ink); font-weight: 600; }
+.port i { position: absolute; top: 50%; width: 9px; height: 9px; margin-top: -4.5px; border-radius: 50%; border: 2px solid var(--node); }
+.port.in i { left: -5px; } .port.out i { right: -5px; }
+.dot-primaire { background: var(--primaire); } .dot-transfo { background: var(--transfo); } .dot-conso { background: var(--conso); }
+.np .sep { height: 1px; background: var(--rule-2); margin: 3px 0; }
+.nf { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; padding: 5px 9px 7px; border-top: 1px solid var(--rule-2); font-size: 12px; }
+.nf .cash { font: 700 12.5px var(--f-mono); }
+.nf .staff { margin-right: auto; color: var(--ink-2); font-weight: 400; }
+.chip { font-size: 10.5px; font-weight: 600; letter-spacing: .02em; padding: 1px 6px; border-radius: 9px; border: 1px solid currentColor; white-space: nowrap; }
+.chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); } .chip.ok { color: var(--ok); } .chip.info { color: var(--accent); } .chip.mute { color: var(--ink-3); }
+.stat { display: grid; grid-template-columns: 1fr auto; padding: 2px 12px; font-size: 12.5px; }
+.stat span { color: var(--ink-2); }
+.stat em { font: normal 12px var(--f-mono); font-variant-numeric: tabular-nums; }
+.stat em.bad { color: var(--bad); font-weight: 700; }
+
+.gtools { position: absolute; left: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.gtools .seg button { padding: 4px 9px; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; background: var(--node); border: 1px solid var(--rule); border-radius: 3px; padding: 4px 9px; cursor: pointer; }
+.legend { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--ink-2); background: color-mix(in srgb, var(--sheet) 88%, transparent); border: 1px solid var(--rule-2); padding: 5px 9px; border-radius: 3px; max-width: calc(100% - 24px); }
+.legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+.legend i.m { background: repeating-linear-gradient(90deg, var(--money) 0 5px, transparent 5px 8px); }
+.ucs { position: absolute; right: 14px; bottom: 12px; pointer-events: none; }
+.ucs text { font: 700 10px var(--f-mono); fill: var(--ink-3); }
+
+/* ---------- Palette latérale */
+.panel { border-left: 1px solid var(--rule); background: var(--sheet); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.tabs { display: flex; border-bottom: 1px solid var(--rule); overflow-x: auto; flex: none; }
+.tabs button { flex: 1; border: 0; background: none; padding: 9px 8px 8px; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--ink-2); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs button.god[aria-selected="true"] { border-bottom-color: var(--warn); }
+.tabbody { overflow-y: auto; padding: 14px 16px 24px; flex: 1; min-height: 0; }
+.tabbody h2 { font: 800 22px/1.05 var(--f-display); letter-spacing: .01em; margin: 0 0 2px; text-wrap: balance; }
+.tabbody h3 { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin: 18px 0 6px; font-weight: 700; }
+.tabbody p { margin: 4px 0 8px; color: var(--ink-2); font-size: 13px; }
+.lead { font-size: 12.5px; color: var(--ink-3); margin-bottom: 10px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.kv { display: flex; flex-direction: column; min-width: 0; }
+.kv small { font-size: 11px; color: var(--ink-3); }
+.kv b { font: 700 15px var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kv b.bad { color: var(--bad); } .kv b.ok { color: var(--ok); }
+table.t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.t th { text-align: left; font-weight: 600; font-size: 11px; color: var(--ink-3); border-bottom: 1px solid var(--rule); padding: 4px 4px; white-space: nowrap; }
+table.t td { padding: 4px 4px; border-bottom: 1px solid var(--rule-2); vertical-align: top; }
+table.t td.n, table.t th.n { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.t tr.click { cursor: pointer; }
+table.t tr.click:hover td { background: var(--accent-soft); }
+.tscroll { max-height: 340px; overflow: auto; border: 1px solid var(--rule-2); border-radius: 3px; }
+.tscroll table.t th { position: sticky; top: 0; background: var(--sheet); }
+.field { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; margin: 6px 0; font-size: 13px; }
+.field label { color: var(--ink-2); }
+.field input[type="number"], .field input[type="text"], .field select, .row input[type="number"], .row input[type="text"], .row select {
+  border: 1px solid var(--rule); background: var(--node); border-radius: 3px; padding: 4px 6px; min-width: 0;
+}
+.field input[type="number"] { width: 110px; font-family: var(--f-mono); }
+.field input[type="range"] { width: 140px; }
+.field output { font: 12px var(--f-mono); color: var(--ink-2); grid-column: 2; text-align: right; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.row > select, .row > input[type="text"] { flex: 1 1 140px; }
+.row > input[type="number"] { width: 110px; font-family: var(--f-mono); }
+.card { border: 1px solid var(--rule); border-radius: 3px; padding: 10px 12px; background: var(--node); margin: 8px 0; }
+.card.god { border-left: 3px solid var(--warn); }
+.ledger { font: 12px var(--f-mono); width: 100%; border-collapse: collapse; }
+.ledger td { padding: 2px 0; }
+.ledger td:last-child { text-align: right; }
+.ledger tr.total td { border-top: 1px solid var(--rule); font-weight: 700; padding-top: 4px; }
+.hint { font-size: 12px; color: var(--ink-3); }
+.confirm { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--bad); }
+.charts { display: grid; gap: 14px; }
+.chart { min-width: 0; }
+.chart header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.chart header b { font-size: 12.5px; font-weight: 700; }
+.chart header span { font-size: 11px; color: var(--ink-3); }
+.chart canvas { width: 100%; height: 130px; display: block; }
+.chart .leg { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11px; color: var(--ink-2); margin-top: 3px; }
+.chart .leg i { display: inline-block; width: 10px; height: 3px; margin-right: 4px; vertical-align: middle; }
+.log { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
+.log li { display: grid; grid-template-columns: 54px 1fr; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--rule-2); }
+.log li time { font: 11px var(--f-mono); color: var(--ink-3); padding-top: 1px; }
+.log li.god { color: var(--warn); }
+.log li.warn, .log li.short { color: var(--bad); }
+.steps { margin: 6px 0 10px; padding-left: 20px; font-size: 13px; color: var(--ink-2); }
+.steps li { margin: 3px 0; }
+.empty { color: var(--ink-3); font-size: 13px; padding: 10px 0; }
+.mdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.pill { display: inline-block; font-size: 10.5px; padding: 0 5px; border-radius: 8px; border: 1px solid currentColor; margin-right: 3px; }
+
+/* ---------- Petits écrans */
+@media (max-width: 1100px) {
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpi:nth-child(3) { border-right: 0; }
+  .kpi:nth-child(-n+3) { border-bottom: 1px solid var(--rule-2); }
+}
+@media (max-width: 860px) {
+  .app { height: auto; }
+  .work { grid-template-columns: minmax(0, 1fr); }
+  .graph { height: 62vh; min-height: 380px; }
+  .panel { border-left: 0; border-top: 1px solid var(--rule); }
+  .tabbody { overflow: visible; }
+  .bar > * { padding: 7px 12px; }
+  .bar .spacer { display: none; }
+  .kpi canvas { width: 54px; }
+}
+@media (max-width: 480px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi:nth-child(3) { border-right: 1px solid var(--rule-2); }
+  .kpi:nth-child(2n) { border-right: 0; }
+  .kpi:nth-child(-n+4) { border-bottom: 1px solid var(--rule-2); }
+  .integrity { display: none !important; }
+}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand"><b>ÉcoNodes</b><small>Économie locale · bac à sable</small></div>
+    <div class="daybox"><small>Jour</small><b id="dayNum">0</b></div>
+    <div class="transport">
+      <button class="btn primary" id="btnPlay" type="button">Pause</button>
+      <button class="btn" id="btnStep" type="button">+1 jour</button>
+      <div class="seg" role="group" aria-label="Vitesse (jours par seconde)" id="speedSeg">
+        <button type="button" data-speed="1">1 j/s</button>
+        <button type="button" data-speed="4">4 j/s</button>
+        <button type="button" data-speed="16">16 j/s</button>
+        <button type="button" data-speed="64">64 j/s</button>
+      </div>
+      <span id="resetBox"><button class="btn" id="btnReset" type="button">Réinitialiser</button></span>
+    </div>
+    <div class="spacer"></div>
+    <div class="integrity" id="integrity" title="Masse monétaire réelle comparée à la masse attendue (départ + god mode + exportations − importations)">—</div>
+  </header>
+
+  <section class="kpis" id="kpis" aria-label="Indicateurs">
+    <div class="kpi"><small>Chômage</small><b id="k-unemp">—</b><canvas id="s-unemp"></canvas><span class="sub" id="k-unemp-sub"></span></div>
+    <div class="kpi"><small>Salaire moyen / jour</small><b id="k-wage">—</b><canvas id="s-wage"></canvas><span class="sub" id="k-wage-sub"></span></div>
+    <div class="kpi"><small>Panier de base / jour</small><b id="k-need">—</b><canvas id="s-need"></canvas><span class="sub">repas + logement + souliers</span></div>
+    <div class="kpi"><small>Faim · sans-abri</small><b id="k-distress">—</b><canvas id="s-distress"></canvas><span class="sub" id="k-distress-sub"></span></div>
+    <div class="kpi"><small>Inégalité (Gini)</small><b id="k-gini">—</b><canvas id="s-gini"></canvas><span class="sub" id="k-gini-sub"></span></div>
+    <div class="kpi"><small>Masse monétaire</small><b id="k-money">—</b><canvas id="s-money"></canvas><span class="sub" id="k-money-sub"></span></div>
+  </section>
+
+  <main class="work">
+    <div class="graph" id="graph" aria-label="Graphe des entreprises et des flux">
+      <div class="world" id="world">
+        <svg id="edges" viewBox="-2000 -2000 6000 6000" aria-hidden="true">
+          <defs>
+            <marker id="ar-primaire" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M0 1 L9 5 L0 9 z" style="fill: var(--primaire)"/></marker>
+            <marker id="ar-transfo" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M0 1 L9 5 L0 9 z" style="fill: var(--transfo)"/></marker>
+            <marker id="ar-conso" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M0 1 L9 5 L0 9 z" style="fill: var(--conso)"/></marker>
+            <marker id="ar-money" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M0 1 L9 5 L0 9 z" style="fill: var(--money)"/></marker>
+          </defs>
+          <g id="edgeG"></g>
+          <g id="labelG"></g>
+        </svg>
+        <div id="nodes"></div>
+      </div>
+      <div class="gtools">
+        <div class="seg" role="group" aria-label="Zoom">
+          <button type="button" id="zoomOut" aria-label="Dézoomer">−</button>
+          <button type="button" id="zoomFit">Ajuster</button>
+          <button type="button" id="zoomIn" aria-label="Zoomer">+</button>
+        </div>
+        <label class="toggle"><input type="checkbox" id="showMoney"> Salaires et dividendes</label>
+      </div>
+      <div class="legend" aria-hidden="true">
+        <span><i style="background: var(--primaire)"></i>Matières premières</span>
+        <span><i style="background: var(--transfo)"></i>Transformées</span>
+        <span><i style="background: var(--conso)"></i>Consommation</span>
+        <span><i class="m"></i>Argent</span>
+      </div>
+      <svg class="ucs" width="54" height="50" viewBox="0 0 54 50" aria-hidden="true">
+        <path d="M8 42 H44 M44 42 l-6 -3 v6 z M8 42 V8 M8 8 l-3 6 h6 z" style="stroke: var(--ink-3); fill: var(--ink-3)" stroke-width="1.4"/>
+        <rect x="5" y="39" width="6" height="6" style="fill: none; stroke: var(--ink-3)"/>
+        <text x="46" y="38">X</text><text x="13" y="10">Y</text>
+      </svg>
+    </div>
+
+    <aside class="panel">
+      <nav class="tabs" role="tablist">
+        <button role="tab" type="button" data-tab="inspect" aria-selected="true">Inspecteur</button>
+        <button role="tab" type="button" data-tab="god" class="god" aria-selected="false">God mode</button>
+        <button role="tab" type="button" data-tab="econ" aria-selected="false">Économie</button>
+        <button role="tab" type="button" data-tab="log" aria-selected="false">Journal</button>
+        <button role="tab" type="button" data-tab="model" aria-selected="false">Modèle</button>
+      </nav>
+      <div class="tabbody" id="tab-inspect" role="tabpanel"></div>
+      <div class="tabbody" id="tab-god" role="tabpanel" hidden></div>
+      <div class="tabbody" id="tab-econ" role="tabpanel" hidden></div>
+      <div class="tabbody" id="tab-log" role="tabpanel" hidden></div>
+      <div class="tabbody" id="tab-model" role="tabpanel" hidden></div>
+    </aside>
+  </main>
+</div>
+
+<script>
+/* ÉcoNodes — moteur de simulation (sans DOM, testable en Node)
+ * Tick = 1 jour. Toute la monnaie passe par transfer() : la masse monétaire
+ * ne change que par le god mode ou le commerce extérieur.
+ */
+(function (root) {
+  'use strict';
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // ---------------------------------------------------------------- Biens
+  const GOODS = {
+    viande:   { label: 'Viande',   unit: 'kg',     perish: false, guess: 60 },
+    cuir:     { label: 'Cuir',     unit: 'peau',   perish: false, guess: 110 },
+    bois:     { label: 'Bois',     unit: 'm³',     perish: false, guess: 40 },
+    minerai:  { label: 'Minerai',  unit: 't',      perish: false, guess: 80 },
+    planches: { label: 'Planches', unit: 'paquet', perish: false, guess: 180 },
+    acier:    { label: 'Acier',    unit: 't',      perish: false, guess: 400 },
+    boulons:  { label: 'Boulons',  unit: 'boîte',  perish: false, guess: 130 },
+    repas:    { label: 'Repas',    unit: 'repas',  perish: false, guess: 75, final: true },
+    souliers: { label: 'Souliers', unit: 'paire',  perish: false, guess: 250, final: true },
+    logement: { label: 'Logement', unit: 'nuitée', perish: true,  guess: 55, final: true },
+    loisirs:  { label: 'Loisirs',  unit: 'sortie', perish: true,  guess: 22, final: true },
+  };
+
+  // ------------------------------------------------- Types d'entreprises
+  // rate = lots produits par employé par jour ; inputs/outputs = par lot
+  const TEMPLATES = {
+    ferme:          { label: 'Ferme',          code: 'FE', sector: 'primaire', inputs: {}, outputs: { viande: 4, cuir: 0.3 }, rate: 1 },
+    bucheron:       { label: 'Bûcheron',       code: 'BU', sector: 'primaire', inputs: {}, outputs: { bois: 5 }, rate: 1 },
+    mine:           { label: 'Mine',           code: 'MI', sector: 'primaire', inputs: {}, outputs: { minerai: 2.5 }, rate: 1 },
+    scierie:        { label: 'Scierie',        code: 'SC', sector: 'transfo',  inputs: { bois: 2 }, outputs: { planches: 1 }, rate: 2.5 },
+    acierie:        { label: 'Aciérie',        code: 'AC', sector: 'transfo',  inputs: { minerai: 2 }, outputs: { acier: 1 }, rate: 1 },
+    boulonnerie:    { label: 'Boulonnerie',    code: 'BO', sector: 'transfo',  inputs: { acier: 0.2 }, outputs: { boulons: 1 }, rate: 5 },
+    restaurant:     { label: 'Restaurant',     code: 'RE', sector: 'conso',    inputs: { viande: 0.5 }, outputs: { repas: 1 }, rate: 6 },
+    cordonnerie:    { label: 'Cordonnerie',    code: 'CO', sector: 'conso',    inputs: { cuir: 1 }, outputs: { souliers: 1 }, rate: 1.5 },
+    immobilier:     { label: 'Immobilier',     code: 'IM', sector: 'conso',    inputs: { planches: 0.1, boulons: 0.1 }, outputs: { logement: 1 }, rate: 16, capacity: 85 },
+    divertissement: { label: 'Divertissement', code: 'DI', sector: 'conso',    inputs: {}, outputs: { loisirs: 1 }, rate: 8 },
+  };
+
+  const DEFAULT_PARAMS = {
+    population: 80,
+    startWallet: 3000,
+    startWage: 150,
+    markup: 1.15,
+    propensity: 0.05,     // part de l'épargne au-dessus du coussin dépensée chaque jour
+    bufferDays: 12,       // coussin d'épargne, en jours de besoins de base
+    shoeLife: 30,         // jours avant qu'une paire de souliers soit usée
+    trade: false,         // commerce extérieur
+    importMarkup: 1.3,
+    exportDiscount: 0.7,
+    ubi: 0,               // injection divine quotidienne par citoyen
+    priceStep: 0.02,
+    wageStep: 0.015,
+    dividendRate: 0.08,
+    invTargetDays: 4,
+    jobSwitch: 0.03,
+    taxRate: 0.12,        // impôt retenu sur salaires et dividendes
+    benefit: 80,          // prestation quotidienne par sans-emploi
+    minWage: 0,           // salaire minimum quotidien (0 = aucun)
+    stateRebate: 0.05,    // part du surplus de l'État redistribuée chaque jour
+    recapitalize: true,   // les propriétaires renflouent leurs entreprises
+  };
+
+  const FIRST = ['Marc', 'Julie', 'Éric', 'Annie', 'Steve', 'Mélanie', 'Patrick', 'Karine', 'Martin', 'Isabelle', 'Sylvain', 'Nathalie', 'Jean-Guy', 'Chantal', 'Kevin', 'Valérie', 'Dany', 'Josée', 'Mathieu', 'Geneviève', 'Simon', 'Caroline', 'Luc', 'Émilie', 'Yannick', 'Sophie', 'Jonathan', 'Marie-Ève', 'Guillaume', 'Audrey', 'Pierre-Luc', 'Catherine', 'Francis', 'Stéphanie', 'Maxime', 'Véronique', 'Olivier', 'Mélissa', 'Réjean', 'Ginette', 'Gilles', 'Lise', 'Normand', 'Carole', 'Samuel', 'Jessica', 'Alexandre', 'Roxanne'];
+  const LAST = ['Gagnon', 'Tremblay', 'Roy', 'Côté', 'Bouchard', 'Gauthier', 'Morin', 'Lavoie', 'Fortin', 'Gagné', 'Ouellet', 'Pelletier', 'Bélanger', 'Lévesque', 'Bergeron', 'Leblanc', 'Paquette', 'Girard', 'Simard', 'Boucher', 'Caron', 'Beaulieu', 'Cloutier', 'Dubé', 'Poirier', 'Fournier', 'Lapointe', 'Leclerc', 'Lefebvre', 'Poulin', 'Thibault', 'Bédard', 'Lessard', 'Laflamme', 'Rivard', 'Audet', 'Grenier', 'Dion'];
+
+  // x, y = position dans le graphe (coordonnées monde)
+  const SCENARIO = [
+    { type: 'ferme',          name: 'Ferme Gagnon',         workers: 14, x: 40,  y: 30 },
+    { type: 'bucheron',       name: 'Chantier Boréal',      workers: 3,  x: 40,  y: 330 },
+    { type: 'mine',           name: 'Mine du Nord',         workers: 2,  x: 40,  y: 570 },
+    { type: 'scierie',        name: 'Scierie Tremblay',     workers: 3,  x: 330, y: 330 },
+    { type: 'acierie',        name: 'Aciérie Laflamme',     workers: 2,  x: 330, y: 570 },
+    { type: 'restaurant',     name: 'Casse-croûte Ginette', workers: 18, x: 620, y: 30 },
+    { type: 'cordonnerie',    name: 'Cordonnerie Roy',      workers: 3,  x: 620, y: 250 },
+    { type: 'boulonnerie',    name: 'Boulonnerie Côté',     workers: 2,  x: 620, y: 570 },
+    { type: 'immobilier',     name: 'Gestion Bédard',       workers: 5,  x: 910, y: 400 },
+    { type: 'divertissement', name: 'Bar Le Trappeur',      workers: 24, x: 910, y: 640 },
+  ];
+
+  const EPS = 1e-9;
+
+  class Sim {
+    constructor(opts) { this.reset(opts || {}); }
+
+    // ============================================================ Setup
+    reset(opts) {
+      opts = opts || {};
+      this.seed = opts.seed != null ? opts.seed : 42;
+      this.rng = mulberry32(this.seed);
+      this.params = Object.assign({}, DEFAULT_PARAMS, opts.params || {});
+      this.day = 0;
+      this.nextId = 1;
+      this.citizens = [];
+      this.cmap = new Map();
+      this.firms = [];
+      this.ledger = { god: 0, imports: 0, exports: 0 };
+      this.events = [];
+      this.history = [];
+      this.flows = {};       // flux du jour courant
+      this.flowsEma = {};    // flux lissés pour l'affichage
+      this.unmet = {};
+      this.marketStats = {};
+      this.lastShortage = {};
+      this.householdSpend = 0;
+      this.nodePos = { M: { x: 1200, y: 250 }, E: { x: 1200, y: 20 }, X: { x: 1200, y: 640 } };
+      this.state = { id: 'E', kind: 'state', name: 'État', money: 20000, taxes: 0, paid: 0 };
+
+      const P = this.params;
+      // prix de départ : coût de revient + marge, résolus par itération
+      const price = {};
+      for (const g in GOODS) price[g] = GOODS[g].guess;
+      for (let it = 0; it < 40; it++) {
+        for (const t in TEMPLATES) {
+          const T = TEMPLATES[t];
+          let cost = P.startWage / T.rate;
+          for (const g in T.inputs) cost += T.inputs[g] * price[g];
+          const value = cost * P.markup;
+          let tot = 0;
+          for (const g in T.outputs) tot += T.outputs[g] * price[g];
+          for (const g in T.outputs) price[g] = value * (T.outputs[g] * price[g] / tot) / T.outputs[g];
+        }
+      }
+      this.worldPrice = Object.assign({}, price);
+
+      for (let i = 0; i < P.population; i++) this._newCitizen(P.startWallet * (0.6 + 0.8 * this.rng()));
+
+      const pool = this.citizens.slice();
+      this._shuffle(pool);
+      for (const s of (opts.scenario || SCENARIO)) {
+        const f = this._newFirm(s.type, s.name, 0, null, s.x, s.y, price);
+        for (let k = 0; k < s.workers && pool.length; k++) this._hire(f, pool.pop());
+        const batches = this._capBatches(f, f.workers.length * f.recipe.rate);
+        for (const g in f.recipe.outputs) {
+          const d = batches * f.recipe.outputs[g];
+          f.demandEma[g] = d;
+          f.inv[g] = GOODS[g].perish ? 0 : d * P.invTargetDays;
+        }
+        for (const g in f.recipe.inputs) f.inv[g] = batches * f.recipe.inputs[g] * 5;
+        let inputCost = 0;
+        for (const g in f.recipe.inputs) inputCost += batches * f.recipe.inputs[g] * price[g];
+        f.money = Math.max(6000, 12 * (f.wage * f.workers.length + inputCost));
+        f.ownerId = this.citizens[Math.floor(this.rng() * this.citizens.length)].id;
+      }
+      this.M0 = this.totalMoney();
+      this.needCost = this.bestPrice('repas') + this.bestPrice('logement') + this.bestPrice('souliers') / P.shoeLife;
+      this._record();
+    }
+
+    _newCitizen(money) {
+      let name = '';
+      for (let k = 0; k < 30; k++) {
+        name = FIRST[Math.floor(this.rng() * FIRST.length)] + ' ' + LAST[Math.floor(this.rng() * LAST.length)];
+        if (!this.citizens.some(x => x.name === name)) break;
+      }
+      const c = {
+        id: this.nextId++, kind: 'citizen',
+        name,
+        money, employer: null, hunger: 0, homeless: false,
+        shoes: Math.floor(this.rng() * this.params.shoeLife) + 1,
+        income: 0, spend: 0, daysUnemployed: 0,
+      };
+      this.citizens.push(c);
+      this.cmap.set(c.id, c);
+      return c;
+    }
+
+    _newFirm(type, name, money, ownerId, x, y, priceTable) {
+      const T = TEMPLATES[type];
+      const f = {
+        id: this.nextId++, kind: 'firm', type, name: name || T.label,
+        recipe: { inputs: Object.assign({}, T.inputs), outputs: Object.assign({}, T.outputs), rate: T.rate },
+        capacity: T.capacity || null,
+        prodMult: 1,
+        money, ownerId,
+        wage: this.params.startWage,
+        workers: [], vacancies: 0, unfilledDays: 0,
+        inv: {}, price: {}, markup: {}, demandEma: {}, sold: {}, produced: {}, unmetShare: {},
+        lockPrice: false, lockWage: false,
+        x: x != null ? x : 400, y: y != null ? y : 250,
+        revenue: 0, costs: 0, profitEma: 0, inputSpendEma: 0, wagesPaid: 0, dividends: 0,
+        lastDistressLog: -99,
+        hist: [],
+      };
+      const pt = priceTable || this.worldPrice || {};
+      for (const g in f.recipe.outputs) {
+        f.price[g] = pt[g] || GOODS[g].guess; f.inv[g] = 0; f.demandEma[g] = 0;
+      }
+      for (const g in f.recipe.inputs) f.inv[g] = f.inv[g] || 0;
+      this.firms.push(f);
+      return f;
+    }
+
+    // ======================================================= Utilitaires
+    _shuffle(a) {
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(this.rng() * (i + 1));
+        const t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
+    }
+    citizen(id) { return this.cmap.get(id); }
+    firm(id) { return this.firms.find(f => f.id === id); }
+    totalMoney() {
+      let m = 0;
+      for (const c of this.citizens) m += c.money;
+      for (const f of this.firms) m += f.money;
+      return m + this.state.money;
+    }
+    expectedMoney() { return this.M0 + this.ledger.god + this.ledger.exports - this.ledger.imports; }
+
+    transfer(from, to, amt) {
+      if (!(amt > 0)) return 0;
+      if (from && from.money + EPS < amt) throw new Error('Transfert à découvert');
+      if (from) from.money -= amt;
+      if (to) to.money += amt;
+      if (from && from.money < 0) from.money = 0; // poussière flottante
+      return amt;
+    }
+
+    _flow(from, to, good, qty, value) {
+      const k = from + '>' + to + '>' + good;
+      const e = this.flows[k] || (this.flows[k] = { from, to, good, qty: 0, value: 0 });
+      e.qty += qty; e.value += value;
+    }
+
+    _hire(f, c) {
+      if (c.employer) this._fire(this.firm(c.employer), c);
+      c.employer = f.id; c.daysUnemployed = 0;
+      f.workers.push(c.id);
+    }
+    _fire(f, c) {
+      if (!f || !c) return;
+      f.workers = f.workers.filter(id => id !== c.id);
+      c.employer = null;
+    }
+
+    efficiency(c) {
+      let e = 1;
+      if (c.hunger >= 2) e *= 0.5;
+      if (c.homeless) e *= 0.8;
+      if (c.shoes <= 0) e *= 0.9;
+      return e;
+    }
+
+    _capBatches(f, b) { return f.capacity != null ? Math.min(b, f.capacity) : b; }
+
+    sellersOf(good) { return this.firms.filter(f => f.recipe.outputs[good] !== undefined); }
+
+    bestPrice(good) {
+      let best = Infinity;
+      for (const f of this.firms) {
+        if (f.recipe.outputs[good] !== undefined && f.inv[good] >= 1 - EPS && f.price[good] < best) best = f.price[good];
+      }
+      if (this.params.trade && !GOODS[good].perish) best = Math.min(best, this.worldPrice[good] * this.params.importMarkup);
+      if (best === Infinity) {
+        // aucun stock : on prend le prix affiché le plus bas comme référence
+        for (const f of this.sellersOf(good)) best = Math.min(best, f.price[good]);
+      }
+      return best === Infinity ? this.worldPrice[good] : best;
+    }
+
+    unitCost(f) {
+      // coût d'un lot : salaires + intrants au prix du marché
+      let batch = f.wage / Math.max(EPS, f.recipe.rate * f.prodMult);
+      for (const g in f.recipe.inputs) batch += f.recipe.inputs[g] * this.bestPrice(g);
+      // coût réparti entre les extrants selon les prix mondiaux (stable pour les sous-produits)
+      let tot = 0;
+      for (const g in f.recipe.outputs) tot += f.recipe.outputs[g] * this.worldPrice[g];
+      const out = {};
+      for (const g in f.recipe.outputs) {
+        const share = tot > 0 ? f.recipe.outputs[g] * this.worldPrice[g] / tot : 1 / Object.keys(f.recipe.outputs).length;
+        out[g] = batch * share / f.recipe.outputs[g];
+      }
+      return out;
+    }
+
+    /** Achat sur le marché : moins cher d'abord. Retourne {qty, spent}. */
+    buy(buyer, buyerKey, good, qty, budget, integer) {
+      if (qty <= EPS || budget <= EPS) return { qty: 0, spent: 0 };
+      const offers = [];
+      for (const f of this.firms) {
+        if (f === buyer || f.recipe.outputs[good] === undefined) continue;
+        if (f.inv[good] > EPS) offers.push({ s: f, p: f.price[good], r: this.rng() });
+      }
+      const P = this.params;
+      if (P.trade && !GOODS[good].perish) offers.push({ s: 'X', p: this.worldPrice[good] * P.importMarkup, r: this.rng() });
+      offers.sort((a, b) => a.p * (1 + 0.03 * a.r) - b.p * (1 + 0.03 * b.r));
+
+      let remaining = qty, spent = 0, broke = false;
+      for (const o of offers) {
+        if (remaining <= EPS) break;
+        const avail = o.s === 'X' ? Infinity : o.s.inv[good];
+        const afford = (budget - spent) / o.p;
+        let q = Math.min(remaining, avail, afford);
+        if (integer) q = Math.floor(q + 1e-7);
+        if (afford < remaining && afford <= avail) broke = true;
+        if (q <= EPS) continue;
+        const cost = Math.min(q * o.p, buyer.money);
+        if (o.s === 'X') {
+          this.transfer(buyer, null, cost);
+          this.ledger.imports += cost;
+        } else {
+          this.transfer(buyer, o.s, cost);
+          o.s.inv[good] -= q;
+          o.s.sold[good] = (o.s.sold[good] || 0) + q;
+          o.s.revenue += cost;
+        }
+        this._flow(o.s === 'X' ? 'X' : o.s.id, buyerKey, good, q, cost);
+        const ms = this.marketStats[good];
+        ms.qty += q; ms.value += cost;
+        remaining -= q; spent += cost;
+        if (broke) break;
+      }
+      if (remaining > EPS && !broke) this.unmet[good] = (this.unmet[good] || 0) + remaining;
+      return { qty: qty - remaining, spent };
+    }
+
+    _log(type, text) {
+      this.events.push({ day: this.day, type, text });
+      if (this.events.length > 300) this.events.shift();
+    }
+
+    // ============================================================= Tick
+    step() {
+      const P = this.params;
+      this.day++;
+      this.flows = {};
+      this.unmet = {};
+      this.householdSpend = 0;
+      for (const g in GOODS) this.marketStats[g] = { qty: 0, value: 0 };
+      for (const f of this.firms) {
+        f.sold = {}; f.produced = {}; f.revenue = 0; f.costs = 0; f.inputSpend = 0; f.wagesPaid = 0;
+      }
+      for (const c of this.citizens) { c.income = 0; c.spend = 0; }
+      this.state.taxesToday = 0; this.state.paidToday = 0;
+      for (const f of this.firms) f.prevWorkers = f.workers.length;
+
+      // 0. Revenu de base divin (création monétaire)
+      if (P.ubi > 0) {
+        for (const c of this.citizens) { c.money += P.ubi; this.ledger.god += P.ubi; }
+      }
+
+      this._laborMarket();
+      this._produce();
+      this._payWages();
+      this._buyInputs();
+      this._consume();
+      if (P.trade) this._export();
+      this._expire();
+      this._decide();
+      this._finance();
+      this._record();
+    }
+
+    /** Renflouement par les propriétaires, rachats, redistribution du surplus de l'État. */
+    _finance() {
+      const P = this.params;
+      const buffer = P.bufferDays * (this.needCost || 140);
+      if (P.recapitalize) {
+        for (const f of this.firms) {
+          const g0 = Object.keys(f.recipe.outputs)[0];
+          if ((f.demandEma[g0] || 0) < 0.05) continue;
+          const nw = Math.max(1, Math.min(f.desired || 1, f.workers.length + 3));
+          const need = 10 * f.wage * nw - f.money;
+          if (need <= 0 || f.money > 4 * f.wage * nw) continue;
+          let owner = f.ownerId != null ? this.citizen(f.ownerId) : null;
+          let surplus = owner ? owner.money - buffer : 0;
+          if (surplus < need * 0.5) {
+            // le propriétaire n'a pas les moyens : le citoyen le plus riche rachète
+            const rich = this.citizens.reduce((a, c) => (c.money > a.money ? c : a), this.citizens[0]);
+            if (rich && rich !== owner && rich.money - buffer > need * 2) {
+              f.ownerId = rich.id; owner = rich; surplus = rich.money - buffer;
+              this._log('info', rich.name + ' rachète ' + f.name + '.');
+            }
+          }
+          if (owner && surplus > 0) {
+            const amt = Math.min(need, surplus * 0.5);
+            if (amt > f.wage) {
+              this.transfer(owner, f, amt);
+              this._flow('M', f.id, '$capital', 1, amt);
+              if (this.day - (f.lastRecapLog || -99) > 30) {
+                this._log('info', owner.name + ' renfloue ' + f.name + ' (' + fmt$(amt) + ').');
+                f.lastRecapLog = this.day;
+              }
+            }
+          }
+        }
+      }
+      // l'État redistribue son surplus au-delà d'une réserve
+      const E = this.state;
+      const reserve = 30 * P.benefit * Math.max(4, this.citizens.length * 0.1);
+      if (P.stateRebate > 0 && E.money > reserve && this.citizens.length) {
+        const total = (E.money - reserve) * P.stateRebate;
+        const each = total / this.citizens.length;
+        for (const c of this.citizens) { this.transfer(E, c, each); c.income += each; }
+        E.paid += total;
+        E.paidToday += total;
+        this._flow('E', 'M', '$redistribution', 1, total);
+      }
+    }
+
+    _laborMarket() {
+      const unemployed = this._shuffle(this.citizens.filter(c => !c.employer));
+      const hiring = this.firms.filter(f => f.vacancies > 0).sort((a, b) => b.wage - a.wage);
+      for (const f of hiring) {
+        while (f.vacancies > 0 && unemployed.length) {
+          this._hire(f, unemployed.pop());
+          f.vacancies--;
+        }
+        f.unfilledDays = f.vacancies > 0 ? f.unfilledDays + 1 : 0;
+      }
+      // mobilité : un employé quitte pour un meilleur salaire
+      const open = this.firms.filter(f => f.vacancies > 0);
+      if (open.length) {
+        for (const c of this.citizens) {
+          if (!c.employer || this.rng() > this.params.jobSwitch) continue;
+          const cur = this.firm(c.employer);
+          const best = open.reduce((a, b) => (b.vacancies > 0 && b.wage > a.wage ? b : a), open[0]);
+          if (best && best.vacancies > 0 && best !== cur && best.wage > cur.wage * 1.08) {
+            this._hire(best, c);
+            best.vacancies--;
+          }
+        }
+      }
+      for (const c of this.citizens) if (!c.employer) c.daysUnemployed++;
+      // assurance-emploi payée par l'État, au prorata si la caisse est vide
+      const idle = this.citizens.filter(c => !c.employer);
+      if (idle.length && this.params.benefit > 0) {
+        const each = Math.min(this.params.benefit, this.state.money / idle.length);
+        if (each > EPS) {
+          for (const c of idle) { this.transfer(this.state, c, each); c.income += each; }
+          this.state.paid += each * idle.length;
+          this.state.paidToday += each * idle.length;
+          this._flow('E', 'M', '$prestations', idle.length, each * idle.length);
+        }
+      }
+    }
+
+    _produce() {
+      for (const f of this.firms) {
+        let eff = 0;
+        for (const id of f.workers) eff += this.efficiency(this.citizen(id));
+        const laborBatches = this._capBatches(f, eff * f.recipe.rate * f.prodMult);
+        let batches = laborBatches;
+        for (const g in f.recipe.inputs) batches = Math.min(batches, (f.inv[g] || 0) / f.recipe.inputs[g]);
+        f.inputLimited = batches < laborBatches - EPS;
+        const g0 = Object.keys(f.recipe.outputs)[0];
+        if (!GOODS[g0].perish && f.inv[g0] > 2 * this.params.invTargetDays * Math.max(f.demandEma[g0], 0.5)) {
+          batches = Math.min(batches, this._plannedBatches(f)); // entrepôt plein : on ralentit
+        }
+        batches = Math.max(0, batches);
+        f.lastBatches = batches;
+        f.effWorkers = eff;
+        for (const g in f.recipe.inputs) f.inv[g] -= batches * f.recipe.inputs[g];
+        for (const g in f.recipe.outputs) {
+          const q = batches * f.recipe.outputs[g];
+          f.inv[g] = (f.inv[g] || 0) + q;
+          f.produced[g] = q;
+        }
+      }
+    }
+
+    _payWages() {
+      for (const f of this.firms) {
+        const n = f.workers.length;
+        if (!n) continue;
+        const bill = f.wage * n;
+        const each = f.money >= bill ? f.wage : f.money / n;
+        const t = this.params.taxRate;
+        for (const id of f.workers) {
+          const c = this.citizen(id);
+          this.transfer(f, c, each * (1 - t));
+          this.transfer(f, this.state, each * t);
+          c.income += each * (1 - t);
+        }
+        f.wagesPaid = each * n;
+        f.costs += each * n;
+        this.state.taxes += each * n * t;
+        this.state.taxesToday += each * n * t;
+        if (each > 0) {
+          this._flow(f.id, 'M', '$salaires', n, each * n * (1 - t));
+          if (t > 0) this._flow('M', 'E', '$impôts', 1, each * n * t);
+        }
+        if (each < f.wage - EPS) {
+          // ne peut pas payer : mise à pied du dernier embauché
+          const c = this.citizen(f.workers[f.workers.length - 1]);
+          this._fire(f, c);
+          f.vacancies = 0;
+          if (this.day - f.lastDistressLog > 10) {
+            this._log('warn', f.name + ' ne peut plus payer ses salaires — mise à pied.');
+            f.lastDistressLog = this.day;
+          }
+        }
+      }
+    }
+
+    _plannedBatches(f) {
+      const g0 = Object.keys(f.recipe.outputs)[0];
+      const per = f.recipe.outputs[g0];
+      const d = f.demandEma[g0] || 0;
+      let target;
+      if (GOODS[g0].perish) target = d * 1.05;
+      else target = d + (this.params.invTargetDays * d - (f.inv[g0] || 0)) / 10;
+      return this._capBatches(f, Math.max(0, target / per));
+    }
+
+    _buyInputs() {
+      for (const f of this._shuffle(this.firms.slice())) {
+        const ins = Object.keys(f.recipe.inputs);
+        if (!ins.length) continue;
+        // on n'achète pas plus de matière que l'équipe peut transformer
+        const crew = (f.workers.length + f.vacancies) * f.recipe.rate * f.prodMult * 1.2;
+        const plan = Math.min(Math.max(this._plannedBatches(f), f.lastBatches || 0), this._capBatches(f, crew));
+        const want = {};
+        let wantValue = 0;
+        for (const g of ins) {
+          const target = plan * f.recipe.inputs[g] * 5;
+          const deficit = target - (f.inv[g] || 0);
+          if (deficit > EPS) { want[g] = deficit; wantValue += deficit * this.bestPrice(g); }
+        }
+        if (wantValue <= 0) continue;
+        const budget = Math.max(0, f.money - 5 * f.wage * f.workers.length);
+        for (const g in want) {
+          const share = budget * (want[g] * this.bestPrice(g)) / wantValue;
+          const r = this.buy(f, f.id, g, want[g], Math.min(share, f.money), false);
+          f.inv[g] = (f.inv[g] || 0) + r.qty;
+          f.costs += r.spent; f.inputSpend += r.spent;
+        }
+      }
+    }
+
+    _consume() {
+      const P = this.params;
+      const pRepas = this.bestPrice('repas'), pLog = this.bestPrice('logement'), pSoul = this.bestPrice('souliers');
+      const needCost = pRepas + pLog + pSoul / P.shoeLife;
+      this.needCost = needCost;
+      for (const c of this._shuffle(this.citizens.slice())) {
+        const before = c.money;
+        // nourriture d'abord
+        let r = this.buy(c, 'M', 'repas', 1, c.money, true);
+        c.hunger = r.qty >= 1 ? 0 : c.hunger + 1;
+        // logement
+        r = this.buy(c, 'M', 'logement', 1, c.money, true);
+        c.homeless = r.qty < 1;
+        // souliers
+        c.shoes -= 1;
+        if (c.shoes <= 0) {
+          r = this.buy(c, 'M', 'souliers', 1, c.money, true);
+          c.shoes = r.qty >= 1 ? P.shoeLife : 0;
+        }
+        // dépenses discrétionnaires : une part de l'épargne au-dessus du coussin
+        const surplus = c.money - P.bufferDays * needCost;
+        if (surplus > 0) {
+          const budget = surplus * P.propensity;
+          const pl = this.bestPrice('loisirs');
+          let n = budget * 0.6 / pl;
+          n = Math.floor(n) + (this.rng() < n - Math.floor(n) ? 1 : 0);
+          if (n > 0) this.buy(c, 'M', 'loisirs', Math.min(n, 200), c.money, true);
+          let m = budget * 0.25 / pRepas; // sorties au resto
+          m = Math.floor(m) + (this.rng() < m - Math.floor(m) ? 1 : 0);
+          if (m > 0) this.buy(c, 'M', 'repas', Math.min(m, 50), c.money, true);
+          if (this.rng() < budget * 0.15 / pSoul) {
+            r = this.buy(c, 'M', 'souliers', 1, c.money, true);
+            if (r.qty >= 1) c.shoes += P.shoeLife;
+          }
+        }
+        c.spend = before - c.money;
+        this.householdSpend += c.spend;
+      }
+    }
+
+    _export() {
+      const P = this.params;
+      for (const f of this.firms) {
+        for (const g in f.recipe.outputs) {
+          if (GOODS[g].perish) continue;
+          const excess = f.inv[g] - 8 * Math.max(f.demandEma[g] || 0, 0.5);
+          if (excess <= EPS) continue;
+          const p = this.worldPrice[g] * P.exportDiscount;
+          const value = excess * p;
+          f.inv[g] -= excess;
+          f.money += value; f.revenue += value;
+          this.ledger.exports += value;
+          f.sold[g] = (f.sold[g] || 0); // l'export ne compte pas comme demande locale
+          this._flow(f.id, 'X', g, excess, value);
+        }
+      }
+    }
+
+    _expire() {
+      for (const f of this.firms) {
+        for (const g in f.recipe.outputs) if (GOODS[g].perish) f.inv[g] = 0;
+      }
+    }
+
+    _decide() {
+      const P = this.params;
+      const n = this.citizens.length;
+      const unemp = n ? this.citizens.filter(c => !c.employer).length / n : 0;
+
+      // répartir la demande non servie entre les producteurs du bien
+      for (const g in this.unmet) {
+        const s = this.sellersOf(g);
+        for (const f of s) f.unmetShare[g] = this.unmet[g] / s.length;
+      }
+
+      // salaire de référence (norme du marché du travail)
+      let wsum = 0, wn = 0;
+      for (const f of this.firms) { wsum += f.wage * f.workers.length; wn += f.workers.length; }
+      const avgWage = wn ? wsum / wn : P.startWage;
+      this.avgWage = avgWage;
+      const baseMk = P.markup - 1;
+
+      for (const f of this.firms) {
+        const cost = this.unitCost(f);
+        f.unitCostCache = cost;
+        for (const g in f.recipe.outputs) {
+          const unmet = f.unmetShare[g] || 0;
+          f.unmetShare[g] = 0;
+          const demand = (f.sold[g] || 0) + unmet;
+          if (g === Object.keys(f.recipe.outputs)[0]) f.urgency = demand > EPS ? unmet / demand : 0;
+          f.demandEma[g] = 0.85 * (f.demandEma[g] || 0) + 0.15 * demand;
+          if (f.markup[g] == null) f.markup[g] = baseMk;
+          if (f.lockPrice) continue;
+          // signal de rareté : stock trop bas (ou capacité saturée) → marge ↑ ; surstock → marge ↓
+          let dir = 0;
+          if (GOODS[g].perish) {
+            const prod = f.produced[g] || 0;
+            const util = prod > EPS ? (f.sold[g] || 0) / prod : (unmet > 0 ? 1 : 0);
+            if (unmet > EPS && util > 0.97) dir = 1;
+            else if (util < 0.85 && prod > EPS) dir = -1;
+          } else {
+            const days = f.inv[g] / Math.max(f.demandEma[g], 0.05);
+            if (days < 2 && demand > EPS) dir = 1;
+            else if (days > 8) dir = -1;
+          }
+          const pressure = 1 + 2 * Math.min(1, unmet / Math.max(f.sold[g] || 0, 1));
+          const step = P.priceStep * (0.5 + this.rng());
+          let mk = f.markup[g];
+          if (dir > 0) mk += step * pressure;
+          else if (dir < 0) mk -= step;
+          else mk += (baseMk - mk) * 0.03; // la concurrence ramène la marge vers la normale
+          mk = Math.max(-0.4, Math.min(3, mk));
+          f.markup[g] = mk;
+          const target = cost[g] * (1 + mk);
+          f.price[g] += (target - f.price[g]) * 0.25;
+          if (f.price[g] < 0.01) f.price[g] = 0.01;
+        }
+
+        // ------- plan d'embauche
+        const nw = f.workers.length;
+        const avgEff = nw ? Math.max(0.3, f.effWorkers / nw) : 1;
+        const per = Math.max(EPS, f.recipe.rate * f.prodMult * avgEff);
+        let desired = Math.ceil(this._plannedBatches(f) / per - 0.2);
+        if (f.inputLimited) desired = Math.min(desired, Math.ceil(f.lastBatches / per)); // pas d'embauche sans matière
+        f.desired = desired;
+        const bill = f.wage * nw;
+        f.vacancies = 0;
+        if (nw > 0 && f.money < bill * 2) {
+          this._fire(f, this.citizen(f.workers[nw - 1]));
+        } else if (desired > nw) {
+          const affordable = Math.floor(f.money / (f.wage * 8)) - nw;
+          f.vacancies = Math.max(0, Math.min(desired - nw, 3, affordable));
+        } else if (desired < nw - 1) {
+          const k = Math.min(nw - desired - 1, Math.max(1, Math.ceil(nw * 0.08)));
+          for (let i = 0; i < k; i++) this._fire(f, this.citizen(f.workers[f.workers.length - 1]));
+        }
+
+        // ------- salaires
+        if (!f.lockWage) {
+          // postes vacants : on monte le salaire, plus vite si des clients repartent les mains vides
+          if (f.vacancies > 0 && f.unfilledDays >= 2) { f.wage *= 1 + P.wageStep * (1 + 3 * Math.min(1, f.urgency || 0)); f.unfilledDays = 0; }
+          else if (f.vacancies === 0 && unemp > 0.08) f.wage *= 1 - P.wageStep * 0.1;
+          f.wage += (avgWage - f.wage) * 0.01; // les écarts de salaire se résorbent lentement
+          if (f.wage < Math.max(1, P.minWage)) f.wage = Math.max(1, P.minWage);
+        }
+
+        // ------- profits et dividendes
+        const profit = f.revenue - f.costs;
+        f.profitEma = 0.9 * f.profitEma + 0.1 * profit;
+        f.inputSpendEma = 0.9 * f.inputSpendEma + 0.1 * (f.inputSpend || 0);
+        const reserve = 8 * (f.wage * f.workers.length + f.inputSpendEma);
+        const owner = f.ownerId != null ? this.citizen(f.ownerId) : null;
+        f.dividends = 0;
+        if (owner && f.money > reserve) {
+          const d = (f.money - reserve) * P.dividendRate;
+          this.transfer(f, owner, d * (1 - P.taxRate));
+          this.transfer(f, this.state, d * P.taxRate);
+          this.state.taxes += d * P.taxRate;
+          this.state.taxesToday += d * P.taxRate;
+          owner.income += d * (1 - P.taxRate);
+          f.dividends = d;
+          this._flow(f.id, 'M', '$dividendes', 1, d * (1 - P.taxRate));
+          if (P.taxRate > 0) this._flow('M', 'E', '$impôts', 1, d * P.taxRate);
+        }
+      }
+
+      // pénuries notables
+      for (const g in this.unmet) {
+        const ms = this.marketStats[g];
+        if (this.unmet[g] > 0.2 * (ms.qty + this.unmet[g]) && this.unmet[g] >= 1 && this.day - (this.lastShortage[g] || -99) > 20) {
+          this._log('short', 'Pénurie de ' + GOODS[g].label.toLowerCase() + ' : ' + Math.round(this.unmet[g]) + ' ' + GOODS[g].unit + ' non servis.');
+          this.lastShortage[g] = this.day;
+        }
+      }
+
+      // flux lissés pour l'affichage
+      for (const k in this.flowsEma) { this.flowsEma[k].qty *= 0.8; this.flowsEma[k].value *= 0.8; }
+      for (const k in this.flows) {
+        const e = this.flowsEma[k] || (this.flowsEma[k] = { from: this.flows[k].from, to: this.flows[k].to, good: this.flows[k].good, qty: 0, value: 0 });
+        e.qty += 0.2 * this.flows[k].qty; e.value += 0.2 * this.flows[k].value;
+      }
+      for (const k in this.flowsEma) if (this.flowsEma[k].value < 0.5 && !this.flows[k]) delete this.flowsEma[k];
+    }
+
+    gini() {
+      const v = this.citizens.map(c => Math.max(0, c.money)).sort((a, b) => a - b);
+      const n = v.length; if (!n) return 0;
+      let cum = 0, tot = 0;
+      for (let i = 0; i < n; i++) { cum += (i + 1) * v[i]; tot += v[i]; }
+      return tot > 0 ? (2 * cum) / (n * tot) - (n + 1) / n : 0;
+    }
+
+    _record() {
+      const n = this.citizens.length;
+      const employed = this.citizens.filter(c => c.employer);
+      let mH = 0, mF = 0;
+      for (const c of this.citizens) mH += c.money;
+      for (const f of this.firms) mF += f.money;
+      let wsum = 0;
+      for (const c of employed) wsum += this.firm(c.employer).wage;
+      const prices = {};
+      for (const g in GOODS) {
+        const ms = this.marketStats[g];
+        prices[g] = ms && ms.qty > EPS ? ms.value / ms.qty : this.bestPrice(g);
+      }
+      this.history.push({
+        day: this.day, mH, mF, mE: this.state.money, M: mH + mF + this.state.money,
+        unemp: n ? (n - employed.length) / n : 0,
+        wage: employed.length ? wsum / employed.length : 0,
+        prices,
+        gdp: this.householdSpend,
+        hungry: this.citizens.filter(c => c.hunger >= 1).length,
+        homeless: this.citizens.filter(c => c.homeless).length,
+        gini: this.gini(),
+        pop: n,
+        need: this.needCost || 0,
+      });
+      if (this.history.length > 1500) this.history.shift();
+      for (const f of this.firms) {
+        const g0 = Object.keys(f.recipe.outputs)[0];
+        f.hist.push({ money: f.money, workers: f.workers.length, price: f.price[g0], sold: f.sold[g0] || 0, profit: f.revenue - f.costs });
+        if (f.hist.length > 365) f.hist.shift();
+        if (f.prevWorkers > 0 && f.workers.length === 0) this._log('warn', f.name + " n'a plus d'employés.");
+      }
+    }
+
+    // ========================================================= God mode
+    godMoney(target, amount) {
+      const list = this._targets(target);
+      let total = 0;
+      for (const e of list) {
+        let a = amount;
+        if (a < 0) a = -Math.min(-a, e.money);
+        e.money += a; total += a;
+      }
+      this.ledger.god += total;
+      this._log('god', (total >= 0 ? 'Injection de ' : 'Retrait de ') + fmt$(Math.abs(total)) + ' → ' + this._targetLabel(target) + '.');
+      return total;
+    }
+
+    godGoods(firmId, good, qty) {
+      const f = this.firm(firmId);
+      if (!f) return 0;
+      const before = f.inv[good] || 0;
+      f.inv[good] = Math.max(0, before + qty);
+      const d = f.inv[good] - before;
+      this._log('god', (d >= 0 ? 'Ajout de ' : 'Retrait de ') + Math.abs(round1(d)) + ' ' + GOODS[good].unit + ' de ' + GOODS[good].label.toLowerCase() + ' chez ' + f.name + '.');
+      return d;
+    }
+
+    godDestroy(good, pct) {
+      let lost = 0;
+      for (const f of this.firms) {
+        if (f.inv[good] > 0) { const q = f.inv[good] * pct; f.inv[good] -= q; lost += q; }
+      }
+      this._log('god', 'Catastrophe : ' + Math.round(pct * 100) + ' % des stocks de ' + GOODS[good].label.toLowerCase() + ' détruits (' + round1(lost) + ' ' + GOODS[good].unit + ').');
+      return lost;
+    }
+
+    godAddCitizens(n, money) {
+      for (let i = 0; i < n; i++) { this._newCitizen(money); this.ledger.god += money; }
+      this._log('god', n + ' nouveaux citoyens arrivent avec ' + fmt$(money) + ' chacun.');
+    }
+
+    godRemoveCitizens(n) {
+      // départs : les sans-emploi d'abord ; leur argent quitte l'économie
+      const order = this.citizens.slice().sort((a, b) => (a.employer ? 1 : 0) - (b.employer ? 1 : 0));
+      let gone = 0, money = 0;
+      for (let i = 0; i < n && i < order.length; i++) {
+        const c = order[i];
+        if (this.firms.some(f => f.ownerId === c.id)) continue;
+        if (c.employer) this._fire(this.firm(c.employer), c);
+        money += c.money; this.ledger.god -= c.money; c.money = 0;
+        this.citizens = this.citizens.filter(x => x !== c);
+        this.cmap.delete(c.id);
+        gone++;
+      }
+      this._log('god', gone + ' citoyens quittent la région (emportant ' + fmt$(money) + ').');
+    }
+
+    godFirm(id, patch) {
+      const f = this.firm(id);
+      if (!f) return;
+      const notes = [];
+      if (patch.wage != null && isFinite(patch.wage)) { f.wage = Math.max(1, patch.wage); notes.push('salaire ' + fmt$(f.wage)); }
+      if (patch.lockWage != null) f.lockWage = !!patch.lockWage;
+      if (patch.price) for (const g in patch.price) if (isFinite(patch.price[g])) { f.price[g] = Math.max(0.01, patch.price[g]); notes.push('prix ' + GOODS[g].label.toLowerCase() + ' ' + fmt$(f.price[g])); }
+      if (patch.lockPrice != null) f.lockPrice = !!patch.lockPrice;
+      if (patch.prodMult != null && isFinite(patch.prodMult)) { f.prodMult = Math.max(0, patch.prodMult); notes.push('productivité ×' + f.prodMult.toFixed(2)); }
+      if (patch.capacity !== undefined) { f.capacity = patch.capacity == null ? null : Math.max(0, patch.capacity); notes.push('capacité ' + (f.capacity == null ? 'illimitée' : f.capacity)); }
+      if (notes.length) this._log('god', f.name + ' : ' + notes.join(', ') + '.');
+    }
+
+    setUBI(v) {
+      this.params.ubi = Math.max(0, v);
+      this._log('god', v > 0 ? 'Revenu de base divin : ' + fmt$(v) + '/jour par citoyen.' : 'Revenu de base divin arrêté.');
+    }
+
+    setTrade(on) {
+      this.params.trade = !!on;
+      this._log('god', on ? 'Frontières ouvertes : import/export aux prix mondiaux.' : 'Frontières fermées : économie autarcique.');
+    }
+
+    addFirm(type, name, money, ownerId, x, y) {
+      const f = this._newFirm(type, name, 0, ownerId != null ? ownerId : null, x, y);
+      if (f.ownerId == null && this.citizens.length) f.ownerId = this.citizens[Math.floor(this.rng() * this.citizens.length)].id;
+      f.money = money; this.ledger.god += money;
+      for (const g in f.recipe.outputs) {
+        const s = this.sellersOf(g).filter(o => o !== f);
+        f.demandEma[g] = s.length ? s.reduce((a, o) => a + (o.demandEma[g] || 0), 0) / (s.length + 1) : 1;
+        if (s.length) f.price[g] = Math.min(...s.map(o => o.price[g]));
+      }
+      f.vacancies = 2;
+      this._log('god', 'Nouvelle entreprise : ' + f.name + ' (' + TEMPLATES[type].label.toLowerCase() + ', capital ' + fmt$(money) + ').');
+      return f;
+    }
+
+    removeFirm(id) {
+      const f = this.firm(id);
+      if (!f) return;
+      for (const wid of f.workers.slice()) this._fire(f, this.citizen(wid));
+      const owner = f.ownerId != null ? this.citizen(f.ownerId) : null;
+      if (owner) this.transfer(f, owner, f.money);
+      else { this.ledger.god -= f.money; f.money = 0; }
+      this.firms = this.firms.filter(x => x !== f);
+      for (const k in this.flowsEma) if (this.flowsEma[k].from === id || this.flowsEma[k].to === id) delete this.flowsEma[k];
+      this._log('god', f.name + ' ferme ses portes. Les employés sont mis à pied.');
+    }
+
+    _targets(t) {
+      if (t.kind === 'allCitizens') return this.citizens;
+      if (t.kind === 'allFirms') return this.firms;
+      if (t.kind === 'citizen') return [this.citizen(t.id)].filter(Boolean);
+      if (t.kind === 'firm') return [this.firm(t.id)].filter(Boolean);
+      if (t.kind === 'unemployed') return this.citizens.filter(c => !c.employer);
+      if (t.kind === 'state') return [this.state];
+      return [];
+    }
+    _targetLabel(t) {
+      if (t.kind === 'allCitizens') return 'tous les citoyens';
+      if (t.kind === 'allFirms') return 'toutes les entreprises';
+      if (t.kind === 'unemployed') return 'les sans-emploi';
+      if (t.kind === 'state') return "l'État";
+      if (t.kind === 'citizen') { const c = this.citizen(t.id); return c ? c.name : '?'; }
+      if (t.kind === 'firm') { const f = this.firm(t.id); return f ? f.name : '?'; }
+      return '?';
+    }
+  }
+
+  function fmt$(v) {
+    return Math.round(v).toLocaleString('fr-CA') + ' $';
+  }
+  function round1(v) { return Math.round(v * 10) / 10; }
+
+  const api = { Sim, GOODS, TEMPLATES, DEFAULT_PARAMS, SCENARIO, fmt$ };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.EcoSim = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+(function () {
+'use strict';
+const { Sim, GOODS, TEMPLATES } = EcoSim;
+
+// ------------------------------------------------------------------ état UI
+const SECTOR_OF_GOOD = { viande: 'primaire', cuir: 'primaire', bois: 'primaire', minerai: 'primaire', planches: 'transfo', acier: 'transfo', boulons: 'transfo', repas: 'conso', souliers: 'conso', logement: 'conso', loisirs: 'conso' };
+const FINAL = ['repas', 'logement', 'souliers', 'loisirs'];
+let sim = new Sim({ seed: 42 });
+const ui = {
+  playing: true, speed: 4, acc: 0, last: performance.now(), lastRender: 0, lastSlow: 0,
+  sel: { kind: 'M' }, tab: 'inspect', showMoney: false,
+  view: { x: 0, y: 0, z: 1 }, fitted: false, inspectKey: '', confirmClose: false,
+};
+
+// ------------------------------------------------------------------ format
+const nf0 = new Intl.NumberFormat('fr-CA', { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat('fr-CA', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const nf2 = new Intl.NumberFormat('fr-CA', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+const money = v => (Math.abs(v) < 100 ? nf1.format(v) : nf0.format(v)) + ' $';
+const money0 = v => nf0.format(v) + ' $';
+const qty = v => (Math.abs(v) < 10 ? nf1.format(v) : nf0.format(v));
+const pct = v => nf1.format(v * 100) + ' %';
+const kmoney = v => Math.abs(v) >= 1e6 ? nf2.format(v / 1e6) + ' M$' : Math.abs(v) >= 1e4 ? nf1.format(v / 1e3) + ' k$' : money0(v);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = id => document.getElementById(id);
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// ------------------------------------------------------------------ boucle
+function frame(now) {
+  const dt = Math.min(0.25, (now - ui.last) / 1000);
+  ui.last = now;
+  if (ui.playing) {
+    ui.acc += dt * ui.speed;
+    let n = 0;
+    while (ui.acc >= 1 && n < 120) { sim.step(); ui.acc -= 1; n++; }
+  }
+  if (now - ui.lastRender > 140) { render(false); ui.lastRender = now; }
+  requestAnimationFrame(frame);
+}
+
+function render(force) {
+  renderTop();
+  renderGraph();
+  const now = performance.now();
+  if (force || now - ui.lastSlow > 400) {
+    ui.lastSlow = now;
+    if (ui.tab === 'inspect') updateInspector();
+    if (ui.tab === 'econ') renderCharts();
+    if (ui.tab === 'log') renderLog();
+    if (ui.tab === 'god') updateGodLedger();
+  }
+}
+
+// ------------------------------------------------------------------ cartouche + indicateurs
+function seriesOf(key, n) {
+  const h = sim.history;
+  const s = h.slice(Math.max(0, h.length - (n || 120)));
+  return s.map(typeof key === 'function' ? key : (x => x[key]));
+}
+function renderTop() {
+  const h = sim.history[sim.history.length - 1];
+  $('dayNum').textContent = String(sim.day).padStart(4, '0');
+  $('k-unemp').textContent = pct(h.unemp);
+  $('k-unemp-sub').textContent = Math.round(h.unemp * h.pop) + ' sur ' + h.pop + ' citoyens';
+  $('k-wage').textContent = money(h.wage);
+  $('k-wage-sub').textContent = 'net ' + money(h.wage * (1 - sim.params.taxRate)) + ' après impôt';
+  $('k-need').textContent = money(h.need || sim.bestPrice('repas') + sim.bestPrice('logement') + sim.bestPrice('souliers') / sim.params.shoeLife);
+  $('k-distress').textContent = h.hungry + ' · ' + h.homeless;
+  $('k-distress').style.color = (h.hungry + h.homeless) > 0 ? 'var(--bad)' : '';
+  $('k-distress-sub').textContent = h.hungry + h.homeless > 0 ? 'citoyens en détresse' : 'personne en détresse';
+  $('k-gini').textContent = nf2.format(h.gini);
+  $('k-gini-sub').textContent = h.gini < 0.3 ? 'faible' : h.gini < 0.5 ? 'modérée' : h.gini < 0.7 ? 'forte' : 'extrême';
+  $('k-money').textContent = kmoney(h.M);
+  $('k-money-sub').textContent = 'ménages ' + Math.round(h.mH / h.M * 100) + ' % · firmes ' + Math.round(h.mF / h.M * 100) + ' %';
+  spark($('s-unemp'), seriesOf('unemp'), css('--warn'));
+  spark($('s-wage'), seriesOf('wage'), css('--ink-2'));
+  spark($('s-need'), seriesOf('need'), css('--conso'));
+  spark($('s-distress'), seriesOf(x => x.hungry + x.homeless), css('--bad'));
+  spark($('s-gini'), seriesOf('gini'), css('--ink-2'));
+  spark($('s-money'), seriesOf('M'), css('--money'));
+  const drift = sim.totalMoney() - sim.expectedMoney();
+  const okM = Math.abs(drift) < 0.01;
+  $('integrity').innerHTML = (okM ? '<span class="chip ok">Monnaie conservée</span>' : '<span class="chip bad">Écart ' + money(drift) + '</span>');
+  $('btnPlay').textContent = ui.playing ? 'Pause' : 'Lecture';
+  for (const b of document.querySelectorAll('#speedSeg button')) b.setAttribute('aria-pressed', String(+b.dataset.speed === ui.speed));
+}
+
+function prepCanvas(c) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight;
+  if (!w || !h) return null;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+function spark(c, data, color) {
+  const p = prepCanvas(c);
+  if (!p || data.length < 2) return;
+  const { ctx, w, h } = p;
+  let mn = Math.min(...data), mx = Math.max(...data);
+  if (mx - mn < 1e-9) { mx += 1; mn -= 1; }
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = i / (data.length - 1) * (w - 4) + 1, y = h - 3 - (v - mn) / (mx - mn) * (h - 6);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.stroke();
+  const v = data[data.length - 1];
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(w - 3, h - 3 - (v - mn) / (mx - mn) * (h - 6), 2.2, 0, 7); ctx.fill();
+}
+
+// ------------------------------------------------------------------ graphe
+const nodeEls = new Map();
+function nodeList() {
+  const list = sim.firms.map(f => ({ key: String(f.id), kind: 'firm', f }));
+  list.push({ key: 'M', kind: 'M' }, { key: 'E', kind: 'E' });
+  const hasX = sim.params.trade || Object.values(sim.flowsEma).some(e => e.from === 'X' || e.to === 'X');
+  if (hasX) list.push({ key: 'X', kind: 'X' });
+  return list;
+}
+function posOf(key) {
+  if (key === 'M' || key === 'E' || key === 'X') return sim.nodePos[key];
+  return sim.firm(+key);
+}
+function isSelected(n) {
+  if (ui.sel.kind === 'firm') return n.kind === 'firm' && n.f.id === ui.sel.id;
+  if (ui.sel.kind === 'citizen') return n.kind === 'M';
+  return n.kind === ui.sel.kind;
+}
+
+function firmNodeHTML(f) {
+  const T = TEMPLATES[f.type];
+  const owner = f.ownerId != null ? sim.citizen(f.ownerId) : null;
+  let h = '<span class="grip tl"></span><span class="grip tr"></span><span class="grip bl"></span><span class="grip br"></span>';
+  h += '<div class="nh"><span class="code s-' + T.sector + '">' + T.code + '</span><div class="nt"><b>' + esc(f.name) + '</b><small>' + T.label + (owner ? ' · ' + esc(owner.name) : '') + '</small></div>';
+  h += '</div><div class="np">';
+  const ins = Object.keys(f.recipe.inputs);
+  for (const g of ins) {
+    h += '<div class="port in" data-port="in:' + g + '"><i class="dot-' + SECTOR_OF_GOOD[g] + '"></i><span>' + GOODS[g].label + '</span><em>' + qty(f.inv[g] || 0) + ' ' + GOODS[g].unit + '</em></div>';
+  }
+  if (ins.length) h += '<div class="sep"></div>';
+  for (const g in f.recipe.outputs) {
+    const stock = GOODS[g].perish ? (f.produced[g] ? qty(f.sold[g] || 0) + '/' + qty(f.produced[g]) : '0') : qty(f.inv[g] || 0);
+    h += '<div class="port out" data-port="out:' + g + '"><span>' + GOODS[g].label + ' <small style="color:var(--ink-3);font-weight:400">' + stock + '</small></span><em>' + money(f.price[g]) + '</em><i class="dot-' + SECTOR_OF_GOOD[g] + '"></i></div>';
+  }
+  h += '</div><div class="nf"><span class="cash" title="Caisse">' + kmoney(f.money) + '</span><span class="staff" title="Employés">' + f.workers.length + ' empl.</span>';
+  const chips = [];
+  let unmet = 0;
+  for (const g in f.recipe.outputs) unmet += sim.unmet[g] || 0;
+  if (f.workers.length === 0) chips.push('<span class="chip bad">à l\'arrêt</span>');
+  if (unmet > 0.5 && f.workers.length > 0) chips.push('<span class="chip warn">pénurie</span>');
+  if (f.inputLimited) chips.push('<span class="chip warn">manque d\'intrants</span>');
+  if (f.vacancies > 0) chips.push('<span class="chip info">embauche</span>');
+  if (f.profitEma < 0 && f.workers.length > 0) chips.push('<span class="chip mute">déficit</span>');
+  if (f.lockPrice || f.lockWage) chips.push('<span class="chip mute">verrou</span>');
+  h += chips.join('') + '</div>';
+  return h;
+}
+function menagesNodeHTML() {
+  const h = sim.history[sim.history.length - 1];
+  const bought = {};
+  for (const k in sim.flowsEma) { const e = sim.flowsEma[k]; if (e.to === 'M' && GOODS[e.good]) bought[e.good] = (bought[e.good] || 0) + e.qty; }
+  const med = median(sim.citizens.map(c => c.money));
+  let s = '<span class="grip tl"></span><span class="grip tr"></span><span class="grip bl"></span><span class="grip br"></span>';
+  s += '<div class="nh"><span class="code s-menages">MÉ</span><div class="nt"><b>Ménages</b><small>' + h.pop + ' citoyens</small></div><span class="staff" title="En emploi">' + Math.round(h.pop * (1 - h.unemp)) + '<small>/' + h.pop + '</small></span></div><div class="np">';
+  for (const g of FINAL) s += '<div class="port in" data-port="in:' + g + '"><i class="dot-conso"></i><span>' + GOODS[g].label + '</span><em>' + qty(bought[g] || 0) + '/j</em></div>';
+  s += '<div class="sep"></div>';
+  s += '<div class="stat"><span>Portefeuille médian</span><em>' + money0(med) + '</em></div>';
+  s += '<div class="stat"><span>Faim · sans-abri</span><em class="' + (h.hungry + h.homeless ? 'bad' : '') + '">' + h.hungry + ' · ' + h.homeless + '</em></div>';
+  s += '</div><div class="nf"><span class="cash">' + kmoney(h.mH) + '</span>' + (sim.params.ubi > 0 ? '<span class="chip warn">revenu divin</span>' : '') + '</div>';
+  return s;
+}
+function etatNodeHTML() {
+  const E = sim.state;
+  let s = '<span class="grip tl"></span><span class="grip tr"></span><span class="grip bl"></span><span class="grip br"></span>';
+  s += '<div class="nh"><span class="code s-etat">ÉT</span><div class="nt"><b>État</b><small>impôt ' + Math.round(sim.params.taxRate * 100) + ' % · prestation ' + money0(sim.params.benefit) + '</small></div></div><div class="np">';
+  s += '<div class="stat"><span>Impôts perçus / j</span><em>' + money0(E.taxesToday || 0) + '</em></div>';
+  s += '<div class="stat"><span>Versements / j</span><em>' + money0(E.paidToday || 0) + '</em></div>';
+  s += '</div><div class="nf"><span class="cash">' + kmoney(E.money) + '</span></div>';
+  return s;
+}
+function extNodeHTML() {
+  let imp = 0, exp = 0;
+  for (const k in sim.flowsEma) { const e = sim.flowsEma[k]; if (e.from === 'X') imp += e.value; if (e.to === 'X') exp += e.value; }
+  let s = '<span class="grip tl"></span><span class="grip tr"></span><span class="grip bl"></span><span class="grip br"></span>';
+  s += '<div class="nh"><span class="code s-ext">EX</span><div class="nt"><b>Extérieur</b><small>' + (sim.params.trade ? 'frontières ouvertes' : 'frontières fermées') + '</small></div></div><div class="np">';
+  s += '<div class="stat"><span>Importations / j</span><em>' + money0(imp) + '</em></div>';
+  s += '<div class="stat"><span>Exportations / j</span><em>' + money0(exp) + '</em></div>';
+  s += '</div><div class="nf"><span class="hint">Prix mondiaux fixes · import +' + Math.round((sim.params.importMarkup - 1) * 100) + ' %</span></div>';
+  return s;
+}
+function median(a) { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; }
+
+function renderGraph() {
+  const list = nodeList();
+  const keep = new Set(list.map(n => n.key));
+  for (const [k, el] of nodeEls) if (!keep.has(k)) { el.remove(); nodeEls.delete(k); }
+  const host = $('nodes');
+  for (const n of list) {
+    let el = nodeEls.get(n.key);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'node';
+      el.dataset.key = n.key;
+      el.tabIndex = 0;
+      host.appendChild(el);
+      nodeEls.set(n.key, el);
+    }
+    const p = posOf(n.key);
+    el.style.transform = 'translate(' + p.x + 'px,' + p.y + 'px)';
+    el.classList.toggle('sel', isSelected(n));
+    el.setAttribute('aria-label', n.kind === 'firm' ? n.f.name : n.kind === 'M' ? 'Ménages' : n.kind === 'E' ? 'État' : 'Extérieur');
+    el.innerHTML = n.kind === 'firm' ? firmNodeHTML(n.f) : n.kind === 'M' ? menagesNodeHTML() : n.kind === 'E' ? etatNodeHTML() : extNodeHTML();
+  }
+  if (!ui.fitted && list.length) { fitView(); ui.fitted = true; }
+  renderEdges();
+}
+
+function anchor(key, portId, side) {
+  const el = nodeEls.get(key);
+  if (!el) return null;
+  const p = posOf(key);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  if (portId) {
+    const port = el.querySelector('[data-port="' + portId + '"]');
+    if (port) return { x: p.x + (portId.startsWith('in:') ? 0 : w), y: p.y + port.offsetTop + port.offsetHeight / 2, nx: portId.startsWith('in:') ? -1 : 1, ny: 0 };
+  }
+  if (side === 'l') return { x: p.x, y: p.y + 18, nx: -1, ny: 0 };
+  if (side === 'r') return { x: p.x + w, y: p.y + 18, nx: 1, ny: 0 };
+  if (side === 't') return { x: p.x + w / 2, y: p.y, nx: 0, ny: -1 };
+  if (side === 'b') return { x: p.x + w / 2, y: p.y + h, nx: 0, ny: 1 };
+  return { x: p.x + w / 2, y: p.y + h / 2, nx: 0, ny: 0 };
+}
+function sidesBetween(a, b) {
+  const ea = nodeEls.get(a), eb = nodeEls.get(b);
+  const pa = posOf(a), pb = posOf(b);
+  const ca = { x: pa.x + ea.offsetWidth / 2, y: pa.y + ea.offsetHeight / 2 }, cb = { x: pb.x + eb.offsetWidth / 2, y: pb.y + eb.offsetHeight / 2 };
+  const dx = cb.x - ca.x, dy = cb.y - ca.y;
+  if (Math.abs(dx) > Math.abs(dy) * 0.8) return dx > 0 ? ['r', 'l'] : ['l', 'r'];
+  return dy > 0 ? ['b', 't'] : ['t', 'b'];
+}
+function keyOf(id) { return typeof id === 'number' ? String(id) : id; }
+
+function renderEdges() {
+  const flows = Object.values(sim.flowsEma).filter(e => e.value > 0.5 || e.qty > 0.05);
+  const goodsFlows = flows.filter(e => GOODS[e.good]);
+  const moneyFlows = flows.filter(e => !GOODS[e.good] && (ui.showMoney || e.from === 'E' || e.to === 'E'));
+  const maxV = Math.max(1, ...goodsFlows.map(e => e.value));
+  const maxM = Math.max(1, ...moneyFlows.map(e => e.value));
+  const selKey = ui.sel.kind === 'firm' ? String(ui.sel.id) : null;
+  let paths = '', labels = '';
+
+  // regrouper les flux d'argent par paire de nodes
+  const mAgg = {};
+  for (const e of moneyFlows) {
+    const k = keyOf(e.from) + '>' + keyOf(e.to);
+    const a = mAgg[k] || (mAgg[k] = { from: keyOf(e.from), to: keyOf(e.to), value: 0, kinds: new Set() });
+    a.value += e.value; a.kinds.add(e.good.slice(1));
+  }
+  for (const e of goodsFlows) {
+    const from = keyOf(e.from), to = keyOf(e.to);
+    if (!nodeEls.has(from) || !nodeEls.has(to)) continue;
+    const a = anchor(from, 'out:' + e.good, null) || null;
+    let b = anchor(to, 'in:' + e.good, null);
+    if (!a || !b) continue;
+    if (to === 'X') b = anchor(to, null, 'l');
+    const src = from === 'X' ? anchor(from, null, 'l') : a;
+    const dim = selKey && from !== selKey && to !== selKey ? ' dim' : '';
+    const sec = SECTOR_OF_GOOD[e.good];
+    const w = 1.6 + 6 * Math.sqrt(e.value / maxV);
+    const d = curve(src, b);
+    paths += '<path class="e flow c-' + sec + dim + '" d="' + d.d + '" stroke-width="' + w.toFixed(1) + '" marker-end="url(#ar-' + sec + ')"/>';
+    labels += '<text class="lbl' + dim + '" x="' + d.mx.toFixed(1) + '" y="' + (d.my - 5).toFixed(1) + '" text-anchor="middle">' + qty(e.qty) + ' ' + GOODS[e.good].unit + ' · ' + money0(e.value) + '</text>';
+  }
+  for (const k in mAgg) {
+    const m = mAgg[k];
+    if (!nodeEls.has(m.from) || !nodeEls.has(m.to) || m.from === m.to) continue;
+    const [sa, sb] = sidesBetween(m.from, m.to);
+    const a = anchor(m.from, null, sa), b = anchor(m.to, null, sb);
+    const back = mAgg[m.to + '>' + m.from];
+    const off = back ? (m.from < m.to ? 12 : -12) : 0; // décaler les flux aller-retour
+    const vertical = !(sa === 'l' || sa === 'r');
+    if (off) { if (!vertical) { a.y += off; b.y += off; } else { a.x += off; b.x += off; } }
+    const dim = selKey && m.from !== selKey && m.to !== selKey ? ' dim' : '';
+    const w = 1.2 + 4 * Math.sqrt(m.value / maxM);
+    const d = curve(a, b);
+    paths += '<path class="e money' + dim + '" d="' + d.d + '" stroke-width="' + w.toFixed(1) + '" marker-end="url(#ar-money)"/>';
+    if (!dim || m.from === 'E' || m.to === 'E') {
+      const lx = vertical && off ? d.mx + (off > 0 ? 8 : -8) : d.mx;
+      const anchorTxt = vertical && off ? (off > 0 ? 'start' : 'end') : 'middle';
+      const ly = vertical && off ? d.my + 4 : d.my - 5 + (off > 0 ? 16 : 0);
+      labels += '<text class="lbl money' + dim + '" x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="' + anchorTxt + '">' + [...m.kinds].join(', ') + ' · ' + money0(m.value) + '/j</text>';
+    }
+  }
+  $('edgeG').innerHTML = paths;
+  $('labelG').innerHTML = labels;
+}
+function curve(a, b) {
+  const dist = Math.hypot(b.x - a.x, b.y - a.y);
+  const k = Math.max(40, Math.min(220, dist * 0.45));
+  const c1 = { x: a.x + a.nx * k, y: a.y + a.ny * k }, c2 = { x: b.x + b.nx * k, y: b.y + b.ny * k };
+  const mx = 0.125 * a.x + 0.375 * c1.x + 0.375 * c2.x + 0.125 * b.x;
+  const my = 0.125 * a.y + 0.375 * c1.y + 0.375 * c2.y + 0.125 * b.y;
+  return { d: 'M' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + ' C' + c1.x.toFixed(1) + ' ' + c1.y.toFixed(1) + ' ' + c2.x.toFixed(1) + ' ' + c2.y.toFixed(1) + ' ' + b.x.toFixed(1) + ' ' + b.y.toFixed(1), mx, my };
+}
+
+// ---------- pan / zoom / drag
+function applyView() {
+  const v = ui.view;
+  $('world').style.transform = 'translate(' + v.x + 'px,' + v.y + 'px) scale(' + v.z + ')';
+  const g = $('graph');
+  const minor = 20 * v.z, major = 100 * v.z;
+  g.style.backgroundSize = major + 'px ' + major + 'px,' + major + 'px ' + major + 'px,' + minor + 'px ' + minor + 'px,' + minor + 'px ' + minor + 'px';
+  g.style.backgroundPosition = v.x + 'px ' + v.y + 'px';
+}
+function fitView() {
+  const g = $('graph');
+  const W = g.clientWidth, H = g.clientHeight;
+  if (!W || !H) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [k, el] of nodeEls) {
+    const p = posOf(k);
+    x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y);
+    x1 = Math.max(x1, p.x + el.offsetWidth); y1 = Math.max(y1, p.y + el.offsetHeight);
+  }
+  const pad = 40;
+  const z = Math.max(0.18, Math.min(1.25, Math.min((W - pad * 2) / (x1 - x0), (H - pad * 2 - 40) / (y1 - y0))));
+  ui.view = { z, x: (W - (x1 - x0) * z) / 2 - x0 * z, y: (H - (y1 - y0) * z) / 2 - y0 * z + 14 };
+  applyView();
+}
+function zoomAt(cx, cy, factor) {
+  const v = ui.view;
+  const z = Math.max(0.18, Math.min(2.5, v.z * factor));
+  const wx = (cx - v.x) / v.z, wy = (cy - v.y) / v.z;
+  ui.view = { z, x: cx - wx * z, y: cy - wy * z };
+  applyView();
+}
+(function bindGraph() {
+  const g = $('graph');
+  let drag = null;
+  g.addEventListener('pointerdown', ev => {
+    if (ev.target.closest('.gtools, .legend')) return;
+    const nodeEl = ev.target.closest('.node');
+    const r = g.getBoundingClientRect();
+    if (nodeEl) {
+      const p = posOf(nodeEl.dataset.key);
+      drag = { mode: 'node', key: nodeEl.dataset.key, sx: ev.clientX, sy: ev.clientY, ox: p.x, oy: p.y, moved: false };
+    } else {
+      drag = { mode: 'pan', sx: ev.clientX, sy: ev.clientY, ox: ui.view.x, oy: ui.view.y, moved: false };
+      g.classList.add('panning');
+    }
+    g.setPointerCapture(ev.pointerId);
+  });
+  g.addEventListener('pointermove', ev => {
+    if (!drag) return;
+    const dx = ev.clientX - drag.sx, dy = ev.clientY - drag.sy;
+    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    if (!drag.moved) return;
+    if (drag.mode === 'pan') { ui.view.x = drag.ox + dx; ui.view.y = drag.oy + dy; applyView(); }
+    else {
+      const p = posOf(drag.key);
+      p.x = Math.round((drag.ox + dx / ui.view.z) / 10) * 10;
+      p.y = Math.round((drag.oy + dy / ui.view.z) / 10) * 10;
+      const el = nodeEls.get(drag.key);
+      if (el) el.style.transform = 'translate(' + p.x + 'px,' + p.y + 'px)';
+      renderEdges();
+    }
+  });
+  const end = ev => {
+    if (!drag) return;
+    g.classList.remove('panning');
+    if (!drag.moved && drag.mode === 'node') selectKey(drag.key);
+    drag = null;
+  };
+  g.addEventListener('pointerup', end);
+  g.addEventListener('pointercancel', end);
+  g.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    const r = g.getBoundingClientRect();
+    zoomAt(ev.clientX - r.left, ev.clientY - r.top, Math.exp(-ev.deltaY * 0.0015));
+  }, { passive: false });
+  g.addEventListener('keydown', ev => {
+    const nodeEl = ev.target.closest && ev.target.closest('.node');
+    if (nodeEl && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); selectKey(nodeEl.dataset.key); }
+  });
+  $('zoomIn').onclick = () => zoomAt(g.clientWidth / 2, g.clientHeight / 2, 1.2);
+  $('zoomOut').onclick = () => zoomAt(g.clientWidth / 2, g.clientHeight / 2, 1 / 1.2);
+  $('zoomFit').onclick = fitView;
+  $('showMoney').onchange = e => { ui.showMoney = e.target.checked; renderEdges(); };
+  window.addEventListener('resize', () => { applyView(); });
+})();
+
+function selectKey(key) {
+  if (key === 'M' || key === 'E' || key === 'X') ui.sel = { kind: key };
+  else ui.sel = { kind: 'firm', id: +key };
+  ui.confirmClose = false;
+  setTab('inspect');
+  buildInspector();
+  render(true);
+}
+
+// ------------------------------------------------------------------ onglets
+function setTab(t) {
+  ui.tab = t;
+  for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t));
+  for (const id of ['inspect', 'god', 'econ', 'log', 'model']) $('tab-' + id).hidden = id !== t;
+  if (t === 'god') buildGod();
+  if (t === 'inspect') buildInspector();
+  render(true);
+}
+for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => setTab(b.dataset.tab);
+
+// ------------------------------------------------------------------ inspecteur
+function bind(root, vals) {
+  for (const el of root.querySelectorAll('[data-b]')) {
+    const v = vals[el.dataset.b];
+    if (v === undefined) continue;
+    if (typeof v === 'object' && v !== null) { el.innerHTML = v.html; if (v.cls != null) el.className = v.cls; }
+    else el.textContent = v;
+  }
+}
+function inspectorKey() { return ui.sel.kind + ':' + (ui.sel.id || '') + ':' + sim.firms.length; }
+
+function buildInspector() {
+  const root = $('tab-inspect');
+  const s = ui.sel;
+  ui.inspectKey = inspectorKey();
+  if (s.kind === 'firm') {
+    const f = sim.firm(s.id);
+    if (!f) { ui.sel = { kind: 'M' }; return buildInspector(); }
+    const T = TEMPLATES[f.type];
+    const outs = Object.keys(f.recipe.outputs), ins = Object.keys(f.recipe.inputs);
+    const recipe = (ins.length ? ins.map(g => f.recipe.inputs[g] + ' ' + GOODS[g].unit + ' ' + GOODS[g].label.toLowerCase()).join(' + ') + ' → ' : 'Main-d\'œuvre seule → ') + outs.map(g => f.recipe.outputs[g] + ' ' + GOODS[g].unit + ' ' + GOODS[g].label.toLowerCase()).join(' + ');
+    root.innerHTML =
+      '<h2>' + esc(f.name) + '</h2><div class="lead">' + T.label + ' · recette par lot : ' + esc(recipe) + ' · ' + f.recipe.rate + ' lot(s) par employé par jour' + (f.capacity != null ? ' · capacité ' + f.capacity + ' lots/j' : '') + '</div>' +
+      '<div class="grid2">' +
+      kv('Caisse', 'cash') + kv('Profit / jour (lissé)', 'profit') + kv('Employés', 'staff') + kv('Salaire / jour', 'wage') + kv('Propriétaire', 'owner') + kv('Dividendes / jour', 'div') +
+      '</div>' +
+      '<h3>Production et ventes</h3><table class="t"><thead><tr><th>Bien</th><th class="n">Stock</th><th class="n">Demande/j</th><th class="n">Coût</th><th class="n">Prix</th><th class="n">Marge</th></tr></thead><tbody data-b="outs"></tbody></table>' +
+      (ins.length ? '<h3>Intrants</h3><table class="t"><thead><tr><th>Bien</th><th class="n">Stock</th><th class="n">Prix marché</th><th class="n">Jours de stock</th></tr></thead><tbody data-b="ins"></tbody></table>' : '') +
+      '<h3>Historique (365 derniers jours)</h3><div class="chart"><canvas id="firmChart" style="height:110px"></canvas><div class="leg"><span><i style="background:var(--money)"></i>caisse</span><span><i style="background:var(--accent)"></i>employés</span><span><i style="background:var(--conso)"></i>prix ' + GOODS[outs[0]].label.toLowerCase() + '</span></div></div>' +
+      '<h3>Réglages de l\'entreprise</h3>' +
+      '<div class="field"><label for="fWage">Salaire quotidien</label><input type="number" id="fWage" min="1" step="5" value="' + Math.round(f.wage) + '"></div>' +
+      '<div class="field"><label><input type="checkbox" id="fLockWage"' + (f.lockWage ? ' checked' : '') + '> Verrouiller le salaire</label><span></span></div>' +
+      outs.map(g => '<div class="field"><label for="fPrice-' + g + '">Prix ' + GOODS[g].label.toLowerCase() + '</label><input type="number" id="fPrice-' + g + '" min="0.01" step="1" value="' + f.price[g].toFixed(1) + '"></div>').join('') +
+      '<div class="field"><label><input type="checkbox" id="fLockPrice"' + (f.lockPrice ? ' checked' : '') + '> Verrouiller les prix (le marché ne les ajuste plus)</label><span></span></div>' +
+      '<div class="field"><label for="fProd">Productivité</label><input type="range" id="fProd" min="0.25" max="3" step="0.05" value="' + f.prodMult + '"><output id="fProdOut">×' + nf2.format(f.prodMult) + '</output></div>' +
+      '<div class="field"><label for="fCap">Capacité max. (lots/j, vide = illimitée)</label><input type="number" id="fCap" min="0" step="5" value="' + (f.capacity != null ? f.capacity : '') + '"></div>' +
+      '<div class="row"><button class="btn" id="fApply" type="button">Appliquer</button><span class="hint" id="fMsg"></span></div>' +
+      '<div class="card god"><b>God mode sur cette entreprise</b>' +
+      '<div class="row"><input type="number" id="fGodAmt" value="10000" step="1000" aria-label="Montant"><button class="btn small" id="fGodIn" type="button">Injecter $</button><button class="btn small" id="fGodOut" type="button">Retirer $</button></div>' +
+      '<div class="row"><select id="fGodGood" aria-label="Bien">' + ins.concat(outs).map(g => '<option value="' + g + '">' + GOODS[g].label + '</option>').join('') + '</select><input type="number" id="fGodQty" value="100" step="10" aria-label="Quantité"><button class="btn small" id="fGodAdd" type="button">Ajouter au stock</button></div>' +
+      '<div class="row" id="closeRow"><button class="btn small danger" id="fClose" type="button">Fermer l\'entreprise…</button></div></div>' +
+      '<h3>Employés</h3><div data-b="workers" class="hint"></div>';
+    $('fProd').oninput = e => { $('fProdOut').textContent = '×' + nf2.format(+e.target.value); };
+    $('fApply').onclick = () => {
+      const patch = { wage: +$('fWage').value, lockWage: $('fLockWage').checked, lockPrice: $('fLockPrice').checked, prodMult: +$('fProd').value, price: {} };
+      for (const g of outs) {
+        const v = +$('fPrice-' + g).value;
+        if (Math.abs(v - f.price[g]) > 0.05) patch.price[g] = v;
+      }
+      if (Math.abs(patch.wage - f.wage) < 0.5) delete patch.wage;
+      if (Math.abs(patch.prodMult - f.prodMult) < 1e-6) delete patch.prodMult;
+      const cap = $('fCap').value.trim();
+      const newCap = cap === '' ? null : +cap;
+      if (newCap !== f.capacity) patch.capacity = newCap;
+      sim.godFirm(f.id, patch);
+      $('fMsg').textContent = 'Réglages appliqués au jour ' + sim.day + '.';
+      render(true);
+    };
+    $('fGodIn').onclick = () => { sim.godMoney({ kind: 'firm', id: f.id }, Math.abs(+$('fGodAmt').value)); render(true); };
+    $('fGodOut').onclick = () => { sim.godMoney({ kind: 'firm', id: f.id }, -Math.abs(+$('fGodAmt').value)); render(true); };
+    $('fGodAdd').onclick = () => { sim.godGoods(f.id, $('fGodGood').value, +$('fGodQty').value); render(true); };
+    $('fClose').onclick = () => {
+      $('closeRow').innerHTML = '<div class="confirm">Ses ' + f.workers.length + ' employés seront mis à pied et sa caisse ira au propriétaire. <button class="btn small danger" id="fCloseYes" type="button">Fermer</button><button class="btn small" id="fCloseNo" type="button">Annuler</button></div>';
+      $('fCloseYes').onclick = () => { sim.removeFirm(f.id); ui.sel = { kind: 'M' }; buildInspector(); render(true); };
+      $('fCloseNo').onclick = () => buildInspector();
+    };
+  } else if (s.kind === 'M') {
+    root.innerHTML =
+      '<h2>Ménages</h2><div class="lead">Chaque citoyen a un porte-monnaie. Chaque jour, il achète un repas, une nuitée de logement, remplace ses souliers usés, puis dépense une part de son épargne en loisirs, restos et souliers.</div>' +
+      '<div class="grid2">' + kv('Population', 'pop') + kv('En emploi', 'emp') + kv('Portefeuille médian', 'med') + kv('Portefeuille moyen', 'avg') + kv('Le plus riche', 'rich') + kv('Gini', 'gini') + kv('Ont faim', 'hungry') + kv('Sans-abri', 'homeless') + '</div>' +
+      '<h3>Répartition des portefeuilles</h3><div class="chart"><canvas id="histChart" style="height:100px"></canvas></div>' +
+      '<h3>Citoyens</h3><p class="hint">Cliquer un citoyen pour l\'inspecter et lui donner (ou reprendre) de l\'argent.</p>' +
+      '<div class="tscroll"><table class="t"><thead><tr><th>Nom</th><th>Emploi</th><th class="n">Revenu/j</th><th class="n">Portefeuille</th></tr></thead><tbody data-b="citizens"></tbody></table></div>';
+  } else if (s.kind === 'citizen') {
+    const c = sim.citizen(s.id);
+    if (!c) { ui.sel = { kind: 'M' }; return buildInspector(); }
+    root.innerHTML =
+      '<div class="row"><button class="btn small" id="backM" type="button">← Ménages</button></div>' +
+      '<h2>' + esc(c.name) + '</h2><div class="lead" data-b="status"></div>' +
+      '<div class="grid2">' + kv('Portefeuille', 'wallet') + kv('Revenu aujourd\'hui', 'income') + kv('Employeur', 'job') + kv('Salaire / jour', 'cwage') + kv('Dépenses aujourd\'hui', 'spend') + kv('Souliers (jours restants)', 'shoes') + '</div>' +
+      '<h3>Propriétés</h3><div data-b="owns" class="hint"></div>' +
+      '<div class="card god"><b>God mode sur ce citoyen</b><div class="row"><input type="number" id="cGodAmt" value="1000" step="100" aria-label="Montant"><button class="btn small" id="cGodIn" type="button">Donner $</button><button class="btn small" id="cGodOut" type="button">Reprendre $</button></div></div>';
+    $('backM').onclick = () => { ui.sel = { kind: 'M' }; buildInspector(); render(true); };
+    $('cGodIn').onclick = () => { sim.godMoney({ kind: 'citizen', id: c.id }, Math.abs(+$('cGodAmt').value)); render(true); };
+    $('cGodOut').onclick = () => { sim.godMoney({ kind: 'citizen', id: c.id }, -Math.abs(+$('cGodAmt').value)); render(true); };
+  } else if (s.kind === 'E') {
+    root.innerHTML =
+      '<h2>État</h2><div class="lead">Prélève l\'impôt à la source sur les salaires et les dividendes, verse l\'assurance-emploi aux sans-emploi et redistribue à parts égales ce qui dépasse sa réserve.</div>' +
+      '<div class="grid2">' + kv('Caisse', 'ecash') + kv('Réserve visée', 'ereserve') + kv('Impôts / jour', 'etax') + kv('Versements / jour', 'epaid') + kv('Impôts cumulés', 'etaxall') + kv('Versements cumulés', 'epaidall') + '</div>' +
+      '<p class="hint">Les taux se règlent dans l\'onglet God mode, section « Règles du jeu ».</p>' +
+      '<div class="row"><button class="btn" id="goGod" type="button">Ouvrir les règles du jeu</button></div>';
+    $('goGod').onclick = () => setTab('god');
+  } else if (s.kind === 'X') {
+    root.innerHTML = '<h2>Extérieur</h2><div class="lead">Le reste du monde vend et achète à prix fixes. Importer fait sortir de l\'argent de l\'économie locale ; exporter en fait entrer.</div>' +
+      '<div class="grid2">' + kv('Importations cumulées', 'ximp') + kv('Exportations cumulées', 'xexp') + '</div>' +
+      '<h3>Prix mondiaux</h3><table class="t"><thead><tr><th>Bien</th><th class="n">Prix mondial</th><th class="n">Import</th><th class="n">Export</th></tr></thead><tbody>' +
+      Object.keys(GOODS).filter(g => !GOODS[g].perish).map(g => '<tr><td>' + GOODS[g].label + '</td><td class="n">' + money(sim.worldPrice[g]) + '</td><td class="n">' + money(sim.worldPrice[g] * sim.params.importMarkup) + '</td><td class="n">' + money(sim.worldPrice[g] * sim.params.exportDiscount) + '</td></tr>').join('') + '</tbody></table>';
+  }
+  root.onclick = ev => {
+    const tr = ev.target.closest('tr[data-cid]');
+    if (tr) { ui.sel = { kind: 'citizen', id: +tr.dataset.cid }; buildInspector(); render(true); }
+    const fa = ev.target.closest('[data-fid]');
+    if (fa) { ev.preventDefault(); selectKey(fa.dataset.fid); }
+  };
+  updateInspector();
+}
+function kv(label, key) { return '<div class="kv"><small>' + label + '</small><b data-b="' + key + '">—</b></div>'; }
+
+function updateInspector() {
+  if (ui.inspectKey !== inspectorKey()) return buildInspector();
+  const root = $('tab-inspect');
+  const s = ui.sel;
+  if (s.kind === 'firm') {
+    const f = sim.firm(s.id);
+    if (!f) return buildInspector();
+    const owner = f.ownerId != null ? sim.citizen(f.ownerId) : null;
+    const cost = f.unitCostCache || sim.unitCost(f);
+    const outs = Object.keys(f.recipe.outputs), ins = Object.keys(f.recipe.inputs);
+    const used = {};
+    for (const g of ins) used[g] = (f.lastBatches || 0) * f.recipe.inputs[g];
+    bind(root, {
+      cash: money0(f.money),
+      profit: { html: money(f.profitEma), cls: f.profitEma < 0 ? 'bad' : 'ok' },
+      staff: f.workers.length + (f.vacancies ? ' (+' + f.vacancies + ' postes)' : ''),
+      wage: money(f.wage),
+      owner: { html: owner ? '<a href="#" data-cid-link="' + owner.id + '">' + esc(owner.name) + '</a>' : '—' },
+      div: money(f.dividends || 0),
+      outs: { html: outs.map(g => '<tr><td>' + GOODS[g].label + '</td><td class="n">' + (GOODS[g].perish ? '—' : qty(f.inv[g] || 0)) + '</td><td class="n">' + qty(f.demandEma[g] || 0) + '</td><td class="n">' + money(cost[g] || 0) + '</td><td class="n">' + money(f.price[g]) + '</td><td class="n">' + Math.round(((f.price[g] / Math.max(cost[g], 1e-6)) - 1) * 100) + ' %</td></tr>').join('') },
+      ins: { html: ins.map(g => '<tr><td>' + GOODS[g].label + '</td><td class="n">' + qty(f.inv[g] || 0) + '</td><td class="n">' + money(sim.bestPrice(g)) + '</td><td class="n">' + (used[g] > 1e-6 ? nf1.format((f.inv[g] || 0) / used[g]) : '—') + '</td></tr>').join('') },
+      workers: { html: f.workers.length ? f.workers.map(id => { const c = sim.citizen(id); return c ? esc(c.name) : ''; }).join(', ') : 'Aucun employé.' },
+    });
+    const ownerLink = root.querySelector('[data-cid-link]');
+    if (ownerLink) ownerLink.onclick = ev => { ev.preventDefault(); ui.sel = { kind: 'citizen', id: +ownerLink.dataset.cidLink }; buildInspector(); render(true); };
+    drawFirmChart(f);
+  } else if (s.kind === 'M') {
+    const cs = sim.citizens;
+    const h = sim.history[sim.history.length - 1];
+    const wal = cs.map(c => c.money);
+    const rich = cs.reduce((a, c) => (c.money > a.money ? c : a), cs[0]);
+    bind(root, {
+      pop: String(cs.length), emp: cs.filter(c => c.employer).length + ' (' + pct(1 - h.unemp) + ')',
+      med: money0(median(wal)), avg: money0(wal.reduce((a, b) => a + b, 0) / Math.max(1, cs.length)),
+      rich: rich ? money0(rich.money) : '—', gini: nf2.format(h.gini),
+      hungry: { html: String(h.hungry), cls: h.hungry ? 'bad' : '' }, homeless: { html: String(h.homeless), cls: h.homeless ? 'bad' : '' },
+      citizens: { html: cs.slice().sort((a, b) => b.money - a.money).map(c => {
+        const f = c.employer ? sim.firm(c.employer) : null;
+        const flags = (c.hunger >= 1 ? '<span class="pill" style="color:var(--bad)">faim</span>' : '') + (c.homeless ? '<span class="pill" style="color:var(--bad)">sans-abri</span>' : '') + (sim.firms.some(x => x.ownerId === c.id) ? '<span class="pill" style="color:var(--accent)">proprio</span>' : '');
+        return '<tr class="click" data-cid="' + c.id + '"><td>' + esc(c.name) + ' ' + flags + '</td><td>' + (f ? esc(f.name) : '<span style="color:var(--ink-3)">sans emploi</span>') + '</td><td class="n">' + money0(c.income) + '</td><td class="n">' + money0(c.money) + '</td></tr>';
+      }).join('') },
+    });
+    drawHist(wal);
+  } else if (s.kind === 'citizen') {
+    const c = sim.citizen(s.id);
+    if (!c) return buildInspector();
+    const f = c.employer ? sim.firm(c.employer) : null;
+    const owns = sim.firms.filter(x => x.ownerId === c.id);
+    const st = [];
+    st.push(f ? 'Travaille chez ' + esc(f.name) : 'Sans emploi depuis ' + c.daysUnemployed + ' jour(s)');
+    if (c.hunger >= 1) st.push('<b style="color:var(--bad)">a faim (' + c.hunger + ' j)</b>');
+    if (c.homeless) st.push('<b style="color:var(--bad)">sans-abri</b>');
+    if (c.shoes <= 0) st.push('pieds nus');
+    bind(root, {
+      status: { html: st.join(' · ') },
+      wallet: money0(c.money), income: money(c.income), job: { html: f ? '<a href="#" data-fid="' + f.id + '">' + esc(f.name) + '</a>' : 'aucun' },
+      cwage: f ? money(f.wage) : '—', spend: money(c.spend), shoes: String(Math.max(0, c.shoes)),
+      owns: { html: owns.length ? owns.map(x => '<a href="#" data-fid="' + x.id + '">' + esc(x.name) + '</a>').join(', ') : 'Aucune entreprise.' },
+    });
+  } else if (s.kind === 'E') {
+    const E = sim.state;
+    bind(root, {
+      ecash: money0(E.money), ereserve: money0(30 * sim.params.benefit * Math.max(4, sim.citizens.length * 0.1)),
+      etax: money0(E.taxesToday || 0), epaid: money0(E.paidToday || 0), etaxall: kmoney(E.taxes), epaidall: kmoney(E.paid),
+    });
+  } else if (s.kind === 'X') {
+    bind(root, { ximp: kmoney(sim.ledger.imports), xexp: kmoney(sim.ledger.exports) });
+  }
+}
+
+function drawFirmChart(f) {
+  const c = $('firmChart');
+  if (!c) return;
+  const p = prepCanvas(c);
+  if (!p) return;
+  const { ctx, w, h } = p;
+  const H = f.hist;
+  if (H.length < 2) return;
+  ctx.strokeStyle = css('--rule-2'); ctx.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) { const y = 6 + i * (h - 12) / 3; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+  const line = (vals, color, wdt) => {
+    let mn = Math.min(...vals), mx = Math.max(...vals);
+    if (mx - mn < 1e-9) { mx += 1; mn = Math.max(0, mn - 1); }
+    ctx.beginPath();
+    vals.forEach((v, i) => { const x = i / (vals.length - 1) * w, y = h - 6 - (v - mn) / (mx - mn) * (h - 12); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.strokeStyle = color; ctx.lineWidth = wdt; ctx.stroke();
+  };
+  line(H.map(x => x.money), css('--money'), 1.6);
+  line(H.map(x => x.workers), css('--accent'), 1.4);
+  line(H.map(x => x.price), css('--conso'), 1.2);
+}
+function drawHist(vals) {
+  const c = $('histChart');
+  if (!c) return;
+  const p = prepCanvas(c);
+  if (!p || !vals.length) return;
+  const { ctx, w, h } = p;
+  const mx = Math.max(1, ...vals);
+  const bins = 16, counts = new Array(bins).fill(0);
+  for (const v of vals) counts[Math.min(bins - 1, Math.floor(Math.max(0, v) / mx * bins))]++;
+  const cm = Math.max(...counts);
+  const bw = w / bins;
+  ctx.fillStyle = css('--accent');
+  counts.forEach((n, i) => { const bh = n / cm * (h - 18); ctx.fillRect(i * bw + 1, h - 14 - bh, bw - 2, bh); });
+  ctx.fillStyle = css('--ink-3'); ctx.font = '10px ' + css('--f-mono');
+  ctx.textAlign = 'left'; ctx.fillText('0 $', 0, h - 2);
+  ctx.textAlign = 'right'; ctx.fillText(money0(mx), w, h - 2);
+}
+
+// ------------------------------------------------------------------ god mode
+function firmOptions() { return sim.firms.map(f => '<option value="' + f.id + '">' + esc(f.name) + '</option>').join(''); }
+function goodOptions(list) { return (list || Object.keys(GOODS)).map(g => '<option value="' + g + '">' + GOODS[g].label + '</option>').join(''); }
+
+function buildGod() {
+  const P = sim.params;
+  const root = $('tab-god');
+  const keep = {};
+  for (const el of root.querySelectorAll('input, select')) keep[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+  const selCit = ui.sel.kind === 'citizen' ? sim.citizen(ui.sel.id) : null;
+  root.innerHTML =
+    '<h2>God mode</h2><div class="lead">Tout ce qui se fait ici est noté au journal. L\'argent créé ou détruit est comptabilisé au grand livre, pour que l\'écart de masse monétaire reste explicable.</div>' +
+
+    '<div class="card god"><b>Créer ou détruire de l\'argent</b>' +
+    '<div class="row"><select id="gTarget" aria-label="Destinataire"><option value="allCitizens">Chaque citoyen</option><option value="unemployed">Chaque sans-emploi</option><option value="allFirms">Chaque entreprise</option><option value="state">L\'État</option>' +
+    (selCit ? '<option value="citizen:' + selCit.id + '">' + esc(selCit.name) + '</option>' : '') +
+    '<optgroup label="Une entreprise">' + sim.firms.map(f => '<option value="firm:' + f.id + '">' + esc(f.name) + '</option>').join('') + '</optgroup></select></div>' +
+    '<div class="row"><input type="number" id="gAmt" value="1000" min="0" step="100" aria-label="Montant par destinataire"><button class="btn small" data-amt="100" type="button">100</button><button class="btn small" data-amt="1000" type="button">1 000</button><button class="btn small" data-amt="10000" type="button">10 000</button></div>' +
+    '<div class="row"><button class="btn primary" id="gIn" type="button">Injecter</button><button class="btn" id="gOut" type="button">Retirer</button><span class="hint" id="gMsg"></span></div>' +
+    '<p class="hint">Montant par destinataire. Un retrait ne prend jamais plus que ce que la cible possède.</p></div>' +
+
+    '<div class="card god"><b>Revenu de base divin</b><p class="hint">Argent créé chaque jour et versé à chaque citoyen, sans contrepartie.</p>' +
+    '<div class="row"><input type="number" id="gUbi" min="0" step="10" value="' + P.ubi + '" aria-label="Montant quotidien par citoyen"><span class="hint">$ / jour / citoyen</span><button class="btn small" id="gUbiSet" type="button">Appliquer</button></div></div>' +
+
+    '<div class="card god"><b>Matières</b>' +
+    '<div class="row"><select id="gGFirm" aria-label="Entreprise">' + firmOptions() + '</select></div>' +
+    '<div class="row"><select id="gGGood" aria-label="Bien"></select><input type="number" id="gGQty" value="100" step="10" aria-label="Quantité"></div>' +
+    '<div class="row"><button class="btn primary" id="gGAdd" type="button">Ajouter au stock</button><button class="btn" id="gGRem" type="button">Retirer du stock</button></div></div>' +
+
+    '<div class="card god"><b>Catastrophe</b>' +
+    '<div class="row"><select id="gDGood" aria-label="Bien à détruire">' + goodOptions(Object.keys(GOODS).filter(g => !GOODS[g].perish)) + '</select></div>' +
+    '<div class="field"><label for="gDPct">Part des stocks détruite</label><input type="range" id="gDPct" min="10" max="100" step="10" value="50"><output id="gDPctOut">50 %</output></div>' +
+    '<div class="row"><button class="btn danger" id="gDGo" type="button">Détruire</button></div></div>' +
+
+    '<div class="card god"><b>Population</b>' +
+    '<div class="row"><input type="number" id="gPopN" value="10" min="1" step="1" aria-label="Nombre de personnes"><span class="hint">personnes, avec</span><input type="number" id="gPopM" value="1000" min="0" step="100" aria-label="Argent par personne"><span class="hint">$ chacune</span></div>' +
+    '<div class="row"><button class="btn primary" id="gPopAdd" type="button">Faire arriver</button><button class="btn" id="gPopRem" type="button">Faire partir</button></div>' +
+    '<p class="hint">Les départs touchent d\'abord les sans-emploi ; leur argent quitte l\'économie. Le parc de logements ne grandit pas tout seul : augmente la capacité de Gestion Bédard dans l\'inspecteur.</p></div>' +
+
+    '<div class="card god"><b>Nouvelle entreprise</b>' +
+    '<div class="row"><select id="gNType" aria-label="Type">' + Object.keys(TEMPLATES).map(t => '<option value="' + t + '">' + TEMPLATES[t].label + '</option>').join('') + '</select></div>' +
+    '<div class="row"><input type="text" id="gNName" placeholder="Nom (facultatif)" aria-label="Nom"><input type="number" id="gNCap" value="20000" step="1000" aria-label="Capital de départ"></div>' +
+    '<div class="row"><button class="btn primary" id="gNGo" type="button">Créer</button><span class="hint">capital créé par god mode</span></div></div>' +
+
+    '<h3>Règles du jeu</h3>' +
+    rng('pTax', 'Impôt sur le revenu', 0, 60, 1, Math.round(P.taxRate * 100), ' %') +
+    num('pBen', 'Prestation de chômage ($/jour)', P.benefit, 10) +
+    num('pMin', 'Salaire minimum ($/jour, 0 = aucun)', P.minWage, 10) +
+    rng('pRebate', 'Redistribution du surplus de l\'État (%/jour)', 0, 20, 1, Math.round(P.stateRebate * 100), ' %') +
+    rng('pMarkup', 'Marge normale des entreprises', 0, 100, 1, Math.round((P.markup - 1) * 100), ' %') +
+    rng('pProp', 'Part de l\'épargne dépensée par jour', 0, 20, 0.5, P.propensity * 100, ' %') +
+    rng('pShoe', 'Durée de vie des souliers (jours)', 5, 120, 5, P.shoeLife, ' j') +
+    '<div class="field"><label><input type="checkbox" id="pTrade"' + (P.trade ? ' checked' : '') + '> Frontières ouvertes (import/export aux prix mondiaux)</label><span></span></div>' +
+    '<div class="field"><label><input type="checkbox" id="pRecap"' + (P.recapitalize ? ' checked' : '') + '> Les propriétaires renflouent leurs entreprises</label><span></span></div>' +
+
+    '<h3>Grand livre de la monnaie</h3><table class="ledger" id="ledger"></table>' +
+    '<h3>Recommencer</h3><div class="row"><input type="number" id="gSeed" value="' + sim.seed + '" step="1" aria-label="Graine aléatoire"><button class="btn" id="gReset" type="button">Nouvelle partie avec cette graine</button></div>';
+
+  for (const id in keep) { const el = $(id); if (el && id !== 'gUbi' && !id.startsWith('p')) { if (el.type === 'checkbox') el.checked = keep[id]; else el.value = keep[id]; } }
+
+  const syncGoods = () => {
+    const f = sim.firm(+$('gGFirm').value);
+    const list = f ? Object.keys(f.recipe.inputs).concat(Object.keys(f.recipe.outputs)).filter(g => !GOODS[g].perish) : [];
+    const prev = $('gGGood').value;
+    $('gGGood').innerHTML = list.length ? goodOptions(list) : '<option value="">(aucun bien stockable)</option>';
+    if (list.includes(prev)) $('gGGood').value = prev;
+  };
+  syncGoods();
+  $('gGFirm').onchange = syncGoods;
+  for (const b of root.querySelectorAll('[data-amt]')) b.onclick = () => { $('gAmt').value = b.dataset.amt; };
+  const target = () => {
+    const v = $('gTarget').value;
+    if (v.startsWith('firm:')) return { kind: 'firm', id: +v.slice(5) };
+    if (v.startsWith('citizen:')) return { kind: 'citizen', id: +v.slice(8) };
+    return { kind: v };
+  };
+  $('gIn').onclick = () => { const t = sim.godMoney(target(), Math.abs(+$('gAmt').value)); $('gMsg').textContent = money0(t) + ' créés.'; render(true); };
+  $('gOut').onclick = () => { const t = sim.godMoney(target(), -Math.abs(+$('gAmt').value)); $('gMsg').textContent = money0(-t) + ' détruits.'; render(true); };
+  $('gUbiSet').onclick = () => { sim.setUBI(+$('gUbi').value); render(true); };
+  $('gGAdd').onclick = () => { if ($('gGGood').value) sim.godGoods(+$('gGFirm').value, $('gGGood').value, Math.abs(+$('gGQty').value)); render(true); };
+  $('gGRem').onclick = () => { if ($('gGGood').value) sim.godGoods(+$('gGFirm').value, $('gGGood').value, -Math.abs(+$('gGQty').value)); render(true); };
+  $('gDPct').oninput = e => { $('gDPctOut').textContent = e.target.value + ' %'; };
+  $('gDGo').onclick = () => { sim.godDestroy($('gDGood').value, +$('gDPct').value / 100); render(true); };
+  $('gPopAdd').onclick = () => { sim.godAddCitizens(Math.max(1, Math.round(+$('gPopN').value)), Math.max(0, +$('gPopM').value)); render(true); };
+  $('gPopRem').onclick = () => { sim.godRemoveCitizens(Math.max(1, Math.round(+$('gPopN').value))); render(true); };
+  $('gNGo').onclick = () => {
+    const type = $('gNType').value;
+    const sameType = sim.firms.filter(f => f.type === type);
+    const base = sameType.length ? sameType[sameType.length - 1] : { x: 600, y: 300 };
+    const name = $('gNName').value.trim() || TEMPLATES[type].label + ' ' + ['Nouvelle-Vague', 'du Lac', 'Boréale', 'Nordique', 'Coop', 'Express'][sim.firms.length % 6];
+    const f = sim.addFirm(type, name, Math.max(0, +$('gNCap').value), null, base.x + 30, base.y + 230);
+    $('gNName').value = '';
+    buildGod();
+    ui.sel = { kind: 'firm', id: f.id };
+    render(true);
+  };
+  const onP = (id, fn, out, suffix) => {
+    const el = $(id);
+    el.oninput = () => { if (out) $(id + 'Out').textContent = el.value + suffix; fn(el); };
+    el.onchange = () => { fn(el); render(true); };
+  };
+  onP('pTax', el => { P.taxRate = +el.value / 100; }, true, ' %');
+  onP('pBen', el => { P.benefit = Math.max(0, +el.value); });
+  onP('pMin', el => { P.minWage = Math.max(0, +el.value); });
+  onP('pRebate', el => { P.stateRebate = +el.value / 100; }, true, ' %');
+  onP('pMarkup', el => { P.markup = 1 + +el.value / 100; }, true, ' %');
+  onP('pProp', el => { P.propensity = +el.value / 100; }, true, ' %');
+  onP('pShoe', el => { P.shoeLife = +el.value; }, true, ' j');
+  $('pTrade').onchange = e => { sim.setTrade(e.target.checked); render(true); };
+  $('pRecap').onchange = e => { P.recapitalize = e.target.checked; };
+  $('gReset').onclick = () => newGame(Math.round(+$('gSeed').value) || 1);
+  updateGodLedger();
+}
+function rng(id, label, min, max, step, val, suffix) {
+  return '<div class="field"><label for="' + id + '">' + label + '</label><input type="range" id="' + id + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '"><output id="' + id + 'Out">' + val + suffix + '</output></div>';
+}
+function num(id, label, val, step) {
+  return '<div class="field"><label for="' + id + '">' + label + '</label><input type="number" id="' + id + '" min="0" step="' + step + '" value="' + val + '"></div>';
+}
+function updateGodLedger() {
+  const t = $('ledger');
+  if (!t) return;
+  const L = sim.ledger;
+  const real = sim.totalMoney(), exp = sim.expectedMoney();
+  const drift = real - exp;
+  t.innerHTML =
+    '<tr><td>Masse de départ</td><td>' + money0(sim.M0) + '</td></tr>' +
+    '<tr><td>+ Créé (− détruit) par god mode</td><td>' + money0(L.god) + '</td></tr>' +
+    '<tr><td>+ Exportations</td><td>' + money0(L.exports) + '</td></tr>' +
+    '<tr><td>− Importations</td><td>' + money0(L.imports) + '</td></tr>' +
+    '<tr class="total"><td>Masse attendue</td><td>' + money0(exp) + '</td></tr>' +
+    '<tr><td>Masse réelle (ménages + firmes + État)</td><td>' + money0(real) + '</td></tr>' +
+    '<tr><td>Écart</td><td style="color:' + (Math.abs(drift) < 0.01 ? 'var(--ok)' : 'var(--bad)') + '">' + nf2.format(drift) + ' $</td></tr>';
+}
+
+// ------------------------------------------------------------------ économie (graphiques)
+const CHARTS = [
+  { id: 'cUnemp', title: 'Chômage', unit: '%', series: () => [{ label: 'chômage', color: '--warn', data: seriesOf(x => x.unemp * 100, 2000) }] },
+  { id: 'cWage', title: 'Salaire moyen et panier de base', unit: '$ / jour', series: () => [
+    { label: 'salaire brut', color: '--ink-2', data: seriesOf('wage', 2000) },
+    { label: 'salaire net', color: '--accent', data: seriesOf(x => x.wage * (1 - sim.params.taxRate), 2000) },
+    { label: 'panier de base', color: '--conso', data: seriesOf('need', 2000) }] },
+  { id: 'cPrice', title: 'Prix des biens de consommation', unit: '$', series: () => [
+    { label: 'repas', color: '--conso', data: seriesOf(x => x.prices.repas, 2000) },
+    { label: 'logement (nuitée)', color: '--transfo', data: seriesOf(x => x.prices.logement, 2000) },
+    { label: 'loisirs (sortie)', color: '--primaire', data: seriesOf(x => x.prices.loisirs, 2000) }] },
+  { id: 'cMoney', title: 'Où est l\'argent', unit: '$', stacked: true, series: () => [
+    { label: 'ménages', color: '--accent', data: seriesOf('mH', 2000) },
+    { label: 'entreprises', color: '--primaire', data: seriesOf('mF', 2000) },
+    { label: 'État', color: '--money', data: seriesOf('mE', 2000) }] },
+  { id: 'cDistress', title: 'Détresse', unit: 'citoyens', series: () => [
+    { label: 'ont faim', color: '--bad', data: seriesOf('hungry', 2000) },
+    { label: 'sans-abri', color: '--warn', data: seriesOf('homeless', 2000) }] },
+  { id: 'cGdp', title: 'Dépenses des ménages', unit: '$ / jour', series: () => [{ label: 'dépenses', color: '--ink-2', data: seriesOf('gdp', 2000) }] },
+  { id: 'cGini', title: 'Inégalité des portefeuilles (Gini)', unit: '0 à 1', series: () => [{ label: 'Gini', color: '--ink-2', data: seriesOf('gini', 2000) }] },
+];
+function buildEcon() {
+  $('tab-econ').innerHTML = '<h2>Économie</h2><div class="lead">Séries quotidiennes depuis le début de la partie (1 500 derniers jours au plus).</div>' +
+    '<h3>Marchés aujourd\'hui</h3><div style="overflow-x:auto"><table class="t"><thead><tr><th>Bien</th><th class="n">Échangé/j</th><th class="n">Prix moyen</th><th class="n">Non servi</th><th class="n">Vendeurs</th></tr></thead><tbody id="mkt"></tbody></table></div>' +
+    '<p class="hint">« Non servi » : quantité que des acheteurs solvables voulaient mais qu\'aucun vendeur n\'avait en stock. C\'est ce signal qui fait monter les marges.</p>' +
+    '<h3>Séries</h3><div class="charts">' +
+    CHARTS.map(c => '<div class="chart"><header><b>' + c.title + '</b><span>' + c.unit + '</span></header><canvas id="' + c.id + '"></canvas><div class="leg" id="' + c.id + 'Leg"></div></div>').join('') + '</div>';
+}
+function renderCharts() {
+  if (!$('cUnemp')) buildEcon();
+  const agg = {};
+  for (const k in sim.flowsEma) { const e = sim.flowsEma[k]; if (!GOODS[e.good]) continue; const a = agg[e.good] || (agg[e.good] = { q: 0, v: 0 }); a.q += e.qty; a.v += e.value; }
+  $('mkt').innerHTML = Object.keys(GOODS).map(g => {
+    const a = agg[g] || { q: 0, v: 0 }, um = sim.unmet[g] || 0;
+    return '<tr><td style="white-space:nowrap"><i class="mdot dot-' + SECTOR_OF_GOOD[g] + '"></i>' + GOODS[g].label + '</td><td class="n">' + qty(a.q) + ' <small style="color:var(--ink-3)">' + GOODS[g].unit + '</small></td><td class="n">' + (a.q > 1e-6 ? money(a.v / a.q) : '—') + '</td><td class="n"' + (um > 0.5 ? ' style="color:var(--bad);font-weight:700"' : '') + '>' + (um > 0.05 ? qty(um) : '0') + '</td><td class="n">' + sim.sellersOf(g).length + '</td></tr>';
+  }).join('');
+  const days = seriesOf('day', 2000);
+  for (const c of CHARTS) drawChart($(c.id), c.series(), days, c.stacked);
+  for (const c of CHARTS) {
+    const ser = c.series();
+    $(c.id + 'Leg').innerHTML = ser.map(s => '<span><i style="background:var(' + s.color + ')"></i>' + s.label + ' <b class="mono">' + fmtAxis(s.data[s.data.length - 1]) + '</b></span>').join('');
+  }
+}
+function fmtAxis(v) {
+  if (v == null || !isFinite(v)) return '—';
+  const a = Math.abs(v);
+  if (a >= 1e6) return nf1.format(v / 1e6) + ' M';
+  if (a >= 1e4) return nf0.format(v / 1e3) + ' k';
+  if (a >= 100) return nf0.format(v);
+  if (a >= 10) return nf1.format(v);
+  return nf2.format(v);
+}
+function niceStep(range, n) {
+  const raw = range / n, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const m = raw / p;
+  return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p;
+}
+function drawChart(canvas, series, days, stacked) {
+  const p = prepCanvas(canvas);
+  if (!p) return;
+  const { ctx, w, h } = p;
+  const n = days.length;
+  if (n < 2) return;
+  let tops = series.map(s => s.data.slice());
+  if (stacked) for (let i = 1; i < tops.length; i++) tops[i] = tops[i].map((v, k) => v + tops[i - 1][k]);
+  let mx = 0, mn = 0;
+  for (const s of tops) for (const v of s) { if (v > mx) mx = v; if (v < mn) mn = v; }
+  if (mx - mn < 1e-9) mx = mn + 1;
+  const step = niceStep(mx - mn, 3);
+  mx = Math.ceil(mx / step) * step;
+  const L = 44, R = 8, T = 6, B = 18;
+  const X = i => L + i / (n - 1) * (w - L - R);
+  const Y = v => T + (1 - (v - mn) / (mx - mn)) * (h - T - B);
+  ctx.font = '10px ' + css('--f-mono');
+  ctx.strokeStyle = css('--rule-2'); ctx.fillStyle = css('--ink-3'); ctx.lineWidth = 1;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let v = mn; v <= mx + 1e-9; v += step) {
+    const y = Math.round(Y(v)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke();
+    ctx.fillText(fmtAxis(v), L - 5, y);
+  }
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left'; ctx.fillText('j' + days[0], L, h - 4);
+  ctx.textAlign = 'right'; ctx.fillText('j' + days[n - 1], w - R, h - 4);
+  if (stacked) {
+    for (let i = tops.length - 1; i >= 0; i--) {
+      const col = css(series[i].color);
+      ctx.beginPath();
+      tops[i].forEach((v, k) => (k ? ctx.lineTo(X(k), Y(v)) : ctx.moveTo(X(k), Y(v))));
+      if (i > 0) for (let k = n - 1; k >= 0; k--) ctx.lineTo(X(k), Y(tops[i - 1][k]));
+      else { ctx.lineTo(X(n - 1), Y(0)); ctx.lineTo(X(0), Y(0)); }
+      ctx.closePath();
+      ctx.globalAlpha = 0.28; ctx.fillStyle = col; ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      tops[i].forEach((v, k) => (k ? ctx.lineTo(X(k), Y(v)) : ctx.moveTo(X(k), Y(v))));
+      ctx.strokeStyle = col; ctx.lineWidth = 1.4; ctx.stroke();
+    }
+  } else {
+    series.forEach((s, si) => {
+      const col = css(s.color);
+      ctx.beginPath();
+      s.data.forEach((v, k) => (k ? ctx.lineTo(X(k), Y(v)) : ctx.moveTo(X(k), Y(v))));
+      if (si === 0 && series.length === 1) {
+        ctx.lineTo(X(n - 1), Y(mn)); ctx.lineTo(X(0), Y(mn)); ctx.closePath();
+        ctx.globalAlpha = 0.12; ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 1;
+        ctx.beginPath(); s.data.forEach((v, k) => (k ? ctx.lineTo(X(k), Y(v)) : ctx.moveTo(X(k), Y(v))));
+      }
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
+      const last = s.data[n - 1];
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(X(n - 1), Y(last), 2.6, 0, 7); ctx.fill();
+    });
+  }
+}
+
+// ------------------------------------------------------------------ journal + modèle
+function renderLog() {
+  const ev = sim.events.slice().reverse();
+  $('tab-log').innerHTML = '<h2>Journal</h2><div class="lead">Interventions divines, pénuries, mises à pied, renflouements et rachats.</div>' +
+    (ev.length ? '<ul class="log">' + ev.map(e => '<li class="' + e.type + '"><time>j' + e.day + '</time><span>' + esc(e.text) + '</span></li>').join('') + '</ul>' : '<div class="empty">Rien à signaler pour l\'instant.</div>');
+}
+function buildModel() {
+  $('tab-model').innerHTML =
+    '<h2>Le modèle</h2><div class="lead">Un tour de simulation équivaut à une journée. Toute la monnaie circule par transferts entre comptes : elle ne se crée ou ne se détruit que par le god mode ou le commerce extérieur.</div>' +
+    '<h3>Déroulement d\'une journée</h3><ol class="steps">' +
+    '<li><b>Marché du travail.</b> Les sans-emploi comblent les postes ouverts, mieux payés d\'abord. Quelques employés changent d\'emploi pour un salaire au moins 8 % plus élevé. L\'État verse la prestation aux sans-emploi.</li>' +
+    '<li><b>Production.</b> Lots = employés × productivité, limités par les intrants en stock et la capacité. Un employé qui a faim produit moitié moins ; sans logement, 20 % de moins.</li>' +
+    '<li><b>Salaires.</b> Payés chaque jour, impôt retenu à la source. Une entreprise qui ne peut pas payer met à pied son dernier embauché.</li>' +
+    '<li><b>Achats d\'intrants.</b> Chaque entreprise vise 5 jours de stock et achète au vendeur le moins cher, en gardant 5 jours de salaires en réserve.</li>' +
+    '<li><b>Consommation.</b> Chaque citoyen achète un repas, une nuitée, des souliers s\'ils sont usés, puis dépense une part de son épargne au-delà d\'un coussin de ' + sim.params.bufferDays + ' jours de besoins.</li>' +
+    '<li><b>Décisions.</b> Prix = coût unitaire × (1 + marge). La marge monte quand le stock est bas ou la demande non servie, baisse en cas de surstock, sinon revient vers la marge normale. Les embauches suivent la demande ; les salaires montent quand les postes restent vacants et baissent lentement en période de chômage.</li>' +
+    '<li><b>Finances.</b> Dividendes au propriétaire au-delà de 8 jours de coûts en caisse. Un propriétaire renfloue une entreprise à court de fonds ; s\'il ne peut pas, le citoyen le plus riche la rachète. L\'État redistribue son surplus.</li>' +
+    '</ol>' +
+    '<h3>Recettes</h3><table class="t"><thead><tr><th>Type</th><th>Intrants par lot</th><th>Extrants par lot</th><th class="n">Lots/empl./j</th></tr></thead><tbody>' +
+    Object.keys(TEMPLATES).map(t => { const T = TEMPLATES[t]; return '<tr><td>' + T.label + '</td><td>' + (Object.keys(T.inputs).map(g => T.inputs[g] + ' ' + GOODS[g].label.toLowerCase()).join(', ') || '—') + '</td><td>' + Object.keys(T.outputs).map(g => T.outputs[g] + ' ' + GOODS[g].label.toLowerCase()).join(', ') + '</td><td class="n">' + T.rate + '</td></tr>'; }).join('') +
+    '</tbody></table>' +
+    '<h3>Expériences à essayer</h3><ul class="steps">' +
+    '<li>Injecter 5 000 $ à chaque citoyen et regarder les prix et les loyers.</li>' +
+    '<li>Faire arriver 25 personnes sans agrandir le parc de logements.</li>' +
+    '<li>Fermer la Ferme Gagnon, puis en créer une nouvelle.</li>' +
+    '<li>Fixer un salaire minimum de 220 $/jour.</li>' +
+    '<li>Mettre l\'impôt et la prestation à zéro.</li>' +
+    '<li>Détruire 90 % des stocks de viande.</li>' +
+    '</ul>';
+}
+
+// ------------------------------------------------------------------ contrôles
+$('btnPlay').onclick = () => { ui.playing = !ui.playing; render(true); };
+$('btnStep').onclick = () => { ui.playing = false; sim.step(); render(true); };
+for (const b of document.querySelectorAll('#speedSeg button')) b.onclick = () => { ui.speed = +b.dataset.speed; ui.playing = true; render(true); };
+function bindReset() {
+  $('btnReset').onclick = () => {
+    $('resetBox').innerHTML = '<span class="confirm">Tout effacer ? <button class="btn small danger" id="rsYes" type="button">Réinitialiser</button><button class="btn small" id="rsNo" type="button">Annuler</button></span>';
+    $('rsYes').onclick = () => { newGame(sim.seed); restoreReset(); };
+    $('rsNo').onclick = restoreReset;
+  };
+}
+function restoreReset() {
+  $('resetBox').innerHTML = '<button class="btn" id="btnReset" type="button">Réinitialiser</button>';
+  bindReset();
+}
+bindReset();
+function newGame(seed) {
+  sim = new Sim({ seed });
+  for (const [, el] of nodeEls) el.remove();
+  nodeEls.clear();
+  ui.sel = { kind: 'M' }; ui.fitted = false;
+  if (ui.tab === 'god') buildGod();
+  buildInspector();
+  render(true);
+}
+
+// thème : redessiner les canevas quand la palette change
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+if (mq.addEventListener) mq.addEventListener('change', () => render(true));
+new MutationObserver(() => render(true)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+buildModel();
+buildInspector();
+applyView();
+render(true);
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>
