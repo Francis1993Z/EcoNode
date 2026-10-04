@@ -3,10 +3,11 @@ import 'package:flutter/scheduler.dart';
 
 import '../engine/model.dart';
 import '../engine/sim.dart';
+import 'layout.dart';
 
 /// Ce qui est sélectionné dans le graphe.
 class Selection {
-  final String kind; // M | E | X | firm | citizen
+  final String kind; // M | E | B | X | firm | citizen
   final int? id;
   const Selection(this.kind, [this.id]);
 
@@ -16,6 +17,17 @@ class Selection {
   int get hashCode => Object.hash(kind, id);
 }
 
+/// Onglets du panneau latéral.
+class Tabs {
+  static const inspector = 0;
+  static const diagnostic = 1;
+  static const god = 2;
+  static const economy = 3;
+  static const journal = 4;
+  static const model = 5;
+  static const labels = ['Inspecteur', 'Diagnostic', 'God mode', 'Économie', 'Journal', 'Modèle'];
+}
+
 /// Pilote la simulation : boucle de temps, vitesse, sélection, notifications d'interface.
 class SimController extends ChangeNotifier {
   Sim sim;
@@ -23,15 +35,18 @@ class SimController extends ChangeNotifier {
   double speed = 4; // jours par seconde
   Selection selection = const Selection('M');
   bool showMoneyFlows = false;
+  bool showServices = false; // flux de services aux entreprises (comptabilité, entretien, publicité, machines)
   bool panelOpen = true;
-  int panelTab = 0;
+  int panelTab = Tabs.inspector;
 
   late final Ticker _ticker;
   Duration _last = Duration.zero;
   double _acc = 0;
   double _sinceNotify = 0;
 
-  SimController({int seed = 42}) : sim = Sim(seed: seed);
+  SimController({int seed = 42}) : sim = Sim(seed: seed) {
+    autoLayout(sim);
+  }
 
   void attach(TickerProvider vsync) {
     _ticker = vsync.createTicker(_onTick)..start();
@@ -80,13 +95,14 @@ class SimController extends ChangeNotifier {
 
   void select(Selection s) {
     selection = s;
-    panelTab = 0;
+    panelTab = Tabs.inspector;
     panelOpen = true;
     notifyListeners();
   }
 
   void setTab(int t) {
     panelTab = t;
+    panelOpen = true;
     notifyListeners();
   }
 
@@ -100,8 +116,15 @@ class SimController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleServices() {
+    showServices = !showServices;
+    notifyListeners();
+  }
+
+  /// Nouvelle partie : les modules et les filets en cours sont conservés.
   void newGame(int seed, {Params? params}) {
-    sim = Sim(seed: seed, params: params);
+    sim = Sim(seed: seed, params: params, modules: sim.modules.copy(), safeguards: sim.safeguards.copy());
+    autoLayout(sim);
     selection = const Selection('M');
     _acc = 0;
     notifyListeners();

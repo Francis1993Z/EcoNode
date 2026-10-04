@@ -11,13 +11,11 @@ import '../engine/model.dart';
 import '../engine/sim.dart';
 import 'controller.dart';
 import 'format.dart';
+import 'layout.dart';
 import 'palette.dart';
 
-const double kNodeW = 222;
-const double kHeaderH = 40;
-const double kRowH = 20;
-const double kSepH = 7;
-const double kFooterH = 30;
+/// Port d'entrée des services aux entreprises et des machines (ligne « Capital »).
+const String kSvcPort = '@svc';
 
 /// Boîte d'un node dans le repère du monde.
 class NodeBox {
@@ -28,7 +26,7 @@ class NodeBox {
   NodeBox(this.sel, this.rect, this.outY, this.inY);
 
   Offset outPort(String good) => Offset(rect.right, outY[good] ?? rect.top + kHeaderH / 2);
-  Offset inPort(String good) => Offset(rect.left, inY[good] ?? rect.top + kHeaderH / 2);
+  Offset inPort(String good) => Offset(rect.left, inY[good] ?? inY[kSvcPort] ?? rect.top + kHeaderH / 2);
   Offset get headRight => Offset(rect.right, rect.top + kHeaderH / 2);
   Offset get headLeft => Offset(rect.left, rect.top + kHeaderH / 2);
 }
@@ -43,13 +41,13 @@ NodeBox firmBox(Firm f) {
     outY[g] = y + kRowH / 2;
     y += kRowH;
   }
-  if (f.inputs.isNotEmpty && f.outputs.isNotEmpty) y += kSepH;
+  if (f.inputs.isNotEmpty) y += kSepH;
   for (final g in f.inputs.keys) {
     inY[g] = y + kRowH / 2;
     y += kRowH;
   }
-  y += kFooterH;
-  return NodeBox(Selection('firm', f.id), Rect.fromLTWH(f.x, f.y, kNodeW, y - f.y), outY, inY);
+  inY[kSvcPort] = y + kRowH / 2;
+  return NodeBox(Selection('firm', f.id), Rect.fromLTWH(f.x, f.y, kNodeW, firmHeight(f)), outY, inY);
 }
 
 List<NodeBox> allBoxes(Sim sim) {
@@ -57,21 +55,22 @@ List<NodeBox> allBoxes(Sim sim) {
   for (final f in sim.firms) {
     out.add(firmBox(f));
   }
-  // ménages : un port d'entrée par bien final
+  // ménages : un port d'entrée par bien qu'ils achètent
   final m = sim.nodePos['M']!;
   final inY = <String, double>{};
   var y = m[1] + kHeaderH;
-  for (final g in finalGoods) {
+  for (final g in householdGoods) {
     inY[g] = y + kRowH / 2;
     y += kRowH;
   }
-  y += kFooterH;
-  out.add(NodeBox(const Selection('M'), Rect.fromLTWH(m[0], m[1], kNodeW, y - m[1]), {}, inY));
-  final e = sim.nodePos['E']!;
-  out.add(NodeBox(const Selection('E'), Rect.fromLTWH(e[0], e[1], kNodeW, kHeaderH + kFooterH), {}, {}));
+  out.add(NodeBox(const Selection('M'), Rect.fromLTWH(m[0], m[1], kNodeW, homesHeight()), {}, inY));
+  for (final k in const ['E', 'B']) {
+    final p = sim.nodePos[k]!;
+    out.add(NodeBox(Selection(k), Rect.fromLTWH(p[0], p[1], kNodeW, kSmallH), {}, {}));
+  }
   if (showsExterior(sim)) {
     final x = sim.nodePos['X']!;
-    out.add(NodeBox(const Selection('X'), Rect.fromLTWH(x[0], x[1], kNodeW, kHeaderH + kFooterH), {}, {}));
+    out.add(NodeBox(const Selection('X'), Rect.fromLTWH(x[0], x[1], kNodeW, kSmallH), {}, {}));
   }
   return out;
 }
@@ -93,10 +92,11 @@ class GraphView extends StatefulWidget {
 }
 
 class _GraphViewState extends State<GraphView> {
-  double scale = 0.7;
+  double scale = 0.5;
   Offset offset = const Offset(20, 20);
   bool _fitted = false;
   Size _size = Size.zero;
+  Sim? _fittedSim;
 
   // état du geste en cours
   NodeBox? _dragBox;
@@ -124,7 +124,7 @@ class _GraphViewState extends State<GraphView> {
       r = r.expandToInclude(b.rect);
     }
     r = r.inflate(24);
-    final s = math.min(_size.width / r.width, _size.height / r.height).clamp(0.2, 1.5).toDouble();
+    final s = math.min(_size.width / r.width, _size.height / r.height).clamp(0.15, 1.5).toDouble();
     setState(() {
       scale = s;
       offset = Offset((_size.width - r.width * s) / 2 - r.left * s, (_size.height - r.height * s) / 2 - r.top * s);
@@ -132,7 +132,7 @@ class _GraphViewState extends State<GraphView> {
   }
 
   void zoomAt(Offset focal, double factor) {
-    final ns = (scale * factor).clamp(0.2, 2.5).toDouble();
+    final ns = (scale * factor).clamp(0.15, 2.5).toDouble();
     final w = toWorld(focal);
     setState(() {
       scale = ns;
@@ -153,7 +153,7 @@ class _GraphViewState extends State<GraphView> {
     _moved = true;
     if (d.pointerCount >= 2) {
       _dragBox = null;
-      final ns = (_startScale * d.scale).clamp(0.2, 2.5).toDouble();
+      final ns = (_startScale * d.scale).clamp(0.15, 2.5).toDouble();
       final w = (_startFocal - _startOffset) / _startScale;
       setState(() {
         scale = ns;
@@ -197,8 +197,10 @@ class _GraphViewState extends State<GraphView> {
     final pal = Pal.of(context);
     return LayoutBuilder(builder: (context, c) {
       _size = Size(c.maxWidth, c.maxHeight);
-      if (!_fitted && !_size.isEmpty) {
+      final sim = widget.ctrl.sim;
+      if ((!_fitted || !identical(_fittedSim, sim)) && !_size.isEmpty) {
         _fitted = true;
+        _fittedSim = sim;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) fit();
         });
@@ -225,6 +227,7 @@ class _GraphViewState extends State<GraphView> {
                       sim: widget.ctrl.sim,
                       selection: widget.ctrl.selection,
                       showMoney: widget.ctrl.showMoneyFlows,
+                      showServices: widget.ctrl.showServices,
                       pal: pal,
                       scale: scale,
                       offset: offset,
@@ -239,13 +242,23 @@ class _GraphViewState extends State<GraphView> {
         Positioned(
           left: 8,
           bottom: 8,
-          child: Row(children: [
-            _MiniBtn(icon: Icons.add, onTap: () => zoomAt(Offset(_size.width / 2, _size.height / 2), 1.25)),
-            const SizedBox(width: 6),
-            _MiniBtn(icon: Icons.remove, onTap: () => zoomAt(Offset(_size.width / 2, _size.height / 2), 0.8)),
-            const SizedBox(width: 6),
-            _MiniBtn(icon: Icons.fit_screen, onTap: fit),
-          ]),
+          child: AnimatedBuilder(
+            animation: widget.ctrl,
+            builder: (context, _) => Row(children: [
+              _MiniBtn(icon: Icons.add, onTap: () => zoomAt(Offset(_size.width / 2, _size.height / 2), 1.25)),
+              const SizedBox(width: 6),
+              _MiniBtn(icon: Icons.remove, onTap: () => zoomAt(Offset(_size.width / 2, _size.height / 2), 0.8)),
+              const SizedBox(width: 6),
+              _MiniBtn(icon: Icons.fit_screen, onTap: fit),
+              const SizedBox(width: 6),
+              _MiniBtn(
+                icon: Icons.hub_outlined,
+                tooltip: 'Flux de services aux entreprises',
+                active: widget.ctrl.showServices,
+                onTap: widget.ctrl.toggleServices,
+              ),
+            ]),
+          ),
         ),
       ]);
     });
@@ -255,20 +268,24 @@ class _GraphViewState extends State<GraphView> {
 class _MiniBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  const _MiniBtn({required this.icon, required this.onTap});
+  final String? tooltip;
+  final bool active;
+  const _MiniBtn({required this.icon, required this.onTap, this.tooltip, this.active = false});
 
   @override
   Widget build(BuildContext context) {
     final pal = Pal.of(context);
-    return Material(
-      color: pal.sheet,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: pal.rule)),
+    final btn = Material(
+      color: active ? pal.accentSoft : pal.sheet,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8), side: BorderSide(color: active ? pal.accent : pal.rule)),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
-        child: SizedBox(width: 40, height: 40, child: Icon(icon, size: 20, color: pal.ink)),
+        child: SizedBox(width: 40, height: 40, child: Icon(icon, size: 20, color: active ? pal.accent : pal.ink)),
       ),
     );
+    return tooltip == null ? btn : Tooltip(message: tooltip!, child: btn);
   }
 }
 
@@ -278,6 +295,7 @@ class GraphPainter extends CustomPainter {
   final Sim sim;
   final Selection selection;
   final bool showMoney;
+  final bool showServices;
   final Pal pal;
   final double scale;
   final Offset offset;
@@ -287,6 +305,7 @@ class GraphPainter extends CustomPainter {
     required this.sim,
     required this.selection,
     required this.showMoney,
+    required this.showServices,
     required this.pal,
     required this.scale,
     required this.offset,
@@ -348,6 +367,20 @@ class GraphPainter extends CustomPainter {
 
   // ---- arêtes
 
+  /// Service ou machine acheté hors recette : il arrive sur la ligne « Capital ».
+  bool _isService(FlowEdge e) {
+    if (e.isMoney) return false;
+    final id = int.tryParse(e.to);
+    if (id == null) return false;
+    final f = sim.firm(id);
+    return f != null && !f.inputs.containsKey(e.good);
+  }
+
+  bool _hot(FlowEdge e) {
+    final k = keyOf(selection);
+    return e.from == k || e.to == k;
+  }
+
   void _edges(Canvas canvas, Map<String, NodeBox> byKey) {
     final list = <FlowEdge>[];
     var maxGood = 1.0, maxMoney = 1.0;
@@ -357,6 +390,7 @@ class GraphPainter extends CustomPainter {
         if (!showMoney) continue;
         maxMoney = math.max(maxMoney, e.value);
       } else {
+        if (!showServices && _isService(e) && !_hot(e)) continue;
         maxGood = math.max(maxGood, e.value);
       }
       list.add(e);
@@ -376,28 +410,30 @@ class GraphPainter extends CustomPainter {
       } else {
         p0 = e.from == 'X' ? a.headLeft : a.outPort(e.good);
         p1 = e.to == 'X' ? b.headLeft : b.inPort(e.good);
-        col = pal.sector(goods[e.good]?.sector ?? 'conso');
+        col = pal.sector(goods[e.good]?.sector ?? 'tertiaire');
       }
+      final hot = _hot(e);
+      final service = _isService(e);
       final ref = e.isMoney ? maxMoney : maxGood;
       final w = (1.2 + 4.0 * math.sqrt(e.value / ref)).clamp(1.2, 5.2).toDouble();
       final dx = math.max(40.0, (p1.dx - p0.dx).abs() * 0.5);
       final path = Path()
         ..moveTo(p0.dx, p0.dy)
         ..cubicTo(p0.dx + dx, p0.dy, p1.dx - dx, p1.dy, p1.dx, p1.dy);
-      final hot = selection.kind != 'M' && selection.kind != 'E' && selection.kind != 'X'
-          ? (e.from == selection.id.toString() || e.to == selection.id.toString())
-          : (keyOf(selection) == e.from || keyOf(selection) == e.to);
+      final alpha = hot ? 0.95 : (service ? 0.3 : 0.55);
       final paint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = w
+        ..strokeWidth = service && !hot ? math.min(w, 2.0) : w
         ..strokeCap = StrokeCap.round
-        ..color = col.withOpacity(hot ? 0.95 : 0.55);
+        ..color = col.withValues(alpha: alpha);
       if (e.isMoney) {
         _dashed(canvas, path, paint, 7, 5);
+      } else if (service) {
+        _dashed(canvas, path, paint, 3, 4);
       } else {
         canvas.drawPath(path, paint);
       }
-      _arrow(canvas, p1, col.withOpacity(hot ? 0.95 : 0.7));
+      _arrow(canvas, p1, col.withValues(alpha: hot ? 0.95 : 0.7));
     }
   }
 
@@ -445,6 +481,9 @@ class GraphPainter extends CustomPainter {
       case 'E':
         _stateNode(canvas, b);
         break;
+      case 'B':
+        _bankNode(canvas, b);
+        break;
       default:
         _worldNode(canvas, b);
     }
@@ -452,24 +491,22 @@ class GraphPainter extends CustomPainter {
 
   void _header(Canvas canvas, Rect r, Color accent, String code, String title, String sub) {
     canvas.drawRRect(
-        RRect.fromRectAndCorners(Rect.fromLTWH(r.left, r.top, 5, kHeaderH),
-            topLeft: const Radius.circular(10)),
+        RRect.fromRectAndCorners(Rect.fromLTWH(r.left, r.top, 5, kHeaderH), topLeft: const Radius.circular(10)),
         Paint()..color = accent);
     final badge = RRect.fromRectAndRadius(Rect.fromLTWH(r.left + 12, r.top + 9, 24, 22), const Radius.circular(5));
-    canvas.drawRRect(badge, Paint()..color = accent.withOpacity(0.16));
+    canvas.drawRRect(badge, Paint()..color = accent.withValues(alpha: 0.16));
     final c = _tp(code, mono(accent, 11, weight: FontWeight.w700));
     c.paint(canvas, Offset(badge.left + (24 - c.width) / 2, badge.top + (22 - c.height) / 2));
-    _tp(title, TextStyle(color: pal.ink, fontSize: 13, fontWeight: FontWeight.w700), maxWidth: kNodeW - 56)
+    _tp(title, TextStyle(color: pal.ink, fontSize: 13, fontWeight: FontWeight.w700), maxWidth: kNodeW - 60)
         .paint(canvas, Offset(r.left + 44, r.top + 5));
     _tp(sub, mono(pal.ink3, 10), maxWidth: kNodeW - 56).paint(canvas, Offset(r.left + 44, r.top + 22));
-    canvas.drawLine(Offset(r.left, r.top + kHeaderH), Offset(r.right, r.top + kHeaderH),
-        Paint()..color = pal.rule2);
+    canvas.drawLine(Offset(r.left, r.top + kHeaderH), Offset(r.right, r.top + kHeaderH), Paint()..color = pal.rule2);
   }
 
   void _row(Canvas canvas, Rect r, double y, Color dot, String label, String right, {Color? rightColor}) {
     canvas.drawCircle(Offset(r.left + 14, y + kRowH / 2), 3.5, Paint()..color = dot);
     _tp(label, TextStyle(color: pal.ink, fontSize: 11.5), maxWidth: 90).paint(canvas, Offset(r.left + 24, y + 3));
-    final t = _tp(right, mono(rightColor ?? pal.ink2, 10.5), maxWidth: kNodeW - 130);
+    final t = _tp(right, mono(rightColor ?? pal.ink2, 10.5), maxWidth: kNodeW - 120);
     t.paint(canvas, Offset(r.right - 10 - t.width, y + 4));
   }
 
@@ -502,13 +539,11 @@ class GraphPainter extends CustomPainter {
     var y = r.top + kHeaderH;
     for (final g in f.outputs.keys) {
       final gd = goods[g]!;
-      final price = f.price[g] ?? 0.0;
-      final stock = f.inv[g] ?? 0.0;
-      _row(canvas, r, y, pal.sector(gd.sector), gd.label, '${qty(stock)} · ${money(price)}');
+      _row(canvas, r, y, pal.sector(gd.sector), gd.label, '${qty(f.inv[g] ?? 0.0)} · ${money(f.price[g] ?? 0.0)}');
       _port(canvas, b.outPort(g), pal.sector(gd.sector));
       y += kRowH;
     }
-    if (f.inputs.isNotEmpty && f.outputs.isNotEmpty) y += kSepH;
+    if (f.inputs.isNotEmpty) y += kSepH;
     for (final g in f.inputs.keys) {
       final gd = goods[g]!;
       final stock = f.inv[g] ?? 0.0;
@@ -517,10 +552,19 @@ class GraphPainter extends CustomPainter {
       _port(canvas, b.inPort(g), pal.sector(gd.sector));
       y += kRowH;
     }
+    // capital : machines, niveau technologique, dette ; port des services aux entreprises
+    final weak = f.maintCover < 0.7 || f.adminCover < 0.7;
+    final cap = <String>[
+      'M ${fmtNum(f.machines, 1)}',
+      'T${f.techLevel}',
+      if (f.debt > 0) 'D ${kmoney(f.debt)}',
+    ].join(' · ');
+    _row(canvas, r, y, pal.ink3, 'Capital', cap, rightColor: weak ? pal.warn : null);
+    _port(canvas, b.inPort(kSvcPort), pal.ink3);
     final profit = f.profitEma;
     _footer(canvas, r, kmoney(f.money), '${profit >= 0 ? '+' : ''}${fmtNum(profit, 0)} \$/j',
         rightColor: profit >= 0 ? pal.ok : pal.bad);
-    // pastille d'état
+    // pastille d'état, et triangle si une alerte concerne l'entreprise
     Color? st;
     if (f.workers.isEmpty) {
       st = pal.bad;
@@ -528,23 +572,36 @@ class GraphPainter extends CustomPainter {
       st = pal.warn;
     }
     if (st != null) canvas.drawCircle(Offset(r.right - 12, r.top + 12), 4.5, Paint()..color = st);
+    final suffix = ':${f.id}';
+    if (sim.monitor.active.keys.any((k) => k.endsWith(suffix))) {
+      final x = r.right - (st != null ? 30 : 16), top = r.top + 6;
+      final tri = Path()
+        ..moveTo(x, top)
+        ..lineTo(x + 7, top + 12)
+        ..lineTo(x - 7, top + 12)
+        ..close();
+      canvas.drawPath(tri, Paint()..color = pal.warn);
+      final t = _tp('!', TextStyle(color: pal.node, fontSize: 9, fontWeight: FontWeight.w900));
+      t.paint(canvas, Offset(x - t.width / 2, top + 2));
+    }
   }
 
   void _homesNode(Canvas canvas, NodeBox b) {
     final r = b.rect;
     final n = sim.citizens.length;
     final unemployed = sim.citizens.where((c) => c.employer == null).length;
-    var total = 0.0;
+    var total = 0.0, happy = 0.0;
     for (final c in sim.citizens) {
       total += c.money;
+      happy += c.happiness;
     }
-    _header(canvas, r, pal.ink2, 'M', 'Ménages', '$n citoyens · ${pct(n > 0 ? unemployed / n : 0.0)} sans emploi');
+    _header(canvas, r, pal.ink2, 'M', 'Ménages',
+        '$n citoyens · ${pct(n > 0 ? unemployed / n : 0.0)} chôm. · bonheur ${pct(n > 0 ? happy / n : 0.0)}');
     var y = r.top + kHeaderH;
-    for (final g in finalGoods) {
+    for (final g in householdGoods) {
       final gd = goods[g]!;
       final un = sim.unmet[g] ?? 0.0;
-      _row(canvas, r, y, pal.sector(gd.sector), gd.label, money(sim.bestPrice(g)),
-          rightColor: un > 0.5 ? pal.bad : null);
+      _row(canvas, r, y, pal.sector(gd.sector), gd.label, money(sim.bestPrice(g)), rightColor: un > 0.5 ? pal.bad : null);
       _port(canvas, b.inPort(g), pal.sector(gd.sector));
       y += kRowH;
     }
@@ -555,6 +612,16 @@ class GraphPainter extends CustomPainter {
     final r = b.rect;
     _header(canvas, r, pal.accent, 'É', 'État', 'impôt ${pct(sim.params.taxRate)} · aide ${money0(sim.params.benefit)}');
     _footer(canvas, r, kmoney(sim.state.money), 'perçu ${kmoney(sim.state.taxes)}');
+  }
+
+  void _bankNode(Canvas canvas, NodeBox b) {
+    final r = b.rect;
+    final loans = sim.totalDebt();
+    final ratio = loans > 0 ? sim.bank.equity / loans : double.nan;
+    _header(canvas, r, pal.money, 'C', 'Caisse populaire',
+        'taux ${pct(sim.params.interestRate)} · ${sim.modules.credit ? 'prête' : 'crédit coupé'}');
+    _footer(canvas, r, 'prêts ${kmoney(loans)}', ratio.isNaN ? 'fonds ${kmoney(sim.bank.equity)}' : 'ratio ${pct(ratio)}',
+        rightColor: !ratio.isNaN && ratio < sim.safeguards.minCapitalRatio ? pal.bad : null);
   }
 
   void _worldNode(Canvas canvas, NodeBox b) {

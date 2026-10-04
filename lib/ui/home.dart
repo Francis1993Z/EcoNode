@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import 'controller.dart';
+import 'diag_tab.dart';
 import 'eco_tab.dart';
 import 'format.dart';
 import 'god_tab.dart';
@@ -117,14 +118,18 @@ class TopBar extends StatelessWidget {
                     _Kpi('Masse', kmoney(h.total)),
                     _Kpi('Chômage', pct(h.unemp), warn: h.unemp > 0.15),
                     _Kpi('Salaire', money0(h.wage)),
+                    _Kpi('Bonheur', pct(h.happiness), warn: h.happiness < 0.6),
+                    _Kpi('Prix', fmtNum(h.cpi * 100, 0)),
                     _Kpi('Panier', money0(h.need)),
                     _Kpi('Affamés', '${h.hungry}', warn: h.hungry > 0),
                     _Kpi('Sans logis', '${h.homeless}', warn: h.homeless > 0),
+                    _Kpi('Dette', kmoney(h.debt)),
                     _Kpi('Gini', fmtNum(h.gini, 2)),
                   ],
                 ]),
               ),
             ),
+            _AlertBadge(ctrl),
             Row(mainAxisSize: MainAxisSize.min, children: [
               Text('Flux \$', style: TextStyle(color: pal.ink2, fontSize: 11)),
               Switch(value: ctrl.showMoneyFlows, onChanged: ctrl.toggleMoneyFlows),
@@ -132,10 +137,48 @@ class TopBar extends StatelessWidget {
             IconButton(
               tooltip: ctrl.panelOpen ? 'Masquer le panneau' : 'Afficher le panneau',
               onPressed: ctrl.togglePanel,
-              icon: Icon(ctrl.panelOpen ? Icons.right_panel_close : Icons.right_panel_open),
+              icon: Icon(ctrl.panelOpen ? Icons.chevron_right : Icons.view_sidebar),
             ),
           ]);
         },
+      ),
+    );
+  }
+}
+
+/// Nombre d'alertes actives (rouge s'il y en a une critique) ; ouvre l'onglet Diagnostic.
+class _AlertBadge extends StatelessWidget {
+  final SimController ctrl;
+  const _AlertBadge(this.ctrl);
+
+  @override
+  Widget build(BuildContext context) {
+    final pal = Pal.of(context);
+    final mon = ctrl.sim.monitor;
+    final n = mon.active.length;
+    final crit = mon.criticalCount;
+    final col = crit > 0 ? pal.bad : (n > 0 ? pal.warn : pal.ok);
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Tooltip(
+        message: n == 0 ? 'Aucune anomalie' : '$n alerte(s) active(s), dont $crit critique(s)',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => ctrl.setTab(Tabs.diagnostic),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: col.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: col.withValues(alpha: 0.6)),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(n == 0 ? Icons.check_circle_outline : Icons.warning_amber_rounded, size: 16, color: col),
+              const SizedBox(width: 4),
+              Text('$n', style: mono(col, 12.5, weight: FontWeight.w800)),
+            ]),
+          ),
+        ),
       ),
     );
   }
@@ -166,23 +209,24 @@ class SidePanel extends StatelessWidget {
   final SimController ctrl;
   const SidePanel(this.ctrl, {super.key});
 
-  static const tabs = ['Inspecteur', 'God mode', 'Économie', 'Journal', 'Modèle'];
-
   @override
   Widget build(BuildContext context) {
     final pal = Pal.of(context);
     Widget body;
     switch (ctrl.panelTab) {
-      case 1:
+      case Tabs.diagnostic:
+        body = DiagnosticTab(ctrl);
+        break;
+      case Tabs.god:
         body = GodTab(ctrl);
         break;
-      case 2:
+      case Tabs.economy:
         body = EconomyTab(ctrl);
         break;
-      case 3:
+      case Tabs.journal:
         body = JournalTab(ctrl);
         break;
-      case 4:
+      case Tabs.model:
         body = ModelTab(ctrl);
         break;
       default:
@@ -195,11 +239,15 @@ class SidePanel extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           children: [
-            for (var i = 0; i < tabs.length; i++)
+            for (var i = 0; i < Tabs.labels.length; i++)
               Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: ChoiceChip(
-                  label: Text(tabs[i], style: const TextStyle(fontSize: 12.5)),
+                  label: Text(
+                      i == Tabs.diagnostic && ctrl.sim.monitor.active.isNotEmpty
+                          ? '${Tabs.labels[i]} (${ctrl.sim.monitor.active.length})'
+                          : Tabs.labels[i],
+                      style: const TextStyle(fontSize: 12.5)),
                   selected: ctrl.panelTab == i,
                   selectedColor: pal.accentSoft,
                   onSelected: (_) => ctrl.setTab(i),

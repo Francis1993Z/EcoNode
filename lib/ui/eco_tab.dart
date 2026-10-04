@@ -20,54 +20,96 @@ class EconomyTab extends StatelessWidget {
     final h = sim.history;
     List<double> col(double Function(HistPoint) f) => downsample(h.map(f).toList());
 
-    final priceColors = {'repas': pal.conso, 'logement': pal.transfo, 'souliers': pal.primaire, 'loisirs': pal.money};
+    final priceColors = {'pain': pal.primaire, 'repas': pal.conso, 'logement': pal.transfo, 'tele': pal.money};
+    TableRow header(String t) => TableRow(children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 2),
+            child: Text(t.toUpperCase(),
+                style: TextStyle(color: pal.ink3, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
+          ),
+          const SizedBox(),
+          const SizedBox(),
+          const SizedBox(),
+          const SizedBox(),
+        ]);
 
     return ListView(padding: const EdgeInsets.all(12), children: [
       Section('Marchés', [
         Table(
-          columnWidths: const {0: FlexColumnWidth(2.2), 1: FlexColumnWidth(1.6), 2: FlexColumnWidth(0.9), 3: FlexColumnWidth(1.3), 4: FlexColumnWidth(1.3)},
+          columnWidths: const {
+            0: FlexColumnWidth(2.4),
+            1: FlexColumnWidth(1.6),
+            2: FlexColumnWidth(0.8),
+            3: FlexColumnWidth(1.3),
+            4: FlexColumnWidth(1.3)
+          },
           children: [
             TableRow(children: [
               for (final t in ['Bien', 'Prix', 'Vend.', 'Volume', 'Manque'])
-                Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(t, style: TextStyle(color: pal.ink3, fontSize: 10.5, fontWeight: FontWeight.w700))),
-            ]),
-            for (final e in goods.entries)
-              TableRow(children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(children: [
-                    Container(width: 7, height: 7, decoration: BoxDecoration(color: pal.sector(e.value.sector), shape: BoxShape.circle)),
-                    const SizedBox(width: 5),
-                    Flexible(child: Text(e.value.label, style: TextStyle(color: pal.ink, fontSize: 12), overflow: TextOverflow.ellipsis)),
-                  ]),
-                ),
-                Text(money(sim.bestPrice(e.key)), style: mono(pal.ink, 11.5)),
-                Text('${sim.sellersOf(e.key).length}', style: mono(pal.ink2, 11.5)),
-                Text(qty(sim.marketStats[e.key]?.qty ?? 0.0), style: mono(pal.ink2, 11.5)),
-                Text(qty(sim.unmet[e.key] ?? 0.0),
-                    style: mono((sim.unmet[e.key] ?? 0.0) > 0.5 ? pal.bad : pal.ink3, 11.5)),
-              ]),
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(t, style: TextStyle(color: pal.ink3, fontSize: 10.5, fontWeight: FontWeight.w700))),
+            ]),
+            for (final s in sectors) ...[
+              header(sectorLabels[s]!),
+              for (final e in goods.entries.where((e) => e.value.sector == s))
+                TableRow(children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(children: [
+                      Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(color: pal.sector(e.value.sector), shape: BoxShape.circle)),
+                      const SizedBox(width: 5),
+                      Flexible(
+                          child: Text(e.value.label,
+                              style: TextStyle(color: pal.ink, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                    ]),
+                  ),
+                  Text(money(sim.bestPrice(e.key)), style: mono(pal.ink, 11.5)),
+                  Text('${sim.sellersOf(e.key).length}', style: mono(pal.ink2, 11.5)),
+                  Text(qty(sim.marketStats[e.key]?.qty ?? 0.0), style: mono(pal.ink2, 11.5)),
+                  Text(qty(sim.unmet[e.key] ?? 0.0),
+                      style: mono((sim.unmet[e.key] ?? 0.0) > 0.5 ? pal.bad : pal.ink3, 11.5)),
+                ]),
+            ],
           ],
         ),
       ]),
       ChartCard(title: 'Chômage', unit: '%', minY: 0, series: [Series('chômage', pal.bad, col((p) => p.unemp))]),
+      ChartCard(title: 'Bonheur moyen', unit: '%', minY: 0, series: [Series('bonheur', pal.ok, col((p) => p.happiness))]),
+      ChartCard(title: 'Indice des prix (panier des ménages, départ = 100)', series: [
+        Series('indice', pal.warn, col((p) => p.cpi * 100)),
+      ]),
       ChartCard(title: 'Salaire moyen et panier de survie', unit: '\$', series: [
         Series('salaire', pal.accent, col((p) => p.wage)),
         Series('panier / jour', pal.warn, col((p) => p.need)),
       ]),
-      ChartCard(title: 'Prix des biens finaux', unit: '\$', series: [
-        for (final g in finalGoods) Series(goods[g]!.label, priceColors[g]!, col((p) => p.prices[g] ?? 0.0)),
+      ChartCard(title: 'Prix de quelques biens', unit: '\$', series: [
+        for (final g in priceColors.keys) Series(goods[g]!.label, priceColors[g]!, col((p) => p.prices[g] ?? 0.0)),
       ]),
       ChartCard(title: 'Où est l’argent', stacked: true, unit: '\$', series: [
         Series('ménages', pal.accent, col((p) => p.mH)),
         Series('entreprises', pal.primaire, col((p) => p.mF)),
         Series('État', pal.conso, col((p) => p.mE)),
+        Series('Caisse', pal.money, col((p) => p.mB)),
+      ]),
+      ChartCard(title: 'Dette des entreprises', unit: '\$', minY: 0, series: [Series('dette', pal.bad, col((p) => p.debt))]),
+      ChartCard(title: 'Machines en service', minY: 0, series: [Series('machines', pal.primaire, col((p) => p.machines))]),
+      ChartCard(title: 'Qualifications', stacked: true, minY: 0, series: [
+        for (var i = 0; i < 3; i++)
+          Series(classLabels[i], [pal.ink3, pal.transfo, pal.accent][i], col((p) => p.classes[i].toDouble())),
       ]),
       ChartCard(title: 'Détresse', minY: 0, series: [
         Series('affamés', pal.warn, col((p) => p.hungry.toDouble())),
         Series('sans logis', pal.bad, col((p) => p.homeless.toDouble())),
       ]),
-      ChartCard(title: 'Dépenses des ménages / jour', unit: '\$', minY: 0, series: [Series('dépenses', pal.transfo, col((p) => p.gdp))]),
+      ChartCard(
+          title: 'Dépenses des ménages / jour',
+          unit: '\$',
+          minY: 0,
+          series: [Series('dépenses', pal.transfo, col((p) => p.gdp))]),
       ChartCard(title: 'Inégalités (Gini)', minY: 0, series: [Series('Gini', pal.conso, col((p) => p.gini))]),
       const SizedBox(height: 24),
     ]);
@@ -88,14 +130,30 @@ class _JournalTabState extends State<JournalTab> {
   Widget build(BuildContext context) {
     final pal = Pal.of(context);
     final ev = widget.ctrl.sim.events.reversed.where((e) => filter == 'all' || e.type == filter).take(150).toList();
-    Color colorOf(String t) => t == 'god'
-        ? pal.accent
-        : t == 'warn'
-            ? pal.bad
-            : t == 'short'
-                ? pal.warn
-                : pal.ink2;
-    const filters = {'all': 'Tout', 'god': 'Divin', 'warn': 'Alertes', 'short': 'Pénuries', 'info': 'Infos'};
+    Color colorOf(String t) {
+      switch (t) {
+        case 'god':
+          return pal.accent;
+        case 'warn':
+        case 'alert':
+          return pal.bad;
+        case 'short':
+        case 'net':
+          return pal.warn;
+        default:
+          return pal.ink2;
+      }
+    }
+
+    const filters = {
+      'all': 'Tout',
+      'alert': 'Alertes',
+      'net': 'Filets',
+      'god': 'Divin',
+      'warn': 'Avertissements',
+      'short': 'Pénuries',
+      'info': 'Infos',
+    };
     return Column(children: [
       SizedBox(
         height: 48,
@@ -106,7 +164,8 @@ class _JournalTabState extends State<JournalTab> {
             for (final e in filters.entries)
               Padding(
                 padding: const EdgeInsets.only(right: 6),
-                child: ChoiceChip(label: Text(e.value), selected: filter == e.key, onSelected: (_) => setState(() => filter = e.key)),
+                child: ChoiceChip(
+                    label: Text(e.value), selected: filter == e.key, onSelected: (_) => setState(() => filter = e.key)),
               ),
           ],
         ),
@@ -142,7 +201,7 @@ class ModelTab extends StatefulWidget {
 
 class _ModelTabState extends State<ModelTab> {
   double seed = 42;
-  double pop = 80;
+  double pop = 240;
   double wallet = 3000;
 
   SimController get ctrl => widget.ctrl;
@@ -158,28 +217,115 @@ class _ModelTabState extends State<ModelTab> {
 
     return ListView(padding: const EdgeInsets.all(12), children: [
       Section('Paramètres en direct', [
-        ParamSlider(label: 'Marge de base', value: p.markup, min: 1, max: 1.6, format: (v) => '×${fmtNum(v, 2)}', hint: 'Prix = coût de revient × marge, puis ajusté selon stocks et demande.', onChanged: (v) => upd(() => p.markup = v)),
-        ParamSlider(label: 'Dépense du surplus (par jour)', value: p.propensity, min: 0, max: 0.3, format: pct, hint: 'Part de l’argent au-delà du coussin que les ménages dépensent chaque jour.', onChanged: (v) => upd(() => p.propensity = v)),
-        ParamSlider(label: 'Coussin des ménages (jours de survie)', value: p.bufferDays, min: 2, max: 40, format: (v) => '${fmtNum(v, 0)} j', onChanged: (v) => upd(() => p.bufferDays = v.roundToDouble())),
-        ParamSlider(label: 'Vitesse d’ajustement des prix', value: p.priceStep, min: 0.005, max: 0.08, format: pct, onChanged: (v) => upd(() => p.priceStep = v)),
-        ParamSlider(label: 'Vitesse d’ajustement des salaires', value: p.wageStep, min: 0.003, max: 0.05, format: pct, onChanged: (v) => upd(() => p.wageStep = v)),
-        ParamSlider(label: 'Stock visé (jours de ventes)', value: p.invTargetDays, min: 1, max: 12, format: (v) => '${fmtNum(v, 1)} j', onChanged: (v) => upd(() => p.invTargetDays = v)),
-        ParamSlider(label: 'Taux de dividendes', value: p.dividendRate, min: 0, max: 0.3, format: pct, onChanged: (v) => upd(() => p.dividendRate = v)),
-        ParamSlider(label: 'Mobilité des travailleurs', value: p.jobSwitch, min: 0, max: 0.2, format: pct, onChanged: (v) => upd(() => p.jobSwitch = v)),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Les propriétaires renflouent leur entreprise'),
-          value: p.recapitalize,
-          onChanged: (v) => upd(() => p.recapitalize = v),
-        ),
+        ParamSlider(
+            label: 'Marge de base',
+            value: p.markup,
+            min: 1,
+            max: 1.6,
+            format: (v) => '×${fmtNum(v, 2)}',
+            hint: 'Prix = coût de revient × marge, puis ajusté selon stocks et demande.',
+            onChanged: (v) => upd(() => p.markup = v)),
+        ParamSlider(
+            label: 'Dépense du surplus (par jour)',
+            value: p.propensity,
+            min: 0,
+            max: 0.3,
+            format: pct,
+            hint: 'Part de l’argent au-delà du coussin que les ménages dépensent chaque jour en divertissement et luxe.',
+            onChanged: (v) => upd(() => p.propensity = v)),
+        ParamSlider(
+            label: 'Coussin des ménages (jours de survie)',
+            value: p.bufferDays,
+            min: 2,
+            max: 40,
+            format: (v) => '${fmtNum(v, 0)} j',
+            onChanged: (v) => upd(() => p.bufferDays = v.roundToDouble())),
+        ParamSlider(
+            label: 'Vitesse d’ajustement des prix',
+            value: p.priceStep,
+            min: 0.005,
+            max: 0.08,
+            format: pct,
+            onChanged: (v) => upd(() => p.priceStep = v)),
+        ParamSlider(
+            label: 'Vitesse d’ajustement des salaires',
+            value: p.wageStep,
+            min: 0.003,
+            max: 0.05,
+            format: pct,
+            onChanged: (v) => upd(() => p.wageStep = v)),
+        ParamSlider(
+            label: 'Stock visé (jours de ventes)',
+            value: p.invTargetDays,
+            min: 1,
+            max: 12,
+            format: (v) => '${fmtNum(v, 1)} j',
+            onChanged: (v) => upd(() => p.invTargetDays = v)),
+        ParamSlider(
+            label: 'Taux de dividendes',
+            value: p.dividendRate,
+            min: 0,
+            max: 0.3,
+            format: pct,
+            onChanged: (v) => upd(() => p.dividendRate = v)),
+        ParamSlider(
+            label: 'Mobilité des travailleurs',
+            value: p.jobSwitch,
+            min: 0,
+            max: 0.2,
+            format: pct,
+            onChanged: (v) => upd(() => p.jobSwitch = v)),
+        ParamSlider(
+            label: 'Effet de la publicité sur la dépense',
+            value: p.adsEffect,
+            min: 0,
+            max: 2,
+            format: (v) => '+${pct(v)} max',
+            onChanged: (v) => upd(() => p.adsEffect = v)),
+        ParamSlider(
+            label: 'Envie de se former',
+            value: p.eduRate,
+            min: 0,
+            max: 1,
+            format: pct,
+            hint: 'Chance quotidienne de suivre un cours, multipliée par l’ambition de chacun.',
+            onChanged: (v) => upd(() => p.eduRate = v)),
+        ParamSlider(
+            label: 'Risque de maladie (par jour)',
+            value: p.illness,
+            min: 0,
+            max: 0.03,
+            format: (v) => pct(v),
+            onChanged: (v) => upd(() => p.illness = v)),
+        ParamSlider(
+            label: 'Usure des machines (par jour)',
+            value: p.depreciation,
+            min: 0,
+            max: 0.02,
+            format: (v) => pct(v),
+            hint: 'Avec entretien ; sans entretien, l’usure est 2,5 fois plus rapide.',
+            onChanged: (v) => upd(() => p.depreciation = v)),
       ]),
       Section('Nouvelle partie', [
         Row(children: [
-          Expanded(child: NumField(label: 'Graine', value: seed, decimals: 0, onSubmit: (v) => setState(() => seed = v.abs().roundToDouble()))),
+          Expanded(
+              child: NumField(
+                  label: 'Graine', value: seed, decimals: 0, onSubmit: (v) => setState(() => seed = v.abs().roundToDouble()))),
           const SizedBox(width: 8),
-          Expanded(child: NumField(label: 'Population', value: pop, decimals: 0, onSubmit: (v) => setState(() => pop = v.abs().clamp(10, 400).toDouble()))),
+          Expanded(
+              child: NumField(
+                  label: 'Population',
+                  value: pop,
+                  decimals: 0,
+                  onSubmit: (v) => setState(() => pop = v.abs().clamp(40, 1000).toDouble()))),
           const SizedBox(width: 8),
-          Expanded(child: NumField(label: 'Capital initial', value: wallet, suffix: '\$', decimals: 0, onSubmit: (v) => setState(() => wallet = v.abs()))),
+          Expanded(
+              child: NumField(
+                  label: 'Capital initial',
+                  value: wallet,
+                  suffix: '\$',
+                  decimals: 0,
+                  onSubmit: (v) => setState(() => wallet = v.abs()))),
         ]),
         const SizedBox(height: 8),
         Btn('Recommencer', () {
@@ -188,15 +334,22 @@ class _ModelTabState extends State<ModelTab> {
             ..startWallet = wallet;
           ctrl.newGame(seed.round(), params: np);
         }, primary: true, icon: Icons.restart_alt),
-        Text('Même graine, mêmes réglages : la simulation se déroule toujours de la même façon.', style: TextStyle(color: pal.ink3, fontSize: 11)),
+        Text(
+            'Même graine, mêmes réglages : la simulation se déroule toujours de la même façon. '
+            'Les modules et les filets en cours sont conservés.',
+            style: TextStyle(color: pal.ink3, fontSize: 11)),
       ]),
       Section('Comment ça marche', [
         Text(
-          '• Chaque jour : embauches, production, salaires, achats d’intrants, consommation des ménages, impôts, dividendes.\n'
-          '• Les ménages ont besoin de manger, de se loger, de s’habiller et de se divertir ; ils achètent toujours le moins cher d’abord.\n'
-          '• Chaque entreprise fixe son prix par coût de revient × marge, et le corrige selon son stock et la demande non servie.\n'
-          '• Une entreprise qui peine à embaucher relève son salaire ; sinon il baisse très lentement.\n'
-          '• L’argent ne se crée ni ne se perd que par le god mode et le commerce extérieur ; le grand livre le vérifie.',
+          '• Chaque jour : embauches, production, salaires, achats d’intrants et de services, consommation, filets, '
+          'usure des machines et dette, prix et salaires, dividendes, État.\n'
+          '• Trois secteurs : primaire (extraction, ressources illimitées), secondaire (transformation), tertiaire (services). '
+          'Les entreprises achètent comptabilité, entretien, publicité et R-D ; elles s’endettent pour acheter des machines.\n'
+          '• Les citoyens ont des désirs (faim, logement, santé, divertissement, luxe) dont la satisfaction s’use. '
+          'Leurs goûts dépendent de leur qualification (manœuvre, technicien, professionnel), qui monte avec la formation.\n'
+          '• La Caisse populaire crée la monnaie qu’elle prête ; le remboursement la détruit. Sinon, l’argent ne se crée ni ne '
+          'se perd que par le god mode et le commerce extérieur : les invariants comptables le vérifient au bit près.\n'
+          '• L’onglet Diagnostic montre les anomalies détectées et les filets de sécurité, avec leurs compteurs.',
           style: TextStyle(color: pal.ink2, fontSize: 12.5, height: 1.45),
         ),
       ]),

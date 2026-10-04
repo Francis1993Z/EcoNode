@@ -166,7 +166,7 @@ class _LinePainter extends CustomPainter {
           path.lineTo(px(i), py(lower[i]));
         }
         path.close();
-        canvas.drawPath(path, Paint()..color = series[si].color.withOpacity(0.55));
+        canvas.drawPath(path, Paint()..color = series[si].color.withValues(alpha: 0.55));
       }
     } else {
       for (final s in series) {
@@ -249,7 +249,7 @@ class _HistPainter extends CustomPainter {
     for (var i = 0; i < values.length; i++) {
       final h = (size.height - labH - 12) * values[i] / hi;
       final r = Rect.fromLTWH(i * w + 2, size.height - labH - h, w - 4, h);
-      canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(2)), Paint()..color = color.withOpacity(0.75));
+      canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(2)), Paint()..color = color.withValues(alpha: 0.75));
       final t = TextPainter(
         text: TextSpan(text: '${values[i].round()}', style: mono(pal.ink2, 9)),
         textDirection: ui.TextDirection.ltr,

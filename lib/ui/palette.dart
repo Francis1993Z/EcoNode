@@ -1,5 +1,3 @@
-import 'dart:ui' show FontFeature;
-
 import 'package:flutter/material.dart';
 
 /// Jetons de couleur de l'interface (clair / sombre), reprenant la version web.
@@ -75,11 +73,12 @@ class Pal {
 
   static Pal of(BuildContext context) => Theme.of(context).brightness == Brightness.dark ? dark : light;
 
+  /// Couleur d'un secteur : primaire (ocre), secondaire (bleu), tertiaire (magenta).
   Color sector(String s) {
     switch (s) {
       case 'primaire':
         return primaire;
-      case 'transfo':
+      case 'secondaire':
         return transfo;
       default:
         return conso;

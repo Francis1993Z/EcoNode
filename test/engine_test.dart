@@ -1,119 +1,145 @@
-// Vérifie que le moteur Dart reproduit le moteur JS (graine 42) et conserve la monnaie.
-// Valeurs de référence produites par engine.js : new Sim({seed: 42}) puis 1, 30 et 365 jours.
+// Tests du moteur v2 : déterminisme, invariants comptables exacts à chaque jour (mode développement),
+// filets et détecteurs provoqués, modules coupés. Le protocole de stabilité complet est dans tool/stabilite.dart.
 
 import 'package:econodes/engine/model.dart';
 import 'package:econodes/engine/sim.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-void expectClose(double actual, double expected, String label, {double rel = 1e-6}) {
-  final tol = rel * (expected.abs() > 1 ? expected.abs() : 1);
-  expect((actual - expected).abs() <= tol, isTrue, reason: '$label : attendu $expected, obtenu $actual');
+void run(Sim s, int days) {
+  for (var i = 0; i < days; i++) {
+    s.step();
+  }
 }
 
 void main() {
-  test('mulberry32 : suite identique à JS pour la graine 42', () {
-    // JS : const r = mulberry32(42); r(), r(), r()
-    final r = Mulberry32(42);
-    final a = r.next(), b = r.next(), c = r.next();
-    expect(a >= 0 && a < 1, isTrue);
-    expect(b >= 0 && b < 1, isTrue);
-    expect(c >= 0 && c < 1, isTrue);
-    // Deux instances de même graine donnent la même suite.
-    final r2 = Mulberry32(42);
-    expect(r2.next(), a);
-    expect(r2.next(), b);
-    expect(r2.next(), c);
-  });
-
-  test('parité avec le moteur JS (graine 42)', () {
-    final s = Sim(seed: 42);
-    final ref = <int, Map<String, double>>{
-      1: {
-        'wage': 150,
-        'unemp': 0.05,
-        'M': 468521.5165754488,
-        'mH': 242851.15151822462,
-        'mF': 203651.51614048338,
-        'repas': 50.549450549450654,
-        'logement': 40.569239999999944,
-        'gini': 0.12513167332373665,
-        'need': 97.61640117216118,
-        'state': 22018.848916740797,
-      },
-      30: {
-        'wage': 169.97650769730802,
-        'unemp': 0.025,
-        'M': 468521.51657544996,
-        'mH': 247063.5931403413,
-        'mF': 173585.5444952686,
-        'repas': 58.05325504419828,
-        'logement': 54.90564637454012,
-        'gini': 0.19709185438581356,
-        'need': 125.31827104677248,
-        'state': 47872.37893984,
-      },
-      365: {
-        'wage': 168.51502780757355,
-        'unemp': 0.05,
-        'M': 468521.5165754572,
-        'mH': 240038.45184767304,
-        'mF': 177739.9811840228,
-        'repas': 57.089378738954714,
-        'logement': 46.03543500867269,
-        'gini': 0.18370719580484374,
-        'need': 111.41305707289412,
-        'state': 50743.083543761335,
-      },
-    };
-    for (var d = 1; d <= 365; d++) {
-      s.step();
-      final r = ref[d];
-      if (r == null) continue;
-      final h = s.history.last;
-      expectClose(h.wage, r['wage']!, 'salaire j$d');
-      expectClose(h.unemp, r['unemp']!, 'chômage j$d');
-      expectClose(h.total, r['M']!, 'masse j$d');
-      expectClose(h.mH, r['mH']!, 'ménages j$d');
-      expectClose(h.mF, r['mF']!, 'firmes j$d');
-      expectClose(h.prices['repas']!, r['repas']!, 'prix repas j$d');
-      expectClose(h.prices['logement']!, r['logement']!, 'prix logement j$d');
-      expectClose(h.gini, r['gini']!, 'Gini j$d');
-      expectClose(h.need, r['need']!, 'panier j$d');
-      expectClose(s.state.money, r['state']!, 'État j$d');
-    }
-    final workers = s.firms.map((f) => f.workers.length).toList();
-    expect(workers, [13, 3, 1, 3, 2, 18, 4, 2, 6, 24]);
-  });
-
-  test('la monnaie est conservée (1 000 jours, plusieurs graines)', () {
-    for (final seed in [1, 2, 3, 7, 99]) {
-      final s = Sim(seed: seed);
-      for (var i = 0; i < 1000; i++) {
-        s.step();
-      }
-      expect((s.totalMoney() - s.expectedMoney()).abs() < 0.01, isTrue, reason: 'graine $seed');
-    }
-  });
-
-  test('god mode : injection, import/export et fermeture gardent le grand livre juste', () {
-    final s = Sim(seed: 5);
+  test('mulberry32 : deux instances de même graine donnent la même suite', () {
+    final r = Mulberry32(42), r2 = Mulberry32(42);
     for (var i = 0; i < 100; i++) {
-      s.step();
+      final a = r.next();
+      expect(a >= 0 && a < 1, isTrue);
+      expect(r2.next(), a);
     }
+  });
+
+  test('déterminisme : même graine, même partie', () {
+    final a = Sim(seed: 7), b = Sim(seed: 7);
+    run(a, 300);
+    run(b, 300);
+    for (var i = 0; i < a.history.length; i++) {
+      final x = a.history[i], y = b.history[i];
+      expect(y.unemp, x.unemp);
+      expect(y.total, x.total);
+      expect(y.cpi, x.cpi);
+      expect(y.gini, x.gini);
+    }
+    expect(b.events.length, a.events.length);
+    expect(b.nets.total(), a.nets.total());
+  });
+
+  test('invariants comptables exacts à chaque jour, avec et sans filets', () {
+    for (final seed in [1, 2]) {
+      final s = Sim(seed: seed, devChecks: true); // lève une exception au premier écart
+      run(s, 1500);
+      expect(s.inv.worst, 0, reason: 'graine $seed');
+      expect(s.totalMoney(), s.expectedMoney());
+    }
+    final s = Sim(seed: 3, safeguards: Safeguards.none(), devChecks: true);
+    run(s, 800);
+    expect(s.inv.worst, 0);
+  });
+
+  test('god mode : injections, crédit, faillite, fermeture gardent les invariants exacts', () {
+    final s = Sim(seed: 5, devChecks: true);
+    run(s, 100);
     s.godMoney(const Target('allCitizens'), 5000);
     s.godMoney(const Target('allFirms'), -1000);
+    s.godMoney(const Target('bank'), 20000);
     s.setUBI(20);
     s.setTrade(true);
     s.godAddCitizens(10, 1000);
     s.addFirm('restaurant', 'Chez Francis', 20000, null, 600, 300);
-    for (var i = 0; i < 200; i++) {
-      s.step();
-    }
+    run(s, 200);
     s.godRemoveCitizens(5);
+    final indebted = s.firms.where((f) => f.debt > 0).toList();
+    if (indebted.isNotEmpty) s.godFirm(indebted.first.id, forgiveDebt: true);
+    s.godBankrupt(s.firms.firstWhere((f) => f.type == 'raffinerie').id);
     s.removeFirm(s.firms.first.id);
-    for (var i = 0; i < 100; i++) {
-      s.step();
+    run(s, 100);
+    expect(s.inv.worst, 0);
+    expect(s.totalMoney(), s.expectedMoney());
+  });
+
+  test('anti-famine : sans aucun aliment, l’État nourrit et la cause est « pas de producteur »', () {
+    final s = Sim(seed: 4);
+    for (final t in ['boulangerie', 'boucherie', 'peche', 'restaurant']) {
+      s.removeFirm(s.firms.firstWhere((f) => f.type == t).id);
     }
-    expect((s.totalMoney() - s.expectedMoney()).abs() < 0.01, isTrue);
+    run(s, 10);
+    expect(s.nets.total('famine'), greaterThan(0));
+    expect(s.nets.causes['famine']!.containsKey('pas de producteur'), isTrue);
+    expect(s.citizens.every((c) => c.hungerDays < s.safeguards.famineDays), isTrue);
+  });
+
+  test('plancher de logement : sans parc immobilier, abri d’urgence pour cause de « parc plein »', () {
+    final s = Sim(seed: 4);
+    s.removeFirm(s.firms.firstWhere((f) => f.type == 'immobilier').id);
+    run(s, 10);
+    expect(s.nets.total('shelter'), greaterThan(0));
+    expect(s.nets.causes['shelter']!.containsKey('parc plein'), isTrue);
+  });
+
+  test('un filet coupé ne se déclenche plus ; chaque déclenchement est compté une fois', () {
+    final s = Sim(seed: 6);
+    run(s, 150);
+    for (final k in Safeguards.keys) {
+      final byAgent = (s.nets.byAgent[k] ?? const <String, int>{}).values.fold(0, (a, b) => a + b);
+      expect(byAgent, s.nets.total(k), reason: k);
+      s.safeguards.set(k, false);
+    }
+    final before = {for (final k in Safeguards.keys) k: s.nets.total(k)};
+    run(s, 50);
+    for (final k in Safeguards.keys) {
+      expect(s.nets.total(k), before[k], reason: k);
+    }
+  });
+
+  test('détecteur d’invariant : de l’argent apparu hors grand livre ouvre une alerte critique', () {
+    final s = Sim(seed: 8);
+    run(s, 20);
+    s.citizens.first.money += 1; // création monétaire sauvage
+    s.step();
+    expect(s.inv.money, closeTo(1, 1e-9));
+    expect(s.monitor.active.containsKey('invariant'), isTrue);
+    expect(s.monitor.active['invariant']!.critical, isTrue);
+    final dev = Sim(seed: 8, devChecks: true);
+    run(dev, 20);
+    dev.citizens.first.money += 1;
+    expect(dev.step, throwsStateError);
+  });
+
+  test('détecteurs : entreprise sans employé, chômage très élevé', () {
+    final s = Sim(seed: 9, safeguards: Safeguards.none());
+    run(s, 30);
+    final f = s.firms.firstWhere((f) => f.type == 'tourisme');
+    s.godBankrupt(f.id);
+    for (final o in s.firms.where((o) => o.type != 'tourisme').take(18).toList()) {
+      s.removeFirm(o.id);
+    }
+    run(s, 60);
+    expect(s.monitor.opened['sansEmploye'] ?? 0, greaterThan(0));
+    expect(s.monitor.opened['chomageHaut'] ?? 0, greaterThan(0));
+    final a = s.monitor.active['chomageHaut'];
+    if (a != null) {
+      expect(a.since, lessThanOrEqualTo(s.day - s.monitor.cfg.unempDays + 1));
+    }
+  });
+
+  test('modules coupés : ni machines, ni dette, ni publicité, invariants exacts', () {
+    final s = Sim(seed: 10, modules: Modules.none(), devChecks: true);
+    run(s, 300);
+    expect(s.totalDebt(), 0);
+    expect(s.bank.lent, 0);
+    expect(s.firms.every((f) => f.machines == 0 && f.brand == 0 && f.adminCover == 1), isTrue);
+    expect(s.inv.worst, 0);
   });
 }
