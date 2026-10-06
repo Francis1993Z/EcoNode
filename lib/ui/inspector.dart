@@ -1,5 +1,7 @@
 // Onglet Inspecteur : détail de l'élément sélectionné dans le graphe.
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../engine/model.dart';
@@ -740,6 +742,8 @@ class _BankView extends StatelessWidget {
         KV('+ Prêts en cours', money0(loans)),
         KV('= Dépôts du public', money0(dep)),
         KV('+ Fonds propres', money0(b.equity), color: b.equity < 0 ? pal.bad : null),
+        KV('dont capital de départ (parts sociales)', money0(b.capital)),
+        KV('Fonds propres visés', money0(math.max(b.capital, p.bankTargetRatio * loans))),
         KV('Écart du bilan', sim.inv.bank == 0 ? '0 (exact)' : sim.inv.bank.toStringAsExponential(2),
             color: sim.inv.bank == 0 ? pal.ok : pal.bad),
         KV('Ratio fonds propres / prêts', ratio.isNaN ? '—' : pct(ratio),
@@ -773,6 +777,28 @@ class _BankView extends StatelessWidget {
             hint: 'Un jour de jeu = un jour : à ces taux, les intérêts quotidiens sont faibles.',
             onChanged: (v) {
               p.interestRate = v;
+              ctrl.touch();
+            }),
+        ParamSlider(
+            label: 'Prime de risque (à pleine garantie)',
+            value: p.riskSpread,
+            min: 0,
+            max: 0.2,
+            format: pct,
+            hint: 'Ajoutée au taux de base en proportion de la dette rapportée à la valeur des machines.',
+            onChanged: (v) {
+              p.riskSpread = v;
+              ctrl.touch();
+            }),
+        ParamSlider(
+            label: 'Fonds propres visés (part des prêts)',
+            value: p.bankTargetRatio,
+            min: 0,
+            max: 0.5,
+            format: pct,
+            hint: 'La Caisse retient ses bénéfices jusqu’à cette part de l’encours avant toute ristourne.',
+            onChanged: (v) {
+              p.bankTargetRatio = v;
               ctrl.touch();
             }),
         ParamSlider(

@@ -112,8 +112,10 @@ const Map<String, List<String>> desireGoods = {
   'luxe': ['bijoux', 'hotel', 'voyage'],
 };
 
-/// Achats maximum par citoyen et par jour (on ne regarde qu'une télé à la fois).
-const Map<String, int> maxPerDay = {'tele': 1, 'loisirs': 3, 'repas': 3, 'hotel': 1, 'voyage': 1, 'bijoux': 2};
+/// Quantité « normale » par citoyen et par jour (on ne regarde qu'une télé à la fois). Lassitude : le n-ième achat du
+/// même bien dans la journée a un attrait divisé par 1 + (n / normale)². Le budget reste la seule limite :
+/// les achats se répartissent entre les biens au lieu d'être plafonnés, et un riche en achète davantage de chacun.
+const Map<String, double> dailyNorm = {'tele': 1, 'loisirs': 3, 'repas': 3, 'hotel': 1, 'voyage': 1, 'bijoux': 2};
 
 /// Poids des désirs discrétionnaires dans le budget, par classe.
 const Map<String, List<double>> desireWeight = {
@@ -164,6 +166,9 @@ class Template {
   bool get heavy => maint == 'genie';
 }
 
+// Un intrant par unité produite est quelque chose que cette unité consomme vraiment (farine du pain, carburant du
+// voyage, fournitures d'une visite). L'équipement (ordinateurs d'un bureau, matériel d'un studio, matériaux du parc
+// immobilier) relève des machines et de leur entretien, pas de la recette.
 const Map<String, Template> templates = {
   // ---- primaire
   'ferme': Template('Ferme', 'FE', 'primaire', {}, {'grain': 4, 'betail': 0.25}, 1.2, capital: 1.0),
@@ -203,22 +208,20 @@ const Map<String, Template> templates = {
       skill: 2, capital: 0.8, rnd: 'genie'),
   // ---- tertiaire
   'ingPetrole': Template('Ingénierie pétrolière', 'IP', 'tertiaire', {}, {'genie': 1}, 5, skill: 2, capital: 0.3, maint: null),
-  'ingCpu': Template('Ingénierie de CPU', 'IC', 'tertiaire', {'ordinateur': 0.005}, {'conception': 1}, 3,
-      skill: 2, capital: 0.3, maint: null),
-  'marketing':
-      Template('Marketing', 'MK', 'tertiaire', {'ordinateur': 0.002}, {'pub': 1}, 3, skill: 2, capital: 0.3, maint: null),
+  'ingCpu': Template('Ingénierie de CPU', 'IC', 'tertiaire', {}, {'conception': 1}, 3, skill: 2, capital: 0.3, maint: null),
+  'marketing': Template('Marketing', 'MK', 'tertiaire', {}, {'pub': 1}, 3, skill: 2, capital: 0.3, maint: null),
   'comptable': Template('Comptabilité', 'CA', 'tertiaire', {}, {'compta': 1}, 6, skill: 2, capital: 0.3, maint: null),
   'restaurant': Template('Restaurant', 'RE', 'tertiaire', {'pain': 0.4, 'viande': 0.15, 'poisson': 0.1}, {'repas': 1}, 10,
       capital: 0.4, ads: true),
-  'tele': Template('Production télé', 'TV', 'tertiaire', {'electronique': 0.01}, {'tele': 1}, 50,
-      skill: 1, capital: 0.6, ads: true),
+  'tele': Template('Production télé', 'TV', 'tertiaire', {}, {'tele': 1}, 50, skill: 1, capital: 0.6, ads: true),
   'hotel': Template('Hôtel', 'HO', 'tertiaire', {'pain': 0.5, 'viande': 0.2}, {'hotel': 1}, 4, capital: 0.4, ads: true),
   'tourisme': Template('Tourisme', 'VO', 'tertiaire', {'carburant': 0.3}, {'voyage': 1}, 2,
       skill: 1, capital: 0.3, maint: null, ads: true),
   'hopital':
       Template('Hôpital', 'HP', 'tertiaire', {'electronique': 0.1, 'plastique': 0.2}, {'soins': 1}, 3, skill: 2, capital: 0.8),
-  'ecole': Template('École', 'EC', 'tertiaire', {'ordinateur': 0.002}, {'cours': 1}, 12, skill: 2, capital: 0.3, maint: null),
-  'immobilier': Template('Immobilier', 'IM', 'tertiaire', {'bois': 0.05, 'acier': 0.005}, {'logement': 1}, 24, capital: 0.4),
+  'ecole': Template('École', 'EC', 'tertiaire', {}, {'cours': 1}, 12, skill: 2, capital: 0.3, maint: null),
+  // la nuitée ne consomme ni bois ni acier : ils serviront à la construction (plan de stabilisation, tâche 6)
+  'immobilier': Template('Immobilier', 'IM', 'tertiaire', {}, {'logement': 1}, 24, capital: 0.4),
   'divertissement': Template('Divertissement', 'DI', 'tertiaire', {}, {'loisirs': 1}, 8, capital: 0.3, ads: true),
 };
 
@@ -233,8 +236,14 @@ class Params {
   double startWallet = 3000;
   double startWage = 150;
   double markup = 1.15;
-  double propensity = 0.05;
   double bufferDays = 12;
+  // Consommation à la Godley-Lavoie : C = α₁ · (revenu − besoins) + α₂ · (richesse − coussin).
+  // α₁ = 0,6 (valeur du modèle SIM). α₂ = (1 − α₁) / T : chaque ménage converge vers T jours de revenu
+  // discrétionnaire au-delà du coussin. T = 20 reproduit la richesse de départ de la calibration v2
+  // (2 750 $ ≈ 21 jours), pour que le capital initial soit cohérent avec la fonction de consommation.
+  double mpcIncome = 0.6;
+  double wealthTargetDays = 20;
+  double get propensity => (1 - mpcIncome) / wealthTargetDays;
   bool trade = false;
   double importMarkup = 1.3;
   double exportDiscount = 0.7;
@@ -251,10 +260,25 @@ class Params {
   // capital, technologie, crédit
   double interestRate = 0.06; // annuel
   double loanTermDays = 365;
+  // Fonds de roulement : une entreprise rentable dont des clients repartent les mains vides peut emprunter de quoi
+  // embaucher (8 jours de salaires par poste), jusqu'à ce plafond de jours de chiffre d'affaires (« prêt/revenu »).
+  // À 30 jours, la Caisse devenait insolvable dans 4 graines sur 5 (radiations de 30 à 62 k$) ; 15 jours la garde solvable.
+  double workingCapitalDays = 15;
   double depreciation = 0.003; // usure quotidienne des machines entretenues
   double maintNeed = 0.05; // heures d'entretien par machine et par jour
+  // Intrants secondaires : sous cette part du coût d'un lot, un intrant qui manque ralentit la cadence en proportion
+  // de son poids au lieu de l'arrêter (une pêcherie sans carburant pêche moins, elle ne ferme pas). Au-dessus,
+  // la recette est stricte (Leontief). À 5 %, presque aucun intrant ne serait concerné ; 15 % couvre les
+  // ingrédients et fournitures en gardant les matières principales strictes.
+  double softInputShare = 0.15;
   double rndShare = 0.02; // part de la trésorerie excédentaire consacrée à la R-D chaque jour
   double bankRebate = 0.05; // part du surplus de la Caisse ristournée chaque jour
+  // Caisse : capital de départ (parts sociales) et fonds propres visés avant toute ristourne.
+  // 100 $ par citoyen couvre 11,5 % d'un encours de 870 $ par citoyen, bien au-delà des pointes observées ;
+  // la cible de 15 % est celle des grandes banques canadiennes (13,6 % observé), au-dessus du plancher de 11,5 %.
+  double bankCapitalPerCitizen = 100;
+  double bankTargetRatio = 0.15;
+  double riskSpread = 0.06; // prime de risque annuelle à pleine garantie (dette = 80 % des machines)
   // marketing
   double adsShare = 0.03; // part du chiffre d'affaires dépensée en publicité
   double adsEffect = 0.6; // hausse maximale de la dépense des ménages due à la publicité
@@ -600,6 +624,7 @@ class Citizen extends Account {
   int computerDays = 0; // jours d'usage restants de son ordinateur
   double happiness = 1;
   double income = 0;
+  double incomeEma = 0; // revenu net lissé (~10 jours) : base de la consommation
   double spend = 0;
   int daysUnemployed = 0;
   Citizen(this.id, this.name, super.money, this.skill, this.ambition);
@@ -624,6 +649,8 @@ class StateAccount extends Account {
 /// (départ, god mode, commerce) ; les dépôts, l'argent du public (citoyens, entreprises, État).
 class BankAccount extends Account {
   double lent = 0; // total prêté depuis le début
+  double lentMachines = 0; // dont prêts pour acheter des machines
+  double lentWorking = 0; // dont fonds de roulement
   double repaid = 0; // capital remboursé (monnaie détruite)
   double interest = 0; // intérêts encaissés
   double capitalized = 0; // intérêts impayés ajoutés à la dette
@@ -631,6 +658,7 @@ class BankAccount extends Account {
   double rebates = 0; // ristournes versées
   double reserves = 0; // tenu par les flux : départ + god mode + exportations − importations
   double equity = 0; // tenu par les flux : intérêts + intérêts capitalisés − radiations − ristournes + god mode
+  double capital = 0; // parts sociales de départ, jamais ristournées
   BankAccount(super.money);
 }
 
@@ -651,7 +679,7 @@ class Firm extends Account {
   String name;
   final Map<String, double> inputs;
   final Map<String, double> outputs;
-  final double rate;
+  double rate; // lots par employé et par jour ; réduit au départ si la demande n'occupe pas un employé (échelle minimale)
   double? capacity;
   double prodMult = 1;
   int? ownerId;
@@ -682,6 +710,7 @@ class Firm extends Account {
   int lastDistressLog = -99;
   int lastRecapLog = -99;
   double lastBatches = 0;
+  double outputEma = 0; // production lissée (~20 jours) : base du coût du travail réellement payé
   double effWorkers = 0;
   bool inputLimited = false;
   int desired = 0;
@@ -700,6 +729,7 @@ class Firm extends Account {
   int lastInvest = -99;
   // dette
   double debt = 0;
+  double workingDebt = 0; // part de la dette prêtée en fonds de roulement (pour le suivi des pertes)
   double interestToday = 0;
   int missedPayments = 0;
   int creditBanUntil = -1;

@@ -44,6 +44,7 @@ const Map<String, String> alertLabels = {
   'sansEmploye': 'Entreprise sans employé',
   'sansClient': 'Entreprise sans client',
   'invariant': 'Invariant comptable rompu',
+  'caisse': 'Caisse insolvable',
 };
 
 /// Alertes critiques : aucune ne doit apparaître dans une partie stable.
@@ -174,6 +175,14 @@ class Monitor {
       cond('sansClient:${f.id}', 'sansClient', sold <= eps, c.noClientDays + 1, 0, 0,
           () => '${f.name} n’a rien vendu depuis plus de ${c.noClientDays} j', () => [f.name]);
     }
+
+    // ---- Caisse : fonds propres négatifs (radiations supérieures au capital et aux intérêts retenus)
+    cond('caisse', 'caisse', s.bank.equity < 0, 1, s.bank.equity, 0,
+        () => 'fonds propres de ${fmtMoney0(s.bank.equity)} pour ${fmtMoney0(s.totalDebt())} de prêts',
+        () => [
+              for (final f in s.firms.where((f) => f.missedPayments > 0).take(4))
+                '${f.name} (${f.missedPayments} j de retard)'
+            ]);
 
     // ---- invariant comptable
     final inv = s.inv;

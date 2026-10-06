@@ -198,17 +198,20 @@ class Sim {
     lastFlows = DayFlows();
     final p = this.params;
     state = StateAccount(250.0 * p.population);
-    bank = BankAccount(0);
+    bank = BankAccount(quantize(p.bankCapitalPerCitizen * p.population));
+    bank.capital = bank.money;
     for (final g in goods.keys) {
       marketStats[g] = MarketStat();
     }
 
-    final scen = scenario ?? defaultScenario;
+    final full = scenario ?? defaultScenario;
     final perType = <String, int>{};
-    for (final s in scen) {
+    for (final s in full) {
       perType[s.type] = (perType[s.type] ?? 0) + 1;
     }
-    final plan = _plan(p, scen, perType);
+    final plan = _plan(p, full, perType);
+    // une entreprise dont le produit n'a aucune demande (module coupé) n'est pas créée
+    final scen = full.where((s) => plan.batches[s.type]! > 1e-6).toList();
     worldPrice = Map<String, double>.from(plan.price);
     cpiWeights = {
       for (final g in householdGoods)
@@ -243,7 +246,10 @@ class Sim {
 
     final created = <Firm>[];
     for (final s in scen) {
-      created.add(_newFirm(s.type, s.name, 0, null, 0, 0, plan.price));
+      final f = _newFirm(s.type, s.name, 0, null, 0, 0, plan.price);
+      // échelle minimale : si la demande n'occupe pas un employé à plein temps, la petite production est moins productive
+      f.rate = f.template.rate * _minScale(plan.workers[s.type]!, perType[s.type]!);
+      created.add(f);
     }
     // les postes les plus qualifiés d'abord, chacun pris par le candidat le moins surqualifié
     final pool = _shuffle(List<Citizen>.from(citizens));
@@ -277,8 +283,13 @@ class Sim {
       }
       f.machines = (plan.machinesPerWorker[f.type]! * f.workers.length).roundToDouble();
       f.revenueEma = revenue;
+      f.outputEma = batches;
       f.money = quantize(math.max(6000.0, 12 * (f.wage * f.workers.length + inputCost)));
       f.ownerId = citizens[(rng() * citizens.length).floor()].id;
+    }
+    for (final c in citizens) {
+      final f = c.employer != null ? firm(c.employer!) : null;
+      c.incomeEma = f != null ? f.wage * (1 - p.taxRate) : p.benefit;
     }
     m0 = totalMoney();
     bank.reserves = m0; // toute la monnaie de départ est « extérieure »
@@ -339,6 +350,10 @@ class Sim {
       return lo;
     }
 
+    // passe 1 : équipements et effectifs sans pénalité de petite taille ; passe 2 : prix avec la pénalité,
+    // équipements figés (sinon des machines chères font disparaître la demande de machines, et la Machinerie avec)
+    var scaled = false;
+
     void solve(double lambda) {
       for (var it = 0; it < 80; it++) {
         final d = <String, double>{
@@ -377,9 +392,9 @@ class Sim {
           final t = templates[ty]!;
           final n = count[ty]!;
           final wage = p.startWage * classWage[t.skill];
-          k[ty] = kStar(t, wage);
+          if (!scaled) k[ty] = kStar(t, wage);
           final mach = k[ty]! * w[ty]!;
-          var cost = wage / perW(ty);
+          var cost = wage / (perW(ty) * (scaled ? _minScale(w[ty]!, n) : 1.0));
           for (final e in t.inputs.entries) {
             cost += e.value * price[e.key]!;
           }
@@ -424,8 +439,13 @@ class Sim {
       lambda = lo;
       solve(lo);
     }
+    scaled = true;
+    solve(lambda);
     return _Plan(price, w, b, k, lambda);
   }
+
+  /// Part de la productivité nominale d'une entreprise trop petite pour occuper un employé à plein temps.
+  static double _minScale(double workers, int firms) => (workers / firms).clamp(0.001, 1.0).toDouble();
 
   Citizen _newCitizen(double money, [double? skill]) {
     var name = '';
@@ -596,6 +616,16 @@ class Sim {
   /// Lots par employé et par jour, à efficacité 1.
   double perWorker(Firm f) => f.rate * f.prodMult * machineMult(f) * techMult(f) * uptime(f) * adminMult(f);
 
+  /// Taux annuel d'une entreprise : taux de base + prime de risque proportionnelle à son endettement,
+  /// mesuré par rapport à la valeur de ses machines (garantie maximale : 80 %).
+  double loanRate(Firm f, [double? machinePrice]) {
+    final p = params;
+    if (f.debt <= 0) return p.interestRate;
+    final pm = machinePrice ?? bestPrice('machines');
+    final lev = pm > 0 ? (f.debt / (math.max(f.machines, 1.0) * pm)).clamp(0.0, 1.0) : 0.0;
+    return p.interestRate + p.riskSpread * lev;
+  }
+
   /// Services de R-D à accumuler pour passer au niveau technologique suivant.
   double rndCost(int level) => 40.0 * level * level;
 
@@ -629,14 +659,19 @@ class Sim {
   }
 
   /// Coût d'un lot : salaires, intrants au prix du marché, frais fixes (services, intérêts, usure), réparti entre les extrants.
+  /// Un employé ne se divise pas : si l'équipe est sous-employée, ses salaires se répartissent sur la production prévue.
   Map<String, double> unitCost(Firm f) {
     final p = params;
-    var batch = f.wage / math.max(eps, perWorker(f));
+    final per = math.max(eps, perWorker(f));
+    final capacity = math.max(1, f.workers.length) * per;
+    // utilisation de l'équipe sur ~20 jours : les achats des clients arrivent par lots, le coût ne doit pas suivre chaque creux
+    final util = f.workers.isEmpty ? 1.0 : (f.outputEma / capacity).clamp(0.05, 1.0);
+    var batch = f.wage / (per * util);
+    final planned = math.max(math.max(f.lastBatches, _plannedBatches(f)), 0.05 * capacity);
     for (final e in f.inputs.entries) {
       batch += e.value * bestPrice(e.key);
     }
-    final planned = math.max(1.0, math.max(f.lastBatches, _plannedBatches(f)));
-    var fixed = f.overheadEma + f.debt * p.interestRate / 365;
+    var fixed = f.overheadEma + f.debt * loanRate(f) / 365;
     if (modules.capital) fixed += f.machines * p.depreciation * bestPrice('machines');
     batch += fixed / planned;
     var tot = 0.0;
@@ -756,6 +791,7 @@ class Sim {
       f.prevWorkers = f.workers.length;
     }
     for (final c in citizens) {
+      c.incomeEma = 0.9 * c.incomeEma + 0.1 * c.income; // revenu complet de la veille (dividendes compris)
       c.income = 0;
       c.spend = 0;
     }
@@ -855,19 +891,36 @@ class Sim {
       }
       final laborBatches = _capBatches(f, eff * perWorker(f));
       var batches = laborBatches;
-      for (final e in f.inputs.entries) {
-        batches = math.min(batches, (f.inv[e.key] ?? 0) / e.value);
+      if (f.inputs.isNotEmpty) {
+        // intrants principaux : recette stricte ; intrants secondaires : la cadence baisse en proportion de leur poids
+        final theta = params.softInputShare;
+        final prices = <String, double>{for (final g in f.inputs.keys) g: bestPrice(g)};
+        var lotCost = f.wage / math.max(eps, perWorker(f));
+        for (final e in f.inputs.entries) {
+          lotCost += e.value * prices[e.key]!;
+        }
+        var soft = 1.0;
+        for (final e in f.inputs.entries) {
+          final stock = f.inv[e.key] ?? 0;
+          final share = lotCost > eps ? e.value * prices[e.key]! / lotCost : 1.0;
+          if (share >= theta) {
+            batches = math.min(batches, stock / e.value);
+          } else if (laborBatches > eps) {
+            final avail = math.min(1.0, stock / (e.value * laborBatches));
+            soft *= 1 - (1 - avail) * share / theta;
+          }
+        }
+        batches = math.min(batches, laborBatches * soft);
       }
       f.inputLimited = batches < laborBatches - eps;
-      final g0 = f.g0;
-      if (!goods[g0]!.perish && (f.inv[g0] ?? 0) > 2 * params.invTargetDays * math.max(f.demandEma[g0] ?? 0, 0.5)) {
-        batches = math.min(batches, _plannedBatches(f)); // entrepôt plein : on ralentit
-      }
-      batches = math.max(0.0, batches);
+      // on produit la demande prévue (et le réassort du stock visé), pas toute la capacité de l'équipe
+      batches = math.max(0.0, math.min(batches, _plannedBatches(f)));
       f.lastBatches = batches;
+      f.outputEma = 0.95 * f.outputEma + 0.05 * batches;
       f.effWorkers = eff;
       for (final e in f.inputs.entries) {
-        f.inv[e.key] = (f.inv[e.key] ?? 0) - batches * e.value;
+        final stock = f.inv[e.key] ?? 0;
+        f.inv[e.key] = stock - math.min(stock, batches * e.value); // un intrant secondaire manquant n'est pas consommé
       }
       for (final e in f.outputs.entries) {
         final q = batches * e.value;
@@ -1076,9 +1129,9 @@ class Sim {
       final u = uses[g]!;
       final pts = u.pts[desire] ?? 0;
       if (pts <= 0) continue;
-      if (counts != null && (counts[g] ?? 0) >= (maxPerDay[g] ?? 99)) continue;
       final h = hype[g] ?? 0;
-      final appeal = u.taste[lvl] * pts * (1 + 0.4 * h / (h + 10));
+      final n = (counts?[g] ?? 0) / (dailyNorm[g] ?? 1);
+      final appeal = u.taste[lvl] * pts * (1 + 0.4 * h / (h + 10)) / (1 + n * n);
       final s0 = appeal / math.max(0.01, bestPrice(g));
       if (s0 > topScore) {
         topScore = s0;
@@ -1167,19 +1220,29 @@ class Sim {
     }
   }
 
-  /// Dépenses discrétionnaires : une part du surplus, répartie entre divertissement et luxe selon la classe.
-  void _leisure(Citizen c) {
+  /// Budget discrétionnaire du jour : C = α₁ · (revenu − besoins) + α₂ · (richesse − coussin), à la Godley-Lavoie.
+  /// Chaque ménage converge vers T jours de revenu discrétionnaire ; personne n'accumule sans fin.
+  /// La publicité accélère la dépense de l'épargne (richesse visée T / adsBoost) ; elle ne fait pas dépenser
+  /// plus que le revenu, ce qui viderait les ménages puis ferait monter les prix.
+  double leisureBudget(Citizen c) {
     final p = params;
-    final surplus = c.money - p.bufferDays * needCost;
-    if (surplus <= 0) return;
-    final budget = surplus * p.propensity * adsBoost;
+    final excess = math.max(0.0, c.money - p.bufferDays * needCost);
+    final income = math.max(0.0, c.incomeEma - needCost);
+    return p.mpcIncome * income + p.propensity * adsBoost * excess;
+  }
+
+  /// Dépenses discrétionnaires : le budget du jour, réparti entre divertissement et luxe selon la classe,
+  /// puis dépensé bien par bien (le plus de satisfaction par dollar, lassitude comprise).
+  void _leisure(Citizen c) {
+    final budget = math.min(leisureBudget(c), c.money);
+    if (budget <= eps) return;
     final lvl = c.level;
     final wDiv = desireWeight['divertissement']![lvl] * (0.25 + math.max(0.0, 1 - c.sat['divertissement']!));
     final wLux = desireWeight['luxe']![lvl] * (0.25 + math.max(0.0, 1 - c.sat['luxe']!));
     final counts = <String, int>{};
     for (final d in const ['divertissement', 'luxe']) {
       var share = budget * (d == 'luxe' ? wLux : wDiv) / (wDiv + wLux);
-      for (var k = 0; k < 6 && share > eps; k++) {
+      for (var k = 0; k < 60 && share > eps; k++) {
         var g = _choose(c, desireGoods[d]!, d, share, counts, signal: k == 0);
         if (g == null) {
           // rien d'abordable avec ce budget : on s'offre le favori de temps en temps (en moyenne, le budget)
@@ -1325,7 +1388,6 @@ class Sim {
   /// Usure des machines, service de la dette, investissement, ristournes de la Caisse.
   void _capital() {
     final p = params;
-    final r = p.interestRate / 365;
     final pm = bestPrice('machines');
     for (final f in _shuffle(List<Firm>.from(firms))) {
       final key = f.id.toString();
@@ -1339,7 +1401,7 @@ class Sim {
       // service de la dette
       f.interestToday = 0;
       if (f.debt > 0) {
-        final interest = quantize(f.debt * r);
+        final interest = quantize(f.debt * loanRate(f, pm) / 365);
         if (f.money >= interest) {
           final paid = transfer(f, bank, interest);
           bank.interest += paid;
@@ -1376,10 +1438,11 @@ class Sim {
       }
       if (modules.capital) _invest(f, pm);
     }
-    // la Caisse ristourne son surplus à ses membres (tous les citoyens)
-    const reserve = 2000.0;
-    if (bank.money > reserve && citizens.isNotEmpty && p.bankRebate > 0) {
-      final each = (bank.money - reserve) * p.bankRebate / citizens.length;
+    // la Caisse ristourne son surplus à ses membres (tous les citoyens), une fois ses fonds propres au-dessus
+    // de la cible (part des prêts) et de son capital de départ
+    final surplus = math.min(bank.money, bank.equity - math.max(bank.capital, p.bankTargetRatio * totalDebt()));
+    if (surplus > eps && citizens.isNotEmpty && p.bankRebate > 0) {
+      final each = surplus * p.bankRebate / citizens.length;
       var total = 0.0;
       for (final c in citizens) {
         final a = transfer(bank, c, each);
@@ -1423,10 +1486,13 @@ class Sim {
     for (final e in f.inputs.entries) {
       margin -= e.value * bestPrice(e.key);
     }
-    // si la demande attend, la machine rapporte des ventes ; sinon elle remplace du travail
+    // une équipe déjà sous-employée n'a besoin d'aucune capacité de plus
+    if (f.outputEma < 0.8 * w * perWorker(f)) return;
+    // si la demande attend, la machine rapporte des ventes ; sinon elle remplace du travail, ce qui suppose
+    // de pouvoir se passer d'un employé (impossible sous un employé)
     final growing = f.urgency > 0.05 || (f.vacancies > 0 && f.unfilledDays > 1);
-    final value = growing ? mpM * math.max(0.0, margin) : f.wage * mpM / math.max(eps, mpL);
-    final cost = pm * (p.interestRate / 365 + p.depreciation + 0.001);
+    final value = growing ? mpM * math.max(0.0, margin) : (nw >= 2 ? f.wage * mpM / math.max(eps, mpL) : 0.0);
+    final cost = pm * (loanRate(f, pm) / 365 + p.depreciation + 0.001);
     if (value < 1.3 * cost) return;
     final price = quote('machines');
     if (!price.isFinite) {
@@ -1435,7 +1501,7 @@ class Sim {
     }
     final cash = f.money - 6 * (f.wage * w + f.inputSpendEma);
     if (cash < price) {
-      if (!modules.credit || day < f.creditBanUntil || f.profitEma < -0.002 * price) return;
+      if (!modules.credit || day < f.creditBanUntil || f.profitEma <= 0) return; // pas de crédit à une entreprise en perte
       final need = price - math.max(0.0, cash);
       if (f.debt + need > 0.8 * (f.machines + 1) * price) return; // garantie : 80 % de la valeur des machines
       if (safeguards.credit && !_creditOk(f, need)) return;
@@ -1448,11 +1514,27 @@ class Sim {
     }
   }
 
+  /// Fonds de roulement : une entreprise qui a des clients en attente et vend au-dessus de son coût emprunte
+  /// de quoi payer 8 jours de salaires aux postes qu'elle veut ouvrir, dans la limite de 30 jours de chiffre d'affaires.
+  void _workingCapital(Firm f, int posts) {
+    final p = params;
+    if (!modules.credit || posts <= 0 || day < f.creditBanUntil || f.urgency < 0.05) return;
+    // la Caisse ne finance qu'une entreprise durablement rentable, dont les ventes couvrent déjà les salaires
+    if (f.profitEma <= 0 || f.revenueEma < f.wage * f.workers.length) return;
+    final need = f.wage * 8 * (f.workers.length + posts) - f.money;
+    if (need <= 0) return;
+    final room = p.workingCapitalDays * f.revenueEma - f.debt;
+    final amt = math.min(need, room);
+    if (amt < f.wage * 8) return; // pas même de quoi ouvrir un poste
+    if (safeguards.credit && !_creditOk(f, amt)) return;
+    _lend(f, amt, working: true);
+  }
+
   /// Anti-crédit-fou : plafond paiements/valeur ajoutée et ratio minimal de fonds propres de la Caisse.
   bool _creditOk(Firm f, double need) {
     final sg = safeguards;
     final p = params;
-    final pay = (f.debt + need) * (p.interestRate / 365 + 1 / p.loanTermDays);
+    final pay = (f.debt + need) * (loanRate(f) / 365 + 1 / p.loanTermDays);
     final added = math.max(0.0, f.revenueEma - f.inputSpendEma);
     if (pay > sg.maxPaymentRatio * added) {
       _net('credit', f.name, need, 'paiements > ${fmtPct(sg.maxPaymentRatio, 0)} de la valeur ajoutée',
@@ -1468,11 +1550,17 @@ class Sim {
     return true;
   }
 
-  void _lend(Firm f, double amt) {
+  void _lend(Firm f, double amt, {bool working = false}) {
     final a = transfer(null, f, amt); // la Caisse crée la monnaie qu'elle prête
     f.debt += a;
     ledgerCredit += a;
     bank.lent += a;
+    if (working) {
+      bank.lentWorking += a;
+      f.workingDebt += a;
+    } else {
+      bank.lentMachines += a;
+    }
     dayFlows.loans += a;
     _flow('B', f.id.toString(), '\$prêts', 1, a);
   }
@@ -1529,12 +1617,12 @@ class Sim {
         if (g == f.g0) f.urgency = demand > eps ? um / demand : 0.0;
         f.demandEma[g] = 0.85 * (f.demandEma[g] ?? 0) + 0.15 * demand;
         f.markup[g] = f.markup[g] ?? baseMk;
-        if (f.lockPrice) continue;
+        if (f.lockPrice || f.workers.isEmpty) continue; // sans employés, le prix affiché reste celui de la fermeture
         // signal de rareté : stock trop bas (ou capacité saturée) → marge ↑ ; surstock → marge ↓
         var dir = 0;
+        final prod = f.produced[g] ?? 0;
         if (goods[g]!.perish) {
-          final prod = f.produced[g] ?? 0;
-          final util = prod > eps ? (f.sold[g] ?? 0) / prod : (um > 0 ? 1.0 : 0.0);
+          final util = prod > eps ? (f.sold[g] ?? 0) / prod : 0.0;
           if (um > eps && util > 0.97) {
             dir = 1;
           } else if (util < 0.85 && prod > eps) {
@@ -1542,8 +1630,8 @@ class Sim {
           }
         } else {
           final days = (f.inv[g] ?? 0) / math.max(f.demandEma[g]!, 0.05);
-          if (days < 2 && demand > eps) {
-            dir = 1;
+          if (days < 2 && demand > eps && (prod > eps || (f.inv[g] ?? 0) > eps)) {
+            dir = 1; // la rareté ne fait monter le prix que si l'entreprise a de quoi vendre ou produit
           } else if (days > 8) {
             dir = -1;
           }
@@ -1579,7 +1667,11 @@ class Sim {
       if (nw > 0 && f.money < bill * 2) {
         _fire(f, _cmap[f.workers[nw - 1]]);
       } else if (desired > nw) {
-        final affordable = (f.money / (f.wage * 8)).floor() - nw;
+        var affordable = (f.money / (f.wage * 8)).floor() - nw;
+        if (affordable < math.min(desired - nw, 3)) {
+          _workingCapital(f, math.min(desired - nw, 3));
+          affordable = (f.money / (f.wage * 8)).floor() - nw;
+        }
         f.vacancies = math.max(0, math.min(desired - nw, math.min(3, affordable)));
       } else if (desired < nw - 1) {
         final k = math.min(nw - desired - 1, math.max(1, (nw * 0.08).ceil()));

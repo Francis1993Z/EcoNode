@@ -162,3 +162,222 @@ sans effet notable :
 - les montants sont arrondis au 2⁻¹⁰ $ inférieur, soit moins de 0,001 $ par transfert ;
 - un transfert ne peut plus passer sous zéro ;
 - `recapitalize`, `lending`, `publicHealth` et `publicEducation` sont passés dans `Safeguards` et `Modules`.
+
+## 4. Journal des corrections
+
+### Tâche 1 — Coût de revient fondé sur le travail réellement payé (4 octobre 2026)
+
+Rapports : [`tache1-noyau.md`](tache1-noyau.md) (comparé à `stabilite-noyau.json`) et
+[`tache1-complet.md`](tache1-complet.md) (comparé à `stabilite-avant.json`).
+
+**Ce qui a changé** (aucun paramètre de calibration modifié) :
+
+- **1a — coût du travail réel.** Le salaire par lot est divisé par l'utilisation de l'équipe lissée sur ~20 jours
+  (plancher 5 %). Une première version qui suivait la production prévue du jour faisait exploser les prix
+  (×8 en 5 jours, effondrement du noyau) : les clients achètent par lots, la demande quotidienne a des creux.
+- **1b — production au plan.** Une entreprise produit la demande prévue et le réassort de son stock visé, au lieu de
+  produire à pleine capacité jusqu'à 8 jours de stock (seuil qui déclenchait aussitôt ses baisses de prix).
+- **1c — dimensionnement à l'échelle minimale.** Au départ, une entreprise dont la demande n'occupe pas un employé à
+  plein temps a une productivité réduite d'autant (une petite production est moins efficace), ce qui rend ses prix de
+  départ cohérents avec son coût réel. Une entreprise dont le produit n'a aucune demande (module coupé) n'est pas créée.
+
+**Résultats** (moyenne ou plage des 5 graines) :
+
+| Indicateur | Noyau avant | Noyau après | Complet avant | Complet après |
+|---|---|---|---|---|
+| Renflouements / 50 j (avec filets) | 63,8 | **6,4** | 66,1 | **14,5** |
+| Plafond de dérive / 50 j | 113,4 | 62,9 | 226,5 | 226,7 |
+| Anti-crédit-fou / 50 j | — | — | 67,1 | 142,8 |
+| Plancher de logement / 50 j | 0,0 | 0,0 | 12,7 | 0,0 |
+| Sans filets : chômage moyen | 4,1 % | 24,7 % | 86,9 % | 70,7 % |
+| Sans filets : faim moyenne | 0,0 % | 0,0 % | 87,0 % | 66,3 % |
+| Sans filets : sans-abri moyen | 100 % | 18,8 % | 95,9 % | 91,8 % |
+| Sans filets : Gini moyen | 0,25 | 0,82 | 0,59 | 0,94 |
+| Avec filets : chômage moyen | 4,9–7,7 % | 9,5–17,4 % | 3,7–6,2 % | 13,8–32,1 % |
+| Avec filets : Gini moyen | 0,46–0,63 | 0,71–0,84 | 0,28–0,45 | 0,81–0,89 |
+| Chocs résorbés en < 200 j (avec filets) | — | — | 5 / 15 | 0 / 15 |
+| Écart comptable max | 0 exact | 0 exact | 0 exact | 0 exact |
+
+**Correctif.** Une première mesure du modèle complet était faussée : la pénalité de petite taille (1c) bouclait sur le
+calcul des équipements de départ (machines chères → aucune demande de machines → Machinerie et Garage non créés).
+Les chiffres ci-dessus sont ceux d'après le correctif (équipements calculés d'abord, pénalité ensuite). Avec filets,
+la Caisse ne prête toujours rien : ses fonds propres sont nuls et l'anti-crédit-fou refuse tout (tâche 8).
+
+**Lecture.** La fuite visée est presque refermée : les entreprises sous-employées ne vendent plus sous leur coût
+(renflouements ÷ 4,5 à ÷ 10, plus d'abri d'urgence), et le noyau ne perd plus son parc de logements. Mais sur le
+modèle complet, le bilan est négatif : la partie jouable (avec filets) passe à 14–32 % de chômage et aucun choc ne se résorbe. Mais elle en révèle une autre, qui
+domine maintenant : **les propriétaires d'entreprises rentables thésaurisent**. Exemple (noyau, graine 1, jour 800) :
+la propriétaire du bar touche ~730 $ de dividendes par jour et en dépense 354 ; elle détient 560 000 $. Les plafonds
+d'achats quotidiens empêchent les riches de dépenser, la monnaie sort du circuit, les salaires baissent de 175 $ à
+55 $ et le Gini dépasse 0,8. Avant la tâche 1, les pertes des entreprises servaient malgré elles de canal de
+recirculation. Le salaire minimum à 220 $, qui représente maintenant +120 % sur des salaires tombés vers 100 $, ne se
+résorbe plus.
+
+**Renflouements restants** : la filière informatique (puces, aluminium, bauxite, conception, ordinateurs), qui tourne à
+5–14 % de sa capacité en autarcie à 240 habitants ; la ferme (deux produits liés, dont un s'écoule mal) ; l'hôpital,
+dont la demande tombe quand le trésor passe sous son plancher (modèle complet).
+
+**Suite proposée** : avancer la tâche 4 (consommation : dépense de la richesse décroissante mais sans plafonds durs
+pour les riches, budget à étages ; cf. phase 1 de la feuille de route), qui est désormais la fuite principale.
+
+### Tâche 4 — Consommation stock-flux (4 octobre 2026)
+
+Rapports : [`tache4-8-noyau.md`](tache4-8-noyau.md) (comparé à `stabilite-noyau.json`), [`tache4-8-complet.md`](tache4-8-complet.md)
+(comparé à `stabilite-avant.json`), [`tache4-8-graine42.md`](tache4-8-graine42.md) (la graine jouée par défaut).
+
+**Ce qui a changé :**
+
+- **Fonction de consommation** (`leisureBudget`) : budget discrétionnaire du jour
+  C = α₁ · (revenu lissé − besoins) + α₂ · (richesse − coussin), à la Godley-Lavoie. Chaque ménage converge vers
+  T jours de revenu discrétionnaire au-delà du coussin ; personne n'accumule sans fin. Le revenu est lissé sur
+  ~10 jours (`incomeEma`, dividendes compris).
+- **Calibration, avec la raison.** α₁ = 0,6 (valeur du modèle SIM de Godley & Lavoie citée dans le rapport).
+  `propensity` (0,05/j) est remplacé par α₂ = (1 − α₁) / T avec T = 20 jours : c'est la richesse de départ de la
+  calibration v2 (2 750 $ ≈ 21 jours de revenu discrétionnaire), pour que le capital initial soit cohérent avec la
+  fonction de consommation. Deux essais l'ont imposé : α₁ = 0,95 (PMC « des pauvres », Carroll) donnait une richesse
+  visée de 1 jour, les ménages vidaient 20 jours d'épargne d'un coup, l'indice des prix faisait ×12. La variante
+  « α décroissant avec la richesse » n'est pas retenue pour l'instant : à T égal, elle ne change que la vitesse
+  d'ajustement ; à T croissant avec la richesse, elle recrée la concentration. À revoir avec l'aspiration de luxe
+  de la feuille de route (phase 7).
+- **Plafonds d'achat remplacés par des normes souples** (`dailyNorm`, lassitude en 1 + (n/normale)²). Sans eux, les
+  riches ne pouvaient pas dépenser (c'était la fuite) ; sans lassitude, tout le budget allait aux biens les moins chers
+  (6 abonnements télé par personne et par jour, hôtels et voyages vidés, chômage à 25 %).
+- **Publicité** : elle n'accélère plus que la dépense de l'épargne (richesse visée T / adsBoost). Appliquée au budget
+  entier, elle faisait dépenser 160 % du revenu : c'est elle qui faisait exploser le modèle complet (indice ×90).
+- **Prix des entreprises inactives** (deux bogues révélés par la dépense libérée) : une entreprise qui ne produit
+  rien ne monte plus son prix sur la demande non servie ; sans employés, son prix est figé et son coût calculé à
+  l'utilisation nominale. Avant, les prix fantômes des entreprises mortes montaient sans fin (voyage à 2 600 $) et
+  empoisonnaient les coûts en aval et l'indice des prix.
+
+**Résultats (5 graines × 1 500 jours) :**
+
+| Indicateur | Noyau, origine | Noyau, après | Complet, origine | Complet, après |
+|---|---|---|---|---|
+| Sans filets : chômage moyen | 4,1 % | 7,7 % | 86,9 % | 62,3 % |
+| Sans filets : faim moyenne | 0,0 % | 2,2 % | 87,0 % | 60,7 % |
+| Sans filets : sans-abri moyen | 100 % | 88,9 % | 95,9 % | 84,9 % |
+| Sans filets : Gini moyen | 0,25 | 0,33 | 0,59 | 0,70 |
+| Avec filets : chômage moyen | 4,9–7,7 % | **1,5–2,8 %** | 3,7–6,2 % | 3,1–8,4 % |
+| Avec filets : faim moyenne | 0 % | 0 % | 0 % | 0–1,8 % |
+| Avec filets : sans-abri moyen | 0 % | 0–0,2 % | 0,2–1,3 % | 0,6–4,9 % |
+| Avec filets : Gini moyen | 0,46–0,63 | **0,11–0,33** | 0,28–0,45 | **0,20–0,37** |
+| Renflouements / 50 j | 63,8 | 14,4 | 66,1 | 19,7 |
+| Plancher de logement / 50 j | 0,0 | 0,1 | 12,7 | 85,9 |
+| Anti-famine / 50 j | 0,0 | 0,0 | 0,0 | 11,9 |
+| Chocs résorbés en < 200 j (avec filets) | — | — | 5 / 15 | 5 / 15 |
+| Écart comptable max | 0 exact | 0 exact | 0 exact | 0 exact |
+
+**Lecture.** La fuite visée est refermée : dans le noyau sans filets, le Gini reste à 0,33 (0,82 après la tâche 1
+seule), les propriétaires détiennent 40 % de la richesse au lieu de 85 %, et la partie avec filets est meilleure
+qu'à l'origine sur tous les indicateurs. Dans le modèle complet, le Gini s'améliore et les renflouements sont divisés
+par 3, mais la faim et les sans-abri sont plus fréquents (graine 1 : 1 469 aides alimentaires, cause « pas de
+producteur » ; plancher de logement « parc plein » à 95 %). Ce qui reste casse l'économie est la **fragilité des
+chaînes à fournisseur unique** (tâche 2) : à 240 habitants, puits, mines, raffinerie, plastique, électronique et
+machinerie tournent à 5–15 % de la capacité d'un seul employé ; avec leur coût désormais honnête (tâche 1), elles
+vendent très cher ou meurent, et tout l'aval suit (tourisme, pêche, télé, logement). Le parc de machines fond
+(429 → 231 en 200 jours dans la graine 42) parce que la Machinerie, dont les intrants viennent de ces entreprises,
+vend 7 000 à 14 600 $ l'unité au lieu de 1 259 $ : plus personne n'investit. Les chocs « hélicoptère » et
+« immigrants » ne se résorbent toujours pas.
+
+### Tâche 8 — Caisse populaire (4 octobre 2026)
+
+**Ce qui a changé :**
+
+- **Capital de départ** : 100 $ par citoyen (`bankCapitalPerCitizen`, 24 000 $ pour 240 habitants, compté dans la
+  masse de départ). Il couvre 11,5 % d'un encours de 870 $ par citoyen, bien au-delà des pointes observées
+  (≈ 300 $ par citoyen). Avant, la Caisse n'avait aucun fonds propre et l'anti-crédit-fou refusait tout : c'est
+  pourquoi elle ne prêtait rien dans le jeu.
+- **Bénéfices retenus** : plus de ristourne tant que les fonds propres sont sous max(capital de départ,
+  15 % de l'encours) (`bankTargetRatio` = 0,15, le niveau observé des grandes banques canadiennes, au-dessus du
+  plancher de 11,5 % du filet).
+- **Prime de risque** (`loanRate`) : taux = taux de base + 6 % × (dette / valeur des machines), soit jusqu'à +4,8 %
+  à pleine garantie (`riskSpread` = 0,06). Elle entre dans les intérêts, le coût de revient et le calcul
+  d'investissement.
+- **Alerte « Caisse insolvable »** (fonds propres négatifs) dans le moniteur ; capital et fonds propres visés
+  dans l'inspecteur de la Caisse.
+
+**Résultats :** dans la partie par défaut (graine 42, filets actifs), la Caisse prête 55 000 $ en 100 jours sans
+aucun refus, ses fonds propres restent à 24 000 $. Sur 5 graines avec filets, l'anti-crédit-fou passe de 67 à 17,5
+déclenchements par 50 jours (presque tous sur les graines 3 à 5, où les radiations des entreprises mortes
+consomment le capital). Sans filets, la Caisse se vide par radiations (16 500 → 200 $ en 300 jours) : l'alerte
+« Caisse insolvable » suit cet état.
+
+**Suite proposée** : tâche 2 (intrants mineurs non bloquants, achat de dépannage à l'extérieur), désormais la cause
+dominante, puis tâche 5 (entrée et sortie d'entreprises) et tâche 3 (lissage des prix).
+
+### Tâche 2 — Intrants mineurs non bloquants (5 octobre 2026)
+
+Rapports : [`tache2-7-noyau.md`](tache2-7-noyau.md) et [`tache2-7-complet.md`](tache2-7-complet.md) (état final des tâches 2
+et 7) ; étapes intermédiaires dans `tache2-complet.md` et `tache7-complet.md`.
+
+**Ce qui a changé :**
+
+- **Recettes : l'équipement sort des intrants par unité.** Un intrant par unité produite est ce que cette unité consomme
+  vraiment. Les ordinateurs d'un bureau (ingénierie de CPU, marketing, école), le matériel d'un studio (télé :
+  électronique) et les matériaux du parc immobilier (bois, acier par nuitée) étaient comptés comme consommés à chaque
+  unité. C'est ce qui faisait dépendre le logement de toute la filière de l'acier : le noyau finissait à 100 % de
+  sans-abri faute de 0,005 lingot par nuitée. L'équipement relève des machines et de leur entretien ; le bois et l'acier
+  serviront à la construction (tâche 6).
+- **Intrants secondaires non bloquants** (`softInputShare` = 15 %, avec la raison dans `model.dart`). Un intrant qui pèse
+  moins de 15 % du coût d'un lot ralentit la cadence en proportion de son poids au lieu de l'arrêter : une pêcherie sans
+  carburant pêche moins, elle ne ferme pas. Au-dessus, la recette reste stricte (farine du pain, pétrole du carburant).
+- **Pas fait :** l'achat de dépannage à l'extérieur. Le commerce est coupé par défaut ; à reprendre avec la balance
+  commerciale de la feuille de route (phase 4).
+- **Fausse piste mesurée et annulée :** arrondir les effectifs de départ au supérieur. La population ne suffisait plus
+  au recrutement initial (modèle complet sans filets : 59 % de chômage contre 38 %).
+
+### Tâche 7 — Pénurie de main-d'œuvre : fonds de roulement (5 octobre 2026)
+
+**Diagnostic** (graine 1) : quand le chômage tombe à 0 %, les employés de la ferme partent pour mieux payé. La ferme a des
+clients qui attendent et vend au-dessus de son coût, mais la règle d'embauche exige 8 jours de salaires en caisse par
+employé : sans poste ouvert, elle ne monte pas non plus son salaire. Les céréales manquent, la boulangerie s'arrête, et
+l'anti-famine se déclenche. Le blocage n'est pas la vitesse des salaires, c'est la trésorerie.
+
+**Ce qui a changé :**
+
+- **Fonds de roulement** (rapport, v1.0). Une entreprise dont des clients repartent les mains vides peut emprunter à la
+  Caisse 8 jours de salaires par poste qu'elle veut ouvrir, dans la limite de 15 jours de chiffre d'affaires
+  (`workingCapitalDays`). À 30 jours, la Caisse devenait insolvable dans 4 graines sur 5.
+- **Prudence de la Caisse.** Elle ne prête qu'à une entreprise rentable en moyenne, dont les ventes couvrent déjà les
+  salaires. Avant, la règle d'achat de machines tolérait de petites pertes.
+- **Bogue d'investissement corrigé.** Une entreprise dont l'équipe tourne sous 80 % de sa capacité n'achète plus de
+  machine, et une machine « qui remplace du travail » ne compte plus quand il n'y a qu'un employé. Avant, des
+  entreprises d'un employé à 10 % de leur capacité s'endettaient pour de la capacité inutile, puis faisaient défaut :
+  90 % des pertes de la Caisse venaient de ces prêts pour machines.
+
+**Comptes de la Caisse** (5 graines, 1 500 jours, filets actifs) : radiations de 30 000–70 000 $ avant ces corrections,
+600–13 000 $ après ; les fonds propres ne descendent jamais sous 13 000 $ ; les intérêts couvrent les pertes.
+
+**Résultats des tâches 2 et 7** (5 graines × 1 500 jours) :
+
+| Indicateur | Noyau, origine | Noyau, après | Complet, origine | Complet, après |
+|---|---|---|---|---|
+| Sans filets : chômage moyen | 4,1 % | 4,4 % | 86,9 % | **8,1 %** |
+| Sans filets : faim moyenne | 0,0 % | 0,0 % | 87,0 % | **6,4 %** |
+| Sans filets : sans-abri moyen | 100 % | **0,1 %** | 95,9 % | **10,1 %** |
+| Sans filets : Gini moyen | 0,25 | 0,35 | 0,59 | 0,63 |
+| Avec filets : chômage moyen | 4,9–7,7 % | 2,4–4,1 % | 3,7–6,2 % | 4,0–10,0 % |
+| Avec filets : faim moyenne | 0 % | 0 % | 0 % | 0–2,1 % ❌ |
+| Avec filets : sans-abri moyen (pics) | 0 % | 0–0,3 % | 0,2–1,3 % (25–100 %) | 0,1–1,9 % (22–58 %) |
+| Avec filets : Gini moyen | 0,46–0,63 | 0,12–0,19 | 0,28–0,45 | 0,17–0,40 |
+| Renflouements / 50 j | 63,8 | 15,1 | 66,1 | 22,9 |
+| Plancher de logement / 50 j | 0,0 | 0,3 | 12,7 | 3,0 |
+| Anti-crédit-fou / 50 j | — | — | 67,1 | 0,0 |
+| Anti-famine / 50 j | 0,0 | 0,0 | 0,0 | 14,4 ❌ |
+| Chocs résorbés en < 200 j (sans / avec filets) | — | — | 0 / 5 | 1 / 7 |
+| Écart comptable max | 0 exact | 0 exact | 0 exact | 0 exact |
+
+**Lecture.** Le modèle complet ne s'effondre plus sans filets, et le noyau sans filets est presque aux critères de sortie
+(chômage 3,2–5,3 %, faim et sans-abri sous 0,2 %, Gini 0,27–0,46). Avec filets, le logement est revenu au niveau
+d'origine (pics divisés par deux, plancher de logement ÷ 4). Le nombre d'alertes critiques monte (142 contre 55) parce
+qu'une économie qui ne s'effondre plus ouvre et ferme ses alertes au lieu de les garder ouvertes 1 300 jours.
+
+**Régression restante : la faim avec filets** dans les graines 2 et 4 (1 373 et 567 aides alimentaires, cause « pas de
+producteur »). Graine 2 : la pêcherie et le restaurant meurent vers le jour 350 et ne renaissent jamais ; au jour 800, à
+0 % de chômage, la ferme perd des employés et le pain manque. Trois causes, pour les prochaines tâches :
+
+1. **Pas d'entrée d'entreprises** : une entreprise morte ne renaît jamais (tâche 5).
+2. **Usure des machines comptée au prix de remplacement actuel**, qui a explosé (1 300 $ → 7 000–14 600 $, la Machinerie
+   étant sous-dimensionnée) : le coût de revient de toutes les petites entreprises équipées gonfle.
+3. **Concurrence pour la main-d'œuvre au plein emploi** : les secteurs vitaux perdent leurs employés au profit de ceux qui
+   paient mieux (problème connu n° 3 ; le fonds de roulement ne suffit pas quand l'entreprise n'est plus rentable).
