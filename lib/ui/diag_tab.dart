@@ -154,6 +154,8 @@ class _DiagnosticTabState extends State<DiagnosticTab> {
             'Chaque module ajouté depuis la v0 peut être coupé ; l’effet est immédiat, et une nouvelle partie '
             'est dimensionnée sans lui.',
             style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+        if (sim.modules.entry || sim.firmsCreated + sim.firmsClosed > 0)
+          KV('Entreprises créées / fermées', '${sim.firmsCreated} / ${sim.firmsClosed}'),
         for (final k in Modules.keys)
           SwitchListTile(
             dense: true,

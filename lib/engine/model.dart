@@ -264,6 +264,11 @@ class Params {
   // embaucher (8 jours de salaires par poste), jusqu'à ce plafond de jours de chiffre d'affaires (« prêt/revenu »).
   // À 30 jours, la Caisse devenait insolvable dans 4 graines sur 5 (radiations de 30 à 62 k$) ; 15 jours la garde solvable.
   double workingCapitalDays = 15;
+  // Entrée et sortie d'entreprises
+  int exitIdleDays = 30; // une entreprise sans employé depuis 30 jours ferme
+  int entryCooldown = 60; // délai entre deux créations d'un même type d'entreprise
+  double entryMinShare = 0.1; // demande non servie minimale : 10 % de la production d'un employé (sans producteur)
+  double entryMarginRatio = 1.4; // concurrence : prix des entreprises en place ≥ 1,4 × leur coût de revient
   double depreciation = 0.003; // usure quotidienne des machines entretenues
   double maintNeed = 0.05; // heures d'entretien par machine et par jour
   // Intrants secondaires : sous cette part du coût d'un lot, un intrant qui manque ralentit la cadence en proportion
@@ -302,6 +307,7 @@ class Modules {
   bool education = true; // cours et progression des qualifications
   bool publicHealth = true; // l'État paie les soins
   bool publicEducation = true; // l'État paie les cours
+  bool entry = true; // une entreprise sans employé ferme ; un bien qui manque attire une nouvelle entreprise
 
   Modules();
 
@@ -314,6 +320,7 @@ class Modules {
 
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
+    'entry',
   ];
   static const Map<String, String> labels = {
     'credit': 'Crédit bancaire (Caisse)',
@@ -325,6 +332,7 @@ class Modules {
     'education': 'Formation et qualifications',
     'publicHealth': 'Santé publique (l’État paie)',
     'publicEducation': 'Éducation publique (l’État paie)',
+    'entry': 'Entrée et sortie d’entreprises',
   };
 
   bool get(String k) {
@@ -347,6 +355,8 @@ class Modules {
         return publicHealth;
       case 'publicEducation':
         return publicEducation;
+      case 'entry':
+        return entry;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -371,6 +381,8 @@ class Modules {
         publicHealth = v;
       case 'publicEducation':
         publicEducation = v;
+      case 'entry':
+        entry = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -732,6 +744,7 @@ class Firm extends Account {
   double workingDebt = 0; // part de la dette prêtée en fonds de roulement (pour le suivi des pertes)
   double interestToday = 0;
   int missedPayments = 0;
+  int idleDays = 0; // jours consécutifs sans employé
   int creditBanUntil = -1;
   final List<FirmPoint> hist = [];
 

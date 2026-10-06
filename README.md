@@ -89,16 +89,16 @@ flutter build web
 
 ## État
 
-`flutter analyze` ne signale rien et `flutter test` passe (10 tests). Tâches 1, 2, 4, 7 et 8 du plan de stabilisation
-faites (coût de revient réel, intrants secondaires non bloquants, consommation stock-flux, fonds de roulement, Caisse
-capitalisée et prudente). Sans filets, le modèle complet ne s'effondre plus (chômage moyen 8 %, contre 87 % à l'origine)
-et le noyau est presque aux critères de sortie. Avec filets, la partie est jouable (chômage 4 à 10 %, Gini 0,17 à 0,40,
-la Caisse prête et reste solvable), mais deux graines sur cinq ont encore des épisodes de famine : voir le journal des
-corrections dans [`rapports/stabilisation.md`](rapports/stabilisation.md). La version Android n'a pas encore été lancée
-sur un appareil.
+`flutter analyze` ne signale rien et `flutter test` passe (10 tests). Tâches 1, 2, 4, 5, 7 et 8 du plan de
+stabilisation faites (coût de revient réel, intrants secondaires non bloquants, consommation stock-flux, entrée et
+sortie d'entreprises, fonds de roulement, Caisse capitalisée et prudente). Sans filets, le modèle complet ne s'effondre
+plus : chômage moyen 5 % (contre 87 % à l'origine), faim 1 %, sans-abri 3 %. Avec filets, la partie est jouable
+(chômage 2 à 5 %, Gini 0,15 à 0,29). Restent surtout des sauts d'inflation d'un jour et des filets encore trop actifs :
+voir le journal des corrections dans [`rapports/stabilisation.md`](rapports/stabilisation.md). La version Android n'a
+pas encore été lancée sur un appareil.
 
 ## À faire
 
-- Stabilisation : tâches 3, 5, 6, 9 et 10 de [`rapports/stabilisation.md`](rapports/stabilisation.md), en commençant par la 5 (entrée et sortie d'entreprises).
+- Stabilisation : tâches 3, 6, 9 et 10 de [`rapports/stabilisation.md`](rapports/stabilisation.md), en commençant par la 3 (lissage des prix).
 - Ensuite, dans l'ordre : cohortes d'âge, services publics avec files d'attente, naissances et décès, logement détaillé.
 - Sauvegarde locale de la partie.

@@ -381,3 +381,66 @@ producteur »). Graine 2 : la pêcherie et le restaurant meurent vers le jour 35
    étant sous-dimensionnée) : le coût de revient de toutes les petites entreprises équipées gonfle.
 3. **Concurrence pour la main-d'œuvre au plein emploi** : les secteurs vitaux perdent leurs employés au profit de ceux qui
    paient mieux (problème connu n° 3 ; le fonds de roulement ne suffit pas quand l'entreprise n'est plus rentable).
+
+### Tâche 5 — Entrée et sortie d'entreprises (5 octobre 2026)
+
+Rapports : [`tache5-complet.md`](tache5-complet.md) (comparé à `tache2-7-complet.json`) et [`tache5-noyau.md`](tache5-noyau.md)
+(noyau avec le module actif, comparé à `tache2-7-noyau.json`).
+
+**Ce qui a changé** (module « Entrée et sortie d'entreprises », actif par défaut, coupé dans `--noyau`) :
+
+- **Sortie.** Une entreprise sans employé depuis 30 jours (`exitIdleDays`) ferme : sa trésorerie revient au
+  propriétaire, sa dette est radiée, sa place dans le graphe est libérée. Avant, elle restait en « zombie » avec un prix
+  figé qui bloquait le marché (17 à 24 entreprises zombies en fin de partie sans filets ; 0 à 3 maintenant).
+- **Entrée.** Un bien qui n'a plus de producteur et dont la demande non servie dépasse 10 % de la production d'un
+  employé (`entryMinShare`) attire une nouvelle entreprise. Après le jour 100, une concurrente peut aussi naître quand
+  les entreprises en place vendent à plus de 1,4 fois leur coût (`entryMarginRatio`) et laissent assez de demande
+  non servie pour occuper un employé. Le fondateur est le citoyen le plus riche qui dispose de 1,5 fois le capital
+  au-delà de son coussin ; le capital couvre 10 jours de salaires et 5 jours d'intrants ; au plus une création par
+  jour, 60 jours entre deux créations d'un même type (`entryCooldown`).
+- **Deux conditions ajoutées après mesure.** (1) Il faut assez de chômeurs ayant la qualification demandée : au plein
+  emploi, une nouvelle entreprise ne fait que débaucher ses voisines (première version : 55 à 86 créations par partie,
+  et les entreprises en place fermaient). (2) Viabilité : au prix que paie le marché (borné au double du prix mondial),
+  les ventes attendues doivent couvrir l'équipe et ses intrants. Sans cette règle, les marchés trop petits pour un
+  employé (cuivre, bauxite, or, puces) étaient recréés sans fin à petite échelle et à prix énormes : 317 créations et
+  304 fermetures dans la graine 1, et l'effondrement des graines 1 et 3 sans filets.
+- **Deux essais sur les intrants secondaires (tâche 2), mesurés puis abandonnés.** Les classer aux prix de référence
+  (pain, viande et poisson devenaient tous secondaires : anti-famine 20,7 / 50 j) ; les déclarer dans chaque recette
+  (anti-famine 72,9 / 50 j, effondrement des graines 2 et 3 sans filets). La règle d'origine (part du coût au prix du
+  jour) reste la meilleure ; son défaut (le prix figé d'une entreprise morte rendait bloquant un intrant manquant) ne
+  dure plus que 30 jours, puisque les entreprises mortes ferment.
+- **Tests adaptés** : le test du god mode met en faillite une entreprise active (la raffinerie a pu fermer et
+  renaître) ; le test des détecteurs coupe ce module (il teste les détecteurs, pas la résorption du chômage).
+
+**Résultats** (5 graines × 1 500 jours) :
+
+| Indicateur | Origine | Tâches 2 et 7 | Tâche 5 |
+|---|---|---|---|
+| Sans filets : chômage moyen | 86,9 % | 8,1 % | **5,3 %** (4,3–5,9 %) |
+| Sans filets : faim moyenne | 87,0 % | 6,4 % | **1,2 %** |
+| Sans filets : sans-abri moyen | 95,9 % | 10,1 % | **2,6 %** |
+| Sans filets : Gini moyen | 0,59 | 0,63 | **0,38** |
+| Avec filets : chômage moyen | 3,7–6,2 % | 4,0–10,0 % | 2,4–4,6 % |
+| Avec filets : faim moyenne | 0 % | 0–2,1 % | 0–1,6 % |
+| Avec filets : sans-abri moyen (pics) | 0,2–1,3 % (25–100 %) | 0,1–1,9 % (22–58 %) | 0,2–0,6 % (24–58 %) |
+| Avec filets : Gini moyen | 0,28–0,45 | 0,17–0,40 | 0,15–0,29 |
+| Anti-famine / 50 j | 0,0 | 14,4 | 4,8 |
+| Renflouements / 50 j | 66,1 | 22,9 | 27,6 |
+| Plancher de logement / 50 j | 12,7 | 3,0 | 2,7 |
+| Plafond de dérive / 50 j | 226,5 | 303,0 | 262,3 |
+| Chocs résorbés en < 200 j (sans / avec filets) | 0 / 5 | 1 / 7 | 3 / 6 |
+| Écart comptable max | 0 exact | 0 exact | 0 exact |
+
+Noyau avec le module actif, sans filets : chômage 2,6–4,3 %, faim 0 %, sans-abri ≤ 0,2 %, inflation 0,004 %/j.
+Critères encore manqués : 33 alertes critiques (sauts d'inflation d'un jour, brefs épisodes de sans-abri), Gini trop
+**bas** dans 3 graines (0,16–0,18, sous la borne de 0,2), chômage à 2,6 % dans une graine, renflouements (21,8 / 50 j)
+et plafond de dérive (95,7 / 50 j).
+
+**Restent à traiter :**
+
+1. **Sauts d'inflation quotidienne** (alerte critique la plus fréquente) : quand le seul producteur d'un bien ferme ou
+   qu'un nouveau arrive, le prix de référence du panier saute (tâche 3, lissage des prix).
+2. **Renflouements en hausse** : le roulement des entreprises demande du capital ; à surveiller avec la tâche 3.
+3. **Caisse insolvable sans filets** (graine 5, 839 jours) : le plancher de fonds propres n'est appliqué que par le
+   filet anti-crédit-fou ; il devrait faire partie de la politique normale de la Caisse.
+4. **Famine avec filets dans la graine 3** (575 aides) : concurrence pour la main-d'œuvre au plein emploi.

@@ -62,7 +62,7 @@ void main() {
     s.godRemoveCitizens(5);
     final indebted = s.firms.where((f) => f.debt > 0).toList();
     if (indebted.isNotEmpty) s.godFirm(indebted.first.id, forgiveDebt: true);
-    s.godBankrupt(s.firms.firstWhere((f) => f.type == 'raffinerie').id);
+    s.godBankrupt(s.firms.firstWhere((f) => f.workers.isNotEmpty).id); // la raffinerie a pu fermer et renaître
     s.removeFirm(s.firms.first.id);
     run(s, 100);
     expect(s.inv.worst, 0);
@@ -118,7 +118,8 @@ void main() {
   });
 
   test('détecteurs : entreprise sans employé, chômage très élevé', () {
-    final s = Sim(seed: 9, safeguards: Safeguards.none());
+    // sans entrée ni sortie d'entreprises : on teste les détecteurs, pas la résorption du chômage
+    final s = Sim(seed: 9, safeguards: Safeguards.none(), modules: Modules()..entry = false);
     run(s, 30);
     final f = s.firms.firstWhere((f) => f.type == 'tourisme');
     s.godBankrupt(f.id);

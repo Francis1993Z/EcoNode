@@ -58,6 +58,8 @@ String fmtPct(double v, [int decimals = 1]) => '${(v * 100).toStringAsFixed(deci
 
 double round1(double v) => (v * 10).roundToDouble() / 10;
 
+String fmtNum1(double v) => round1(v).toStringAsFixed(1).replaceAll('.', ',');
+
 /// Quantifie un montant au 2⁻¹⁰ $ inférieur : la somme de tels montants est exacte.
 double quantize(double v) => (v * 1024).floorToDouble() / 1024;
 
@@ -125,6 +127,11 @@ class Sim {
   Map<String, double> unmet = {};
   final Map<String, MarketStat> marketStats = {};
   final Map<String, int> lastShortage = {};
+  final Map<String, double> unmetEma = {}; // demande non servie lissée (~10 jours), par bien
+  final Map<String, int> _lastEntry = {}; // dernier jour de création, par type d'entreprise
+  final Map<String, List<double>> _slots = {}; // place laissée dans le graphe par une entreprise fermée, par type
+  int firmsCreated = 0;
+  int firmsClosed = 0;
   double householdSpend = 0;
   // positions des nodes spéciaux (ménages, État, Caisse, extérieur) ; l'interface les dispose
   final Map<String, List<double>> nodePos = {
@@ -189,6 +196,11 @@ class Sim {
     unmet = {};
     marketStats.clear();
     lastShortage.clear();
+    unmetEma.clear();
+    _lastEntry.clear();
+    _slots.clear();
+    firmsCreated = 0;
+    firmsClosed = 0;
     householdSpend = 0;
     hype = {};
     adsBoost = 1;
@@ -818,6 +830,10 @@ class Sim {
     _capital();
     _decide();
     _finance();
+    for (final g in goods.keys) {
+      unmetEma[g] = 0.9 * (unmetEma[g] ?? 0) + 0.1 * (unmet[g] ?? 0);
+    }
+    if (modules.entry) _entryExit();
     _record();
     _netSummary();
     _checkInvariants();
@@ -892,7 +908,9 @@ class Sim {
       final laborBatches = _capBatches(f, eff * perWorker(f));
       var batches = laborBatches;
       if (f.inputs.isNotEmpty) {
-        // intrants principaux : recette stricte ; intrants secondaires : la cadence baisse en proportion de leur poids
+        // intrants principaux : recette stricte ; intrants secondaires : la cadence baisse en proportion de leur poids.
+        // Le poids se mesure au prix du jour. Essais moins bons : aux prix de référence (pain, viande et poisson
+        // devenaient tous secondaires) et avec une liste explicite par recette (famine ×15) ; voir le journal.
         final theta = params.softInputShare;
         final prices = <String, double>{for (final g in f.inputs.keys) g: bestPrice(g)};
         var lotCost = f.wage / math.max(eps, perWorker(f));
@@ -1563,6 +1581,127 @@ class Sim {
     }
     dayFlows.loans += a;
     _flow('B', f.id.toString(), '\$prêts', 1, a);
+  }
+
+  // ================================================================ Entrée et sortie d'entreprises
+
+  /// Salaire du marché pour une qualification exigée (moyenne pondérée par les effectifs).
+  double marketWage(int skill) {
+    var ws = 0.0, wn = 0;
+    for (final o in firms) {
+      if (o.template.skill != skill) continue;
+      ws += o.wage * o.workers.length;
+      wn += o.workers.length;
+    }
+    return wn > 0 ? ws / wn : params.startWage * classWage[skill];
+  }
+
+  /// Sortie : une entreprise sans employé depuis 30 jours ferme. Entrée : un bien qui n'a plus de producteur
+  /// (ou dont les producteurs ont de fortes marges et laissent de quoi occuper un employé) attire une nouvelle entreprise.
+  void _entryExit() {
+    final p = params;
+    for (final f in List<Firm>.from(firms)) {
+      f.idleDays = f.workers.isEmpty ? f.idleDays + 1 : 0;
+      if (f.idleDays >= p.exitIdleDays) _close(f);
+    }
+    if (day < 30) return; // pas pendant le démarrage
+    for (final ty in templates.keys) {
+      if (day - (_lastEntry[ty] ?? -100000) < p.entryCooldown) continue;
+      final t = templates[ty]!;
+      final g = t.outputs.keys.first;
+      final want = unmetEma[g] ?? 0; // unités par jour non servies
+      final perWorker0 = t.rate * t.outputs[g]!; // unités par employé et par jour, sans machines
+      if (want < p.entryMinShare * perWorker0) continue;
+      final active = sellersOf(g).where((f) => f.workers.isNotEmpty).toList();
+      String why;
+      if (active.isEmpty) {
+        why = 'plus personne ne produit';
+      } else {
+        // concurrence : seulement après le démarrage, si les marges sont fortes et que la demande laissée occupe
+        // un employé à plein temps
+        if (day < 100 || active.length >= 3 || want < perWorker0) continue;
+        if (!active.every((f) => f.profitEma > 0 && f.price[g]! >= p.entryMarginRatio * (f.unitCostCache[g] ?? double.infinity))) {
+          continue;
+        }
+        why = 'demande non servie et fortes marges';
+      }
+      if (_found(ty, want, why)) return; // au plus une création par jour
+    }
+  }
+
+  /// Un citoyen fonde une entreprise de ce type avec son épargne (10 jours de salaires, 5 jours d'intrants).
+  bool _found(String ty, double want, String why) {
+    final p = params;
+    final t = templates[ty]!;
+    final g = t.outputs.keys.first;
+    final batches = want / t.outputs[g]!;
+    final w = batches / t.rate; // employés nécessaires à productivité nominale
+    final team = w.ceil().clamp(1, 3).toInt();
+    final wage = marketWage(t.skill);
+    var inputCost = 0.0;
+    for (final e in t.inputs.entries) {
+      inputCost += batches * e.value * bestPrice(e.key);
+    }
+    // une entreprise nouvelle embauche des chômeurs ; au plein emploi, elle ne ferait que débaucher ses voisines
+    final available = citizens.where((c) => c.employer == null && c.skill + eps >= t.skill).length;
+    if (available < team) return false;
+    // viabilité : au prix que le marché paie (borné au double du prix mondial), les ventes attendues doivent couvrir
+    // l'équipe et ses intrants ; un marché trop petit pour un employé reste sans producteur
+    var revenue0 = 0.0;
+    for (final e in t.outputs.entries) {
+      revenue0 += batches * e.value * math.min(bestPrice(e.key), 2 * worldPrice[e.key]!);
+    }
+    if (revenue0 < 1.1 * (team * wage + inputCost)) return false;
+    final capital = 10 * wage * team + 5 * inputCost;
+    final buffer = p.bufferDays * needCost;
+    Citizen? founder;
+    for (final c in citizens) {
+      if (c.money - buffer >= 1.5 * capital && (founder == null || c.money > founder.money)) founder = c;
+    }
+    if (founder == null) return false;
+    final same = firms.where((o) => o.type == ty).toList();
+    final slot = _slots.remove(ty) ?? (same.isNotEmpty ? [same.last.x, same.last.y + 170] : [600.0, 300.0]);
+    final f = _newFirm(ty, '${t.label} ${founder.name.split(' ').last}', 0, founder.id, slot[0], slot[1]);
+    f.rate = t.rate * _minScale(w, 1); // échelle minimale si la demande n'occupe pas un employé
+    f.wage = wage;
+    final paid = transfer(founder, f, capital);
+    _flow('M', f.id.toString(), '\$capital', 1, paid);
+    for (final e in f.outputs.entries) {
+      f.demandEma[e.key] = batches * e.value;
+    }
+    f.outputEma = batches;
+    final cost = unitCost(f);
+    var revenue = 0.0;
+    for (final o in f.outputs.keys) {
+      final others = sellersOf(o).where((x) => !identical(x, f) && x.workers.isNotEmpty).map((x) => x.price[o]!);
+      final own = cost[o]! * p.markup;
+      f.price[o] = others.isEmpty ? own : math.min(own, others.reduce(math.min));
+      revenue += f.demandEma[o]! * f.price[o]!;
+    }
+    f.revenueEma = revenue;
+    f.vacancies = team;
+    _lastEntry[ty] = day;
+    firmsCreated++;
+    _log('info', '${founder.name} fonde ${f.name} avec ${fmtMoney0(paid)} : $why '
+        '(${goods[g]!.label.toLowerCase()}, ${fmtNum1(want)} ${goods[g]!.unit}/j non servis).');
+    return true;
+  }
+
+  /// Fermeture faute d'activité : la trésorerie revient au propriétaire, la dette est radiée, la place est libérée.
+  void _close(Firm f) {
+    _writeOff(f);
+    final owner = f.ownerId != null ? _cmap[f.ownerId!] : null;
+    final left = f.money;
+    if (left > 0) transfer(f, owner ?? state, left);
+    _slots[f.type] = [f.x, f.y];
+    firms.remove(f);
+    _fmap.remove(f.id);
+    _rebuildSellers();
+    final key = f.id.toString();
+    flowsEma.removeWhere((k, v) => v.from == key || v.to == key);
+    firmsClosed++;
+    _log('info', '${f.name} ferme ses portes : aucun employé depuis ${params.exitIdleDays} jours'
+        '${left > 0 ? ' (${fmtMoney0(left)} rendus à ${owner?.name ?? 'l’État'})' : ''}.');
   }
 
   /// Applique le plafond de dérive à une nouvelle valeur (prix ou salaire) ; journalise chaque plafonnement.
