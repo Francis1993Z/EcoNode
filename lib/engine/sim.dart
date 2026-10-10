@@ -151,6 +151,10 @@ class Sim {
   double adsBoost = 1; // hausse de la dépense des ménages due à la publicité
   // diagnostic
   final NetStats nets = NetStats();
+  // services publics gratuits (institution I2) : files d'attente par ordre d'arrivée
+  final List<int> careQueue = [];
+  final List<int> schoolQueue = [];
+  final Map<String, ServiceStats> services = {'soins': ServiceStats(), 'cours': ServiceStats()};
   final Monitor monitor = Monitor();
   final Invariants inv = Invariants();
   final DayFlows dayFlows = DayFlows(); // flux depuis la dernière vérification
@@ -206,6 +210,10 @@ class Sim {
     hype = {};
     adsBoost = 1;
     nets.clear();
+    careQueue.clear();
+    schoolQueue.clear();
+    services['soins'] = ServiceStats();
+    services['cours'] = ServiceStats();
     monitor.clear();
     dayFlows.reset();
     lastFlows = DayFlows();
@@ -233,6 +241,10 @@ class Sim {
     };
     if (!this.modules.health) cpiWeights.remove('soins');
     if (!this.modules.education) cpiWeights.remove('cours');
+    // un service public gratuit n'est pas un prix payé par les ménages
+    for (final g in const ['soins', 'cours']) {
+      if (publicGood(g)) cpiWeights.remove(g);
+    }
     _cpiBase = 0;
     for (final e in cpiWeights.entries) {
       _cpiBase += e.value * plan.price[e.key]!;
@@ -299,6 +311,7 @@ class Sim {
       f.outputEma = batches;
       f.money = quantize(math.max(6000.0, 12 * (f.wage * f.workers.length + inputCost)));
       f.ownerId = citizens[(rng() * citizens.length).floor()].id;
+      if (publicService(f)) f.ownerId = null; // établissement public : l'État en est le propriétaire
     }
     for (final c in citizens) {
       final f = c.employer != null ? firm(c.employer!) : null;
@@ -833,6 +846,7 @@ class Sim {
     }
 
     _laborMarket();
+    if (modules.publicBudget) _publicBudget();
     _produce();
     _payWages();
     _buyInputs();
@@ -994,6 +1008,177 @@ class Sim {
           f.lastDistressLog = day;
         }
       }
+    }
+  }
+
+  /// Le bien est un service public gratuit, financé par enveloppe (institution I2).
+  bool publicGood(String g) =>
+      modules.publicBudget &&
+      ((g == 'soins' && modules.health && modules.publicHealth) ||
+          (g == 'cours' && modules.education && modules.publicEducation));
+
+  /// Établissement public : il produit un service public gratuit (hôpital, école).
+  bool publicService(Firm f) => f.outputs.keys.any(publicGood);
+
+  /// Coût quotidien de l'équipe nécessaire à la demande attendue d'un établissement public, telle que la règle
+  /// d'embauche permet de la constituer : l'effectif actuel plus les postes qu'elle ouvrirait aujourd'hui (au plus 3,
+  /// et rien de plus si les intrants manquent), les intrants de ce que cette équipe peut produire, les services.
+  /// Financer l'équipe théorique de la demande entière accumulerait l'argent du trésor dans un établissement qui ne peut
+  /// pas l'employer (constaté : 500 000 $ dans un hôpital privé d'électronique).
+  double serviceBudget(Firm f) {
+    final nw = f.workers.length;
+    final team = math.max(1, math.min(math.max(f.desired, nw), nw + maxPostsPerDay));
+    final avgEff = nw > 0 ? math.max(0.3, f.effWorkers / nw) : 1.0;
+    final batches = math.min(_plannedBatches(f), team * math.max(eps, perWorker(f) * avgEff));
+    var inputs = 0.0;
+    for (final e in f.inputs.entries) {
+      inputs += batches * e.value * bestPrice(e.key);
+    }
+    return team * f.wage + inputs + f.overheadEma;
+  }
+
+  /// Enveloppe budgétaire des établissements publics (institution I2). L'État porte la trésorerie de chacun à
+  /// `publicCashDays` jours du coût de l'équipe nécessaire : il rembourse ainsi chaque jour ce qui a été dépensé, dans la
+  /// limite de ce coût. Au-dessus de son plancher, si le trésor ne suffit pas, toutes les enveloppes baissent dans la
+  /// même proportion (et les files s'allongent). Un budget non dépensé revient au trésor.
+  void _publicBudget() {
+    for (final st in services.values) {
+      st.envelopeToday = 0;
+      st.wantedToday = 0;
+    }
+    final list = firms.where(publicService).toList();
+    if (list.isEmpty) return;
+    final want = <double>[];
+    var total = 0.0;
+    for (final f in list) {
+      final target = params.publicCashDays * serviceBudget(f);
+      final st = services[f.outputs.keys.firstWhere(publicGood)]!;
+      if (f.money > 1.5 * target) {
+        final back = transfer(f, state, f.money - target);
+        st.envelopeTotal -= back;
+        _flow(f.id.toString(), 'E', '\$budget non dépensé', 1, back);
+      }
+      final w = math.max(0.0, target - f.money);
+      want.add(w);
+      total += w;
+      st.wantedToday += w;
+    }
+    final avail = math.max(0.0, state.money - _stateFloor());
+    final k = total > avail ? avail / total : 1.0;
+    final short = <ServiceStats>{};
+    for (var i = 0; i < list.length; i++) {
+      if (want[i] <= 0) continue;
+      final f = list[i];
+      final g = f.outputs.keys.firstWhere(publicGood);
+      final st = services[g]!;
+      if (k < 1) short.add(st);
+      final amt = transfer(state, f, want[i] * k);
+      f.revenue += amt;
+      st.envelopeToday += amt;
+      st.envelopeTotal += amt;
+      state.paid += amt;
+      state.paidToday += amt;
+      if (g == 'soins') {
+        state.healthPaid += amt;
+      } else {
+        state.educationPaid += amt;
+      }
+      _flow('E', f.id.toString(), '\$enveloppe', 1, amt);
+    }
+    for (final st in short) {
+      st.shortDays++;
+    }
+  }
+
+  /// Prend une unité de service public produite aujourd'hui chez un établissement public ; faux s'il n'en reste plus.
+  bool _takePublic(String g) {
+    for (final f in sellersOf(g)) {
+      if (!publicService(f)) continue;
+      final q = f.inv[g] ?? 0;
+      if (q >= 1 - eps) {
+        f.inv[g] = q - 1;
+        f.sold[g] = (f.sold[g] ?? 0) + 1;
+        _flow(f.id.toString(), 'M', g, 1, 0);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _served(ServiceStats st, int wait) {
+    st.servedToday++;
+    st.servedTotal++;
+    st.servedWait = 0.95 * st.servedWait + 0.05 * wait;
+  }
+
+  void _queueStats(ServiceStats st, List<int> queue, int? Function(Citizen) since) {
+    st.queue = queue.length;
+    var sum = 0;
+    for (final id in queue) {
+      sum += day - (since(_cmap[id]!) ?? day);
+    }
+    st.queueAge = queue.isEmpty ? 0 : sum / queue.length;
+  }
+
+  /// Soins et cours publics gratuits, servis par ordre d'arrivée avec la capacité produite aujourd'hui (I2).
+  /// Ce qui reste à servir est noté comme demande non servie : c'est le signal d'embauche de l'établissement.
+  void _serveQueues() {
+    if (publicGood('soins')) {
+      final st = services['soins']!;
+      st.servedToday = 0;
+      final rest = <int>[];
+      var backlog = 0;
+      var open = true;
+      for (final id in careQueue) {
+        final c = _cmap[id];
+        if (c == null) continue; // a quitté l'économie
+        // jusqu'à trois visites, comme une consultation payée
+        var h = c.health, n = 0;
+        while (open && n < 3 && h < 0.95) {
+          if (!_takePublic('soins')) {
+            open = false;
+            break;
+          }
+          h = math.min(1.0, h + 0.3);
+          n++;
+        }
+        if (n == 0) {
+          rest.add(id);
+          backlog += math.min(3, ((0.95 - h) / 0.3).ceil());
+          continue;
+        }
+        c.sat['sante'] = h;
+        _served(st, day - c.careSince!);
+        c.careSince = null;
+      }
+      careQueue
+        ..clear()
+        ..addAll(rest);
+      _queueStats(st, careQueue, (c) => c.careSince);
+      if (backlog > 0) unmet['soins'] = (unmet['soins'] ?? 0) + backlog;
+    }
+    if (publicGood('cours')) {
+      final st = services['cours']!;
+      st.servedToday = 0;
+      final rest = <int>[];
+      var open = true;
+      for (final id in schoolQueue) {
+        final c = _cmap[id];
+        if (c == null) continue;
+        if (!open || !_takePublic('cours')) {
+          open = false;
+          rest.add(id);
+          continue;
+        }
+        c.skill = math.min(3.0, c.skill + params.learnRate);
+        _served(st, day - c.schoolSince!);
+        c.schoolSince = null;
+      }
+      schoolQueue
+        ..clear()
+        ..addAll(rest);
+      _queueStats(st, schoolQueue, (c) => c.schoolSince);
+      if (rest.isNotEmpty) unmet['cours'] = (unmet['cours'] ?? 0) + rest.length;
     }
   }
 
@@ -1160,6 +1345,7 @@ class Sim {
       householdSpend += c.spend;
       c.happiness = happinessOf(c);
     }
+    if (modules.publicBudget) _serveQueues();
   }
 
   /// Le bien qui apporte le plus de satisfaction par dollar, parmi ceux en stock et abordables.
@@ -1209,6 +1395,15 @@ class Sim {
     var h = c.health - desireDecay['sante']!;
     if (rng() < p.illness) h -= 0.2 + 0.3 * rng();
     h = h.clamp(0.05, 1.0).toDouble();
+    if (publicGood('soins')) {
+      // soins publics gratuits : on s'inscrit dans la file de l'hôpital, servie par ordre d'arrivée (I2)
+      if (h < 0.75 && c.careSince == null) {
+        c.careSince = day;
+        careQueue.add(c.id);
+      }
+      c.sat['sante'] = h;
+      return;
+    }
     if (h < 0.75) {
       for (var n = 0; n < 3 && h < 0.95; n++) {
         final pub = modules.publicHealth && state.money > floor;
@@ -1248,6 +1443,14 @@ class Sim {
   void _study(Citizen c, double floor) {
     final p = params;
     if (c.skill >= 3 || rng() >= c.ambition * p.eduRate) return;
+    if (publicGood('cours')) {
+      // cours publics gratuits : on s'inscrit dans la file de l'école (I2)
+      if (c.schoolSince == null) {
+        c.schoolSince = day;
+        schoolQueue.add(c.id);
+      }
+      return;
+    }
     final pub = modules.publicEducation && state.money > floor;
     if (!pub) {
       final pr = quote('cours');
@@ -1545,7 +1748,8 @@ class Sim {
     }
     final cash = f.money - 6 * (f.wage * w + f.inputSpendEma);
     if (cash < price) {
-      if (!modules.credit || day < f.creditBanUntil || f.profitEma <= 0) return; // pas de crédit à une entreprise en perte
+      // pas de crédit à une entreprise en perte, ni à un établissement public (l'État le finance)
+      if (!modules.credit || day < f.creditBanUntil || f.profitEma <= 0 || publicService(f)) return;
       final need = price - math.max(0.0, cash);
       if (f.debt + need > 0.8 * (f.machines + 1) * price) return; // garantie : 80 % de la valeur des machines
       if (safeguards.credit && !_creditOk(f, need)) return;
@@ -1563,6 +1767,7 @@ class Sim {
   void _workingCapital(Firm f, int posts) {
     final p = params;
     if (!modules.credit || posts <= 0 || day < f.creditBanUntil || f.urgency < 0.05) return;
+    if (publicService(f)) return; // un établissement public n'emprunte pas : l'État le finance
     // la Caisse ne finance qu'une entreprise durablement rentable, dont les ventes couvrent déjà les salaires
     if (f.profitEma <= 0 || f.revenueEma < f.wage * f.workers.length) return;
     final need = f.wage * 8 * (f.workers.length + posts) - f.money;
@@ -1628,13 +1833,14 @@ class Sim {
     final p = params;
     for (final f in List<Firm>.from(firms)) {
       f.idleDays = f.workers.isEmpty ? f.idleDays + 1 : 0;
-      if (f.idleDays >= p.exitIdleDays) _close(f);
+      if (f.idleDays >= p.exitIdleDays && !publicService(f)) _close(f); // un établissement public ne ferme pas
     }
     if (day < 30) return; // pas pendant le démarrage
     for (final ty in templates.keys) {
       if (day - (_lastEntry[ty] ?? -100000) < p.entryCooldown) continue;
       final t = templates[ty]!;
       final g = t.outputs.keys.first;
+      if (publicGood(g)) continue; // l'État fournit ce service : pas de concurrent privé
       final want = unmetEma[g] ?? 0; // unités par jour non servies
       final perWorker0 = t.rate * t.outputs[g]!; // unités par employé et par jour, sans machines
       if (want < p.entryMinShare * perWorker0) continue;
@@ -1782,7 +1988,8 @@ class Sim {
         if (g == f.g0) f.urgency = demand > eps ? um / demand : 0.0;
         f.demandEma[g] = 0.85 * (f.demandEma[g] ?? 0) + 0.15 * demand;
         f.markup[g] = f.markup[g] ?? baseMk;
-        if (f.lockPrice || f.workers.isEmpty) continue; // sans employés, le prix affiché reste celui de la fermeture
+        // sans employés, le prix affiché reste celui de la fermeture ; un service public gratuit n'a pas de prix
+        if (f.lockPrice || f.workers.isEmpty || publicService(f)) continue;
         // signal de rareté : stock trop bas (ou capacité saturée) → marge ↑ ; surstock → marge ↓
         var dir = 0;
         final prod = f.produced[g] ?? 0;
@@ -1883,7 +2090,7 @@ class Sim {
       final reserve = 8 * (f.wage * f.workers.length + f.inputSpendEma + f.overheadEma) + f.debt * 0.1;
       final owner = f.ownerId != null ? _cmap[f.ownerId!] : null;
       f.dividends = 0;
-      if (owner != null && f.money > reserve) {
+      if (owner != null && f.money > reserve && !publicService(f)) {
         var d = (f.money - reserve) * p.dividendRate;
         if (modules.dividendTest) d = solventDividend(f, d);
         if (d > 0) {
@@ -1941,6 +2148,7 @@ class Sim {
     if (safeguards.bailout) {
       for (final f in firms) {
         if ((f.demandEma[f.g0] ?? 0) < 0.05) continue;
+        if (publicService(f)) continue; // établissement public : financé par son enveloppe, pas par un propriétaire
         final nw = math.max(1, math.min(f.desired == 0 ? 1 : f.desired, f.workers.length + 3));
         final need = 10 * f.wage * nw - f.money;
         if (need <= 0 || f.money > 4 * f.wage * nw) continue;

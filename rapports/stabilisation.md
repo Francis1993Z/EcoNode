@@ -666,3 +666,89 @@ qu'avant (131–295 fois par partie avant, 54–337 après) : il perd de l'argen
 I1 supprime les dividendes versés en perte (la boucle des hôpitaux) et retient la trésorerie des entreprises qui veulent
 embaucher (point 2 de A3). Il ne suffit pas à remplacer le renflouement, et il fait apparaître un nouveau défaut : la
 trésorerie accumulée des entreprises ne recircule plus.
+
+### I2. Enveloppe budgétaire de l'hôpital et de l'école (10 octobre 2026)
+
+Rapports : [`i2-enveloppe-complet.md`](i2-enveloppe-complet.md) et [`i2-enveloppe-noyau.md`](i2-enveloppe-noyau.md),
+comparés au même code interrupteur coupé (`i2-enveloppe-avant-*.md`), étape « sauf renflouement ».
+
+**Ce qui a changé** (module `publicBudget`, actif par défaut ; ne joue que si la santé, ou l'éducation, publique est
+active) :
+
+- **Établissements publics.** L'hôpital et l'école appartiennent à l'État : pas de propriétaire, pas de dividende, pas de
+  renflouement par un citoyen, pas d'emprunt à la Caisse, pas de fermeture faute d'employés, pas de concurrent privé.
+- **Enveloppe.** Chaque jour, l'État porte leur trésorerie à 10 jours du coût de l'équipe nécessaire (salaires, intrants
+  au prix du marché, services). Il rembourse ainsi ce qu'ils ont dépensé, dans la limite de ce coût. Un budget non dépensé
+  (plus de 1,5 fois cette trésorerie) revient au trésor. Si le trésor ne suffit pas (au-dessus de son plancher de
+  9 600 $), toutes les enveloppes baissent dans la même proportion.
+- **Gratuité et file d'attente.** Soins et cours publics sont gratuits et n'ont plus de prix (ils sortent de l'indice
+  des prix des ménages). Un malade (santé < 0,75) ou un citoyen qui veut un cours s'inscrit dans la file ; chaque jour,
+  la capacité produite sert la file par ordre d'arrivée (jusqu'à 3 visites par malade). Ce qui reste à servir est la
+  demande non servie de l'établissement : c'est son signal d'embauche.
+- **Mesure et affichage.** Attente moyenne (des derniers servis, ou des personnes en file si elle est plus longue),
+  longueur de la file, enveloppe du jour et jours d'enveloppe incomplète, dans l'inspecteur de l'établissement et dans
+  celui de l'État. Nouveau détecteur « Attente trop longue (service public) » : attente moyenne > 7 jours pendant 30 jours.
+
+**Paramètres et raisons.**
+
+- `publicCashDays` = 10 jours. La règle d'embauche exige 8 jours de salaire par employé en caisse ; 2 jours de plus
+  laissent une marge pour les intrants et les services.
+- Seuil d'attente : 7 jours. Les maladies et les envies de cours arrivent au hasard, une file d'un ou deux jours est
+  normale ; au-delà d'une semaine en moyenne, la capacité ou l'enveloppe est durablement insuffisante.
+- Repère : au Canada, les hôpitaux sont surtout financés par un budget global de la province (Fraser Institute, 2021),
+  et non à la visite.
+
+**Correction pendant la mise au point.** La première version finançait l'équipe théorique de toute la demande (jusqu'à
+225 employés pour 670 visites demandées). Un hôpital qui ne pouvait pas embaucher, faute d'électronique et de
+plastique, accumulait l'argent du trésor : 500 000 $ dans la graine 5, et le trésor de l'État vidé. L'enveloppe couvre
+désormais l'équipe que la règle d'embauche permet de constituer (effectif actuel plus les postes ouverts aujourd'hui) et
+les intrants de ce qu'elle peut produire.
+
+**Résultats** (modèle complet, 5 graines × 1 500 jours ; le noyau est inchangé, la santé et l'éducation y étant coupées) :
+
+| Indicateur | Avant (I1) | I2 |
+|---|---|---|
+| Avec filets : renflouements de l'hôpital / 50 j | 8,1 | **0** ✅ |
+| Avec filets : renflouements / 50 j (toutes entreprises) | 28,4 | **16,8** |
+| Avec filets : chômage moyen | 7,8 % | 7,2 % |
+| Avec filets : santé moyenne | 0,73 | 0,73 |
+| Avec filets : anti-famine / 50 j | 1,5 | 6,0 |
+| Sauf renflouement : faim moyenne | 5,0 % | **2,6 %** |
+| Sauf renflouement : santé moyenne | 0,12 | **0,28** |
+| Sauf renflouement : chômage moyen | 8,6 % | 9,4 % (g1 12,1 %, g3 12,3 %) |
+| Sans filets : chômage moyen | 8,2 % | 22,2 % ❌ |
+| Sans filets : faim moyenne | 5,0 % | 20,2 % ❌ |
+| Sans filets : sans-abri moyen | 1,5 % | 16,9 % ❌ |
+| Sans filets : santé moyenne | 0,13 | 0,20 |
+| Sans filets : attente moyenne à l'hôpital | — | 497 jours |
+| Chocs résorbés < 200 j (sans / avec filets) | 0 / 3 | 3 / 3 |
+| Écart comptable max | 0 exact | 0 exact |
+
+**Lecture.**
+
+- **Avec filets, I2 fait ce qui était visé.** L'hôpital n'est plus renfloué (8,1 → 0 par 50 jours). Les renflouements
+  totaux baissent de 41 %, la santé moyenne reste à 0,73. Dans la graine 1 (sonde), la file compte 0 à 3 personnes et
+  l'attente reste sous un jour.
+- **Sans filets, l'économie est plus mauvaise, surtout à cause de la graine 4.** Elle s'effondre définitivement après
+  une famine au jour 384 : 76 % de chômage, faim et sans-abri à près de 80 %. Les autres graines se partagent : la
+  graine 5 s'améliore nettement (faim 5,3 → 0,1 %), la graine 1 se dégrade (chômage 7,3 → 11,0 %).
+- **Huit graines de plus (6 à 13), sans filets** : aucun effondrement, mais chômage 6,9 → 8,7 % et faim 4,7 → 6,6 % en
+  moyenne ; la santé passe de 0,12 à 0,19. En séparant les deux moitiés, c'est l'hôpital qui coûte : chômage 8,2 →
+  11,2 %, contre 7,9 → 8,0 % pour l'école.
+- **Le mécanisme mesuré : l'argent se déplace vers les entreprises.** Avec I2 (graines 6 à 13, sans filets), la dépense
+  des ménages baisse de 11 % (57 800 → 51 500 $/j). Les entreprises gagnent 74 000 $ de trésorerie, l'État en perd 30 000
+  et les ménages 40 000. Sans filets, l'hôpital reste privé d'électronique et de plastique (anomalie A2) : il produit 0 à 2
+  visites par jour pour une file de 240 personnes. L'enveloppe paie donc surtout des professionnels qui ne peuvent pas
+  soigner (graine 4 : 9 embauchés et 130 000 $ en 50 jours, puis licenciés), et des intrants vendus à des prix aberrants.
+  Cet argent public finit dans des entreprises qui, depuis I1, ne le redistribuent plus.
+
+**Critère de réussite.**
+
+- Renflouement coupé : chômage ≤ 10 % ❌ (g1, g3), faim < 2 % ❌ (g1 à g4), même si la faim passe de 5,0 à 2,6 %.
+- Avec filets, l'hôpital n'est plus renfloué ✅ ; les renflouements, toutes entreprises confondues, restent au-dessus
+  de 1 par 50 jours ❌ (16,8).
+- Indicateurs sans filets non dégradés : ❌.
+
+I2 remplace le renflouement de l'hôpital là où l'hôpital peut fonctionner. Sans filets, il bute sur A2 : un hôpital
+financé mais privé d'intrants ne soigne pas, et son enveloppe nourrit la trésorerie bloquée relevée en I1. Les deux
+suites possibles relèvent de décisions réservées : importations de dépannage (A2) et usure de la santé sans maladie.

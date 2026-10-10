@@ -300,6 +300,10 @@ class Params {
   // charges). Vrai : les bénéfices non répartis (lecture de la LCSA, art. 42 b : le dividende ne doit pas entamer le
   // capital déclaré).
   bool dividendFromRetained = false;
+  // Enveloppe des établissements publics : l'État porte leur trésorerie à ce nombre de jours du coût de l'équipe
+  // nécessaire. Raison : la règle d'embauche exige 8 jours de salaire par employé en caisse ; 2 jours de plus laissent
+  // une marge pour les intrants et les services. Au-delà de 1,5 fois cette trésorerie, l'excédent revient au trésor.
+  double publicCashDays = 10;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
@@ -322,6 +326,11 @@ class Modules {
   // acquitter son passif à échéance). Ici : pas de dividende sans bénéfice lissé, ni s'il empêche d'ouvrir les postes
   // voulus ; jamais plus que le bénéfice lissé du jour. Aucun paramètre nouveau.
   bool dividendTest = true;
+  // I2. Enveloppe budgétaire des services publics (hôpital, école). L'État finance l'équipe nécessaire à la demande
+  // attendue ; soins et cours publics sont gratuits et servis par ordre d'arrivée, avec une file d'attente mesurée.
+  // Repère : au Canada, les hôpitaux sont surtout financés par un budget global versé par la province (Fraser
+  // Institute, 2021), et non à la visite. Ne joue que si la santé (ou l'éducation) publique est active.
+  bool publicBudget = true;
 
   Modules();
 
@@ -341,11 +350,11 @@ class Modules {
   }
 
   /// Institutions qui remplacent un filet de sécurité (voir rapports/stabilisation.md).
-  static const List<String> institutions = ['dividendTest'];
+  static const List<String> institutions = ['dividendTest', 'publicBudget'];
 
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
-    'entry', 'dividendTest',
+    'entry', 'dividendTest', 'publicBudget',
   ];
   static const Map<String, String> labels = {
     'credit': 'Crédit bancaire (Caisse)',
@@ -359,6 +368,7 @@ class Modules {
     'publicEducation': 'Éducation publique (l’État paie)',
     'entry': 'Entrée et sortie d’entreprises',
     'dividendTest': 'Dividendes : test de solvabilité',
+    'publicBudget': 'Hôpital et école publics : enveloppe et file d’attente',
   };
 
   bool get(String k) {
@@ -385,6 +395,8 @@ class Modules {
         return entry;
       case 'dividendTest':
         return dividendTest;
+      case 'publicBudget':
+        return publicBudget;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -413,6 +425,8 @@ class Modules {
         entry = v;
       case 'dividendTest':
         dividendTest = v;
+      case 'publicBudget':
+        publicBudget = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -504,6 +518,22 @@ class Safeguards {
       ..minCapitalRatio = minCapitalRatio;
     return s;
   }
+}
+
+/// Un service public gratuit (soins, cours) : son enveloppe et sa file d'attente.
+class ServiceStats {
+  double envelopeToday = 0; // versé aujourd'hui par l'État
+  double wantedToday = 0; // ce que l'enveloppe aurait dû verser
+  double envelopeTotal = 0; // net de ce qui est revenu au trésor
+  int shortDays = 0; // jours où le trésor n'a pas couvert l'enveloppe en entier
+  int servedToday = 0;
+  int servedTotal = 0;
+  double servedWait = 0; // attente des derniers servis, moyenne lissée (jours)
+  int queue = 0; // personnes en file en fin de journée
+  double queueAge = 0; // attente moyenne des personnes encore en file (jours)
+
+  /// Attente moyenne : celle des derniers servis, ou celle des personnes en file si elle est plus longue.
+  double get wait => servedWait > queueAge ? servedWait : queueAge;
 }
 
 /// Un déclenchement de filet.
@@ -669,6 +699,8 @@ class Citizen extends Account {
   double incomeEma = 0; // revenu net lissé (~10 jours) : base de la consommation
   double spend = 0;
   int daysUnemployed = 0;
+  int? careSince; // jour d'inscription dans la file de l'hôpital public (null : pas en file)
+  int? schoolSince; // jour d'inscription dans la file de l'école publique
   Citizen(this.id, this.name, super.money, this.skill, this.ambition);
 
   /// 0 manœuvre, 1 technicien, 2 professionnel.

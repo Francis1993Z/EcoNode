@@ -164,12 +164,21 @@ void main() {
     run(p, 15);
     expect(p.monitor.active.containsKey('penurieTravail'), isTrue);
 
-    // embauches bloquées : sans trésorerie, une entreprise ne peut pas rouvrir les postes qu'elle voudrait
+    // embauches bloquées : l'immobilier, privé de trésorerie chaque jour, ne peut pas rouvrir les postes que sa
+    // demande exige (seuil et persistance abaissés : on teste l'entreprise provoquée)
     final b = Sim(seed: 9, safeguards: Safeguards.none(), modules: Modules()..entry = false);
+    b.monitor.cfg
+      ..blockedHiring = 0.03
+      ..blockedHiringDays = 10;
     run(b, 30);
-    b.godBankrupt(b.firms.firstWhere((f) => f.type == 'restaurant').id);
-    run(b, 45);
-    expect(b.monitor.active['embaucheBloquee']?.value, greaterThan(0.1));
+    final drained = b.firms.firstWhere((f) => f.type == 'immobilier');
+    for (var i = 0; i < 20; i++) {
+      b.godMoney(Target('firm', drained.id), -drained.money);
+      b.step();
+    }
+    final gap = drained.desired - drained.workers.length;
+    expect(gap > drained.vacancies && b.affordablePosts(drained) < 3, isTrue);
+    expect(b.monitor.active.containsKey('embaucheBloquee'), isTrue);
 
     // prix aberrant : le logement vendu 8 fois son prix de référence pendant plus de 30 jours
     final q = Sim(seed: 1, modules: Modules()..entry = false);
@@ -183,10 +192,11 @@ void main() {
   });
 
   test('I1 : une entreprise neuve sans bénéfice ne rend pas son capital en dividendes', () {
+    // (une clinique serait aujourd'hui un établissement public, sans dividendes : on prend une bijouterie)
     double paid(bool on) {
       final s = Sim(seed: 5, modules: Modules()..dividendTest = on);
       run(s, 50);
-      final f = s.addFirm('hopital', 'Clinique test', 20000, s.citizens.first.id, 600, 300);
+      final f = s.addFirm('bijouterie', 'Bijouterie test', 20000, s.citizens.first.id, 600, 300);
       var total = 0.0;
       for (var i = 0; i < 20; i++) {
         s.step();
@@ -198,6 +208,31 @@ void main() {
 
     expect(paid(false), greaterThan(1000)); // ancienne règle : 8 %/j de la trésorerie au-delà de la réserve
     expect(paid(true), 0);
+  });
+
+  test('I2 : hôpital et école publics, enveloppe de l’État, file d’attente par ordre d’arrivée', () {
+    final s = Sim(seed: 3, devChecks: true);
+    run(s, 300);
+    final hp = s.firms.where((f) => f.type == 'hopital').toList();
+    expect(hp, isNotEmpty);
+    expect(hp.every((f) => f.ownerId == null && s.publicService(f)), isTrue);
+    expect(s.nets.byAgent['bailout']?[hp.first.name] ?? 0, 0);
+    expect(s.state.healthPaid, greaterThan(0));
+    expect(s.services['soins']!.servedTotal, greaterThan(0));
+    expect(s.services['cours']!.servedTotal, greaterThan(0));
+    expect(s.cpiWeights.containsKey('soins'), isFalse);
+    // trésor vidé : l'enveloppe ne peut pas être versée en entier
+    s.godMoney(const Target('state'), -s.state.money);
+    s.step();
+    expect(s.services['soins']!.shortDays + s.services['cours']!.shortDays, greaterThan(0));
+    // plus d'hôpital : personne n'est soigné, la file vieillit et l'alerte d'attente s'ouvre
+    for (final f in hp) {
+      s.removeFirm(f.id);
+    }
+    s.monitor.cfg.waitDays = 5;
+    run(s, 30);
+    expect(s.monitor.active.containsKey('attente:soins'), isTrue);
+    expect(s.inv.worst, 0);
   });
 
   test('modules coupés : ni machines, ni dette, ni publicité, invariants exacts', () {

@@ -137,6 +137,9 @@ class RunStats {
   double homelessSum = 0, homelessMax = 0;
   double giniSum = 0, giniEnd = 0;
   double happySum = 0;
+  double healthSum = 0; // santé moyenne de la population
+  double waitSum = 0, queueSum = 0; // hôpital public : attente moyenne et file
+  Map<String, int> bailoutByType = {}; // renflouements en régime, par type d'entreprise
   double inflMaxAbs = 0, infl100MaxAbs = 0;
   double cpiAtWarmup = 1, cpiEnd = 1;
   double invMax = 0;
@@ -158,6 +161,12 @@ class RunStats {
   double get homelessMean => steady > 0 ? homelessSum / steady : 0;
   double get giniMean => steady > 0 ? giniSum / steady : 0;
   double get happyMean => steady > 0 ? happySum / steady : 0;
+  double get healthMean => steady > 0 ? healthSum / steady : 0;
+  double get waitMean => steady > 0 ? waitSum / steady : 0;
+  double get queueMean => steady > 0 ? queueSum / steady : 0;
+
+  /// Renflouements d'un type d'entreprise par 50 jours en régime normal.
+  double bailoutRate(String type) => steady > 0 ? (bailoutByType[type] ?? 0) * 50 / steady : 0;
   double get inflMean => steady > 0 && cpiAtWarmup > 0 ? math.pow(cpiEnd / cpiAtWarmup, 1 / steady) - 1 : 0;
   int get criticalOpened =>
       alertsOpened.entries.where((e) => criticalAlerts.contains(e.key)).fold(0, (a, e) => a + e.value);
@@ -178,6 +187,10 @@ class RunStats {
         'giniMean': giniMean,
         'giniEnd': giniEnd,
         'happyMean': happyMean,
+        'healthMean': healthMean,
+        'waitMean': waitMean,
+        'queueMean': queueMean,
+        'bailoutByType': bailoutByType,
         'inflMean': inflMean,
         'inflMaxAbs': inflMaxAbs,
         'infl100MaxAbs': infl100MaxAbs,
@@ -223,6 +236,21 @@ void observe(Sim s, RunStats r, int warmup) {
     r.homelessSum += ss;
     r.giniSum += h.gini;
     r.happySum += h.happiness;
+    var health = 0.0;
+    for (final c in s.citizens) {
+      health += c.health;
+    }
+    r.healthSum += s.citizens.isEmpty ? 0 : health / s.citizens.length;
+    final care = s.services['soins']!;
+    r.waitSum += care.wait;
+    r.queueSum += care.queue;
+    final log = s.nets.log;
+    for (var i = log.length - 1; i >= 0 && log[i].day == h.day; i--) {
+      if (log[i].net != 'bailout') continue;
+      final f = s.firms.where((f) => f.name == log[i].agent).toList();
+      final t = f.isEmpty ? '?' : f.first.type;
+      r.bailoutByType[t] = (r.bailoutByType[t] ?? 0) + 1;
+    }
   }
   r.cpiEnd = h.cpi;
   r.giniEnd = h.gini;
@@ -506,6 +534,8 @@ String report(Options o, List<RunStats> base, List<RunStats> withNets, List<RunS
     b.writeln('## 1. Sans filets');
     b.writeln();
     indicators(base);
+    b.writeln('Santé moyenne de la population : ${base.map((r) => 'g${r.seed} ${dec(r.healthMean)}').join(', ')}.');
+    b.writeln();
     b.writeln('### Alertes ouvertes, par type (ouvertures · jours-alerte)');
     b.writeln();
     final types = alertLabels.keys.where((t) => base.any((r) => (r.alertsOpened[t] ?? 0) > 0)).toList();
@@ -561,6 +591,20 @@ String report(Options o, List<RunStats> base, List<RunStats> withNets, List<RunS
         '${dec(rate)} ${rate >= 1 ? '❌' : '✅'}', top,
       ]));
     }
+    b.writeln();
+    final types = <String, int>{};
+    for (final r in rs) {
+      for (final e in r.bailoutByType.entries) {
+        types[e.key] = (types[e.key] ?? 0) + e.value;
+      }
+    }
+    if (types.isNotEmpty) {
+      final l = types.entries.toList()..sort((a, c) => c.value.compareTo(a.value));
+      b.writeln('Renflouements en régime, par type d’entreprise (toutes graines) : '
+          '${l.take(8).map((e) => '${templates[e.key]?.label ?? e.key} ${e.value}').join(', ')}.');
+      b.writeln();
+    }
+    b.writeln('Santé moyenne de la population : ${rs.map((r) => 'g${r.seed} ${dec(r.healthMean)}').join(', ')}.');
     b.writeln();
   }
 
@@ -681,6 +725,12 @@ const Map<String, String> _aggLabels = {
   'withNets_hungerMean': 'Avec filets : faim moyenne',
   'withNets_homelessMean': 'Avec filets : sans-abri moyen',
   'withNets_giniMean': 'Avec filets : Gini moyen',
+  'healthMean': 'Santé moyenne (sans filets)',
+  'withNets_healthMean': 'Avec filets : santé moyenne',
+  'sauf_healthMean': 'Filets sauf --sauf : santé moyenne',
+  'waitMean': 'Hôpital public : attente moyenne (j, sans filets)',
+  'net_bailout_hopital': 'Renflouements de l’hôpital / 50 j',
+  'sauf_net_bailout_hopital': 'Filets sauf --sauf : renflouements de l’hôpital / 50 j',
 };
 
 String _fmtAgg(String k, dynamic v) {
@@ -723,6 +773,8 @@ Map<String, dynamic> buildSummary(
     agg['homelessMean'] = mean(base, (r) => r.homelessMean);
     agg['giniMean'] = mean(base, (r) => r.giniMean);
     agg['inflMean'] = mean(base, (r) => r.inflMean);
+    agg['healthMean'] = mean(base, (r) => r.healthMean);
+    agg['waitMean'] = mean(base, (r) => r.waitMean);
     agg['criticalOpened'] = base.fold(0, (a, r) => a + r.criticalOpened);
     agg['alertsTotal'] = base.fold(0, (a, r) => a + r.alertsTotal);
     agg['invMax'] = base.fold(0.0, (a, r) => math.max(a, r.invMax));
@@ -735,6 +787,8 @@ Map<String, dynamic> buildSummary(
     agg['withNets_hungerMean'] = mean(withNets, (r) => r.hungerMean);
     agg['withNets_homelessMean'] = mean(withNets, (r) => r.homelessMean);
     agg['withNets_giniMean'] = mean(withNets, (r) => r.giniMean);
+    agg['withNets_healthMean'] = mean(withNets, (r) => r.healthMean);
+    agg['net_bailout_hopital'] = mean(withNets, (r) => r.bailoutRate('hopital'));
   }
   if (sauf.isNotEmpty) {
     agg['sauf_unempMean'] = mean(sauf, (r) => r.unempMean);
@@ -742,6 +796,8 @@ Map<String, dynamic> buildSummary(
     agg['sauf_homelessMean'] = mean(sauf, (r) => r.homelessMean);
     agg['sauf_giniMean'] = mean(sauf, (r) => r.giniMean);
     agg['sauf_criticalOpened'] = sauf.fold(0, (a, r) => a + r.criticalOpened);
+    agg['sauf_healthMean'] = mean(sauf, (r) => r.healthMean);
+    if (!o.sauf.contains('bailout')) agg['sauf_net_bailout_hopital'] = mean(sauf, (r) => r.bailoutRate('hopital'));
     for (final k in Safeguards.keys.where((k) => !o.sauf.contains(k))) {
       agg['sauf_net_$k'] = mean(sauf, (r) => r.netRate(k));
     }

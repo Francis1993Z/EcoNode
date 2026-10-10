@@ -41,6 +41,11 @@ class MonitorConfig {
   // pénurie, qui mesurait surtout ce cas : dans le noyau, des entreprises sans employé ni argent)…
   double blockedHiring = 0.10;
   int blockedHiringDays = 30; // … pendant 30 jours
+  // Attente moyenne d'un service public (hôpital, école) > 7 jours… Raison : les maladies et les envies de cours
+  // arrivent au hasard, une file d'un ou deux jours est normale ; au-delà d'une semaine en moyenne, la capacité ou
+  // l'enveloppe est durablement insuffisante.
+  double waitLong = 7;
+  int waitDays = 30; // … pendant 30 jours
   double priceAberrant = 5; // prix > 5 fois le prix de référence corrigé des salaires…
   int priceAberrantDays = 30; // … pendant 30 jours (entreprise active)
 }
@@ -65,6 +70,7 @@ const Map<String, String> alertLabels = {
   'penurieTravail': 'Pénurie de main-d’œuvre',
   'embaucheBloquee': 'Embauches bloquées faute de moyens',
   'prixAberrant': 'Prix aberrant',
+  'attente': 'Attente trop longue (service public)',
 };
 
 /// Alertes critiques : aucune ne doit apparaître dans une partie stable.
@@ -201,6 +207,18 @@ class Monitor {
           () => _blocked(s));
     }
 
+    // ---- services publics : attente
+    for (final g in const ['soins', 'cours']) {
+      if (!s.publicGood(g)) continue;
+      final st = s.services[g]!;
+      final who = g == 'soins' ? 'Hôpital public' : 'École publique';
+      cond('attente:$g', 'attente', st.wait > c.waitLong, c.waitDays, st.wait, c.waitLong,
+          () => '$who : attente moyenne ${_dec(st.wait, 1)} j (seuil ${_dec(c.waitLong, 0)} j) ; ${st.queue} personne(s) '
+              'en file ; enveloppe du jour ${fmtMoney0(st.envelopeToday)}'
+              '${st.envelopeToday + 1 < st.wantedToday ? ' sur ${fmtMoney0(st.wantedToday)} voulus (trésor insuffisant)' : ''}',
+          () => _providers(s, g));
+    }
+
     // ---- inégalités et richesse médiane
     cond('gini', 'gini', h.gini > c.giniHigh || h.gini < c.giniLow, c.giniDays, h.gini,
         h.gini > c.giniHigh ? c.giniHigh : c.giniLow,
@@ -322,14 +340,26 @@ class Monitor {
 
   static String _money(double v) => v < 100 ? '${_dec(v, 1)} \$' : fmtMoney0(v);
 
-  /// Hôpitaux : effectifs, visites produites et demandées, intrants qui manquent.
+  /// Hôpitaux : effectifs, visites produites et demandées, intrants qui manquent ; file d'attente si public.
   static List<String> _hospitals(Sim s) {
     final hs = s.firms.where((f) => f.outputs.containsKey('soins')).toList();
     if (hs.isEmpty) return const ['aucun hôpital'];
+    final st = s.services['soins']!;
     return [
-      for (final f in hs.take(3))
+      ..._providers(s, 'soins'),
+      if (s.publicGood('soins')) 'file : ${st.queue} personne(s), attente moyenne ${_dec(st.wait, 1)} j',
+    ];
+  }
+
+  /// Établissements qui produisent un service : effectifs, production et demande, intrants qui manquent.
+  static List<String> _providers(Sim s, String g) {
+    final l = s.firms.where((f) => f.outputs.containsKey(g)).toList();
+    if (l.isEmpty) return [g == 'soins' ? 'aucun hôpital' : 'aucune école'];
+    final unit = g == 'soins' ? 'visite(s)' : 'cours';
+    return [
+      for (final f in l.take(3))
         '${f.name} : ${f.workers.length} employé(s) pour ${f.desired} voulus, '
-            '${_dec(f.produced['soins'] ?? 0, 1)} visite(s)/j pour ${_dec(f.demandEma['soins'] ?? 0, 0)} demandées'
+            '${_dec(f.produced[g] ?? 0, 1)} $unit/j pour ${_dec(f.demandEma[g] ?? 0, 0)} demandés'
             '${f.inputLimited ? ' ; limité par ses intrants${_short(s, f)}' : ''}',
     ];
   }

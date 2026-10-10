@@ -120,6 +120,7 @@ class _FirmView extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4),
               child: Text('⚠ Production limitée par manque d’intrants.', style: TextStyle(color: pal.warn, fontSize: 12))),
       ]),
+      if (sim.publicService(f)) _publicSection(context, ctrl, f),
       Section('Capital et technologie', [
         KV('Machines', '${fmtNum(f.machines, 1)}  (×${fmtNum(sim.machineMult(f), 2)})'),
         KV('Technologie', 'niveau ${f.techLevel}  (×${fmtNum(sim.techMult(f), 2)})'),
@@ -608,6 +609,24 @@ class _Bar extends StatelessWidget {
   }
 }
 
+/// Établissement public (institution I2) : financé par une enveloppe de l'État, il sert une file d'attente.
+Widget _publicSection(BuildContext context, SimController ctrl, Firm f) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final g = f.outputs.keys.firstWhere(sim.publicGood);
+  final st = sim.services[g]!;
+  final who = g == 'soins' ? 'patient(s)' : 'élève(s)';
+  return Section('Établissement public', [
+    const KV('Financement', 'enveloppe de l’État ; service gratuit'),
+    KV('Enveloppe aujourd’hui', money0(st.envelopeToday)),
+    if (st.wantedToday > st.envelopeToday + 1) KV('Enveloppe voulue', money0(st.wantedToday), color: pal.warn),
+    KV('File d’attente', '${st.queue} $who'),
+    KV('Attente moyenne', '${fmtNum(st.wait, 1)} j', color: st.wait > sim.monitor.cfg.waitLong ? pal.bad : null),
+    KV('Servis aujourd’hui', '${st.servedToday}'),
+    if (st.shortDays > 0) KV('Jours d’enveloppe incomplète', '${st.shortDays}', color: pal.warn),
+  ]);
+}
+
 // ------------------------------------------------------------------ État, Caisse, extérieur
 
 class _StateView extends StatelessWidget {
@@ -634,6 +653,16 @@ class _StateView extends StatelessWidget {
         KV('Impôts aujourd’hui', money0(st.taxesToday)),
         KV('Versements aujourd’hui', money0(st.paidToday)),
       ]),
+      if (sim.publicGood('soins') || sim.publicGood('cours'))
+        Section('Services publics gratuits', [
+          for (final g in const ['soins', 'cours'])
+            if (sim.publicGood(g)) ...[
+              KV('${g == 'soins' ? 'Hôpital' : 'École'} : enveloppe du jour', money0(sim.services[g]!.envelopeToday)),
+              KV('${g == 'soins' ? 'Hôpital' : 'École'} : file d’attente',
+                  '${sim.services[g]!.queue} · attente ${fmtNum(sim.services[g]!.wait, 1)} j',
+                  color: sim.services[g]!.wait > sim.monitor.cfg.waitLong ? pal.bad : null),
+            ],
+        ]),
       Section('Politique', [
         ParamSlider(
             label: 'Taux d’impôt (salaires, dividendes)',
@@ -679,7 +708,9 @@ class _StateView extends StatelessWidget {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Santé publique'),
-          subtitle: const Text('L’État paie les soins tant que le trésor le permet.'),
+          subtitle: Text(m.publicBudget
+              ? 'Soins gratuits : l’hôpital reçoit une enveloppe de l’État et sert une file d’attente.'
+              : 'L’État paie les soins tant que le trésor le permet.'),
           value: m.publicHealth,
           onChanged: (v) {
             m.publicHealth = v;
@@ -689,7 +720,9 @@ class _StateView extends StatelessWidget {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Éducation publique'),
-          subtitle: const Text('L’État paie les cours tant que le trésor le permet.'),
+          subtitle: Text(m.publicBudget
+              ? 'Cours gratuits : l’école reçoit une enveloppe de l’État et sert une file d’attente.'
+              : 'L’État paie les cours tant que le trésor le permet.'),
           value: m.publicEducation,
           onChanged: (v) {
             m.publicEducation = v;
