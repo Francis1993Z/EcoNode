@@ -235,6 +235,33 @@ void main() {
     expect(s.inv.worst, 0);
   });
 
+  test('I3 : assurance-emploi indexée, puis aide sociale', () {
+    final s = Sim(seed: 2, devChecks: true);
+    run(s, 150);
+    expect(s.state.eiPremiums, greaterThan(0));
+    // un employé assuré perd son emploi : 55 % de son dernier salaire, plafonné au salaire moyen
+    final f = s.firms.firstWhere((f) => f.workers.any((id) => s.citizen(id)!.insuredDays >= s.params.eiQualifyingDays));
+    final c = s.citizen(f.workers.firstWhere((id) => s.citizen(id)!.insuredDays >= s.params.eiQualifyingDays))!;
+    final wage = c.lastWage;
+    s.removeFirm(f.id);
+    s.step();
+    final expected = s.params.eiReplacement * (wage < s.insurableCap() ? wage : s.insurableCap());
+    expect(c.eiBenefit, closeTo(expected, expected * 0.05));
+    expect(c.eiDaysLeft, greaterThanOrEqualTo(s.params.eiDaysLow - 1));
+    // un nouvel arrivant sans emploi assurable touche l'aide sociale (le panier de survie)
+    s.godAddCitizens(3, 50);
+    final newcomer = s.citizens.last;
+    s.step();
+    expect(newcomer.eiDaysLeft, 0);
+    expect(s.state.assistRecipients, greaterThan(0));
+    // trésor vidé : les prestations sont versées en partie et l'alerte s'ouvre
+    s.godMoney(const Target('state'), -s.state.money);
+    s.step();
+    expect(s.state.benefitCut, lessThan(1));
+    expect(s.monitor.active.containsKey('prestations'), isTrue);
+    expect(s.inv.worst, 0);
+  });
+
   test('modules coupés : ni machines, ni dette, ni publicité, invariants exacts', () {
     final s = Sim(seed: 10, modules: Modules.none(), devChecks: true);
     run(s, 300);

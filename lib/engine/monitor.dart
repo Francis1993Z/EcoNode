@@ -71,6 +71,7 @@ const Map<String, String> alertLabels = {
   'embaucheBloquee': 'Embauches bloquées faute de moyens',
   'prixAberrant': 'Prix aberrant',
   'attente': 'Attente trop longue (service public)',
+  'prestations': 'Prestations réduites faute de trésor',
 };
 
 /// Alertes critiques : aucune ne doit apparaître dans une partie stable.
@@ -206,6 +207,16 @@ class Monitor {
               '(${fmtPct(share, 0)} de la population, seuil ${fmtPct(c.blockedHiring, 0)})',
           () => _blocked(s));
     }
+
+    // ---- prestations aux sans-emploi versées en partie seulement : le trésor ne suffit plus
+    final cut = s.state.benefitCut;
+    cond('prestations', 'prestations', cut < 1 - 1e-9, 1, cut, 1,
+        () => 'le trésor ne verse que ${fmtPct(cut)} des prestations dues aux sans-emploi '
+            '(trésor ${fmtMoney0(s.state.money)})',
+        () => [
+              if (s.modules.insurance) '${s.state.eiClaimants} prestataires de l’assurance-emploi',
+              if (s.modules.insurance) '${s.state.assistRecipients} bénéficiaires de l’aide sociale',
+            ]);
 
     // ---- services publics : attente
     for (final g in const ['soins', 'cours']) {

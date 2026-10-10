@@ -140,6 +140,8 @@ class RunStats {
   double healthSum = 0; // santé moyenne de la population
   double waitSum = 0, queueSum = 0; // hôpital public : attente moyenne et file
   Map<String, int> bailoutByType = {}; // renflouements en régime, par type d'entreprise
+  int benefitCutDays = 0; // jours où les prestations aux sans-emploi n'ont été versées qu'en partie
+  double treasuryMin = double.infinity; // trésor de l'État le plus bas (régime)
   double inflMaxAbs = 0, infl100MaxAbs = 0;
   double cpiAtWarmup = 1, cpiEnd = 1;
   double invMax = 0;
@@ -191,6 +193,8 @@ class RunStats {
         'waitMean': waitMean,
         'queueMean': queueMean,
         'bailoutByType': bailoutByType,
+        'benefitCutDays': benefitCutDays,
+        'treasuryMin': treasuryMin.isFinite ? treasuryMin : null,
         'inflMean': inflMean,
         'inflMaxAbs': inflMaxAbs,
         'infl100MaxAbs': infl100MaxAbs,
@@ -241,6 +245,8 @@ void observe(Sim s, RunStats r, int warmup) {
       health += c.health;
     }
     r.healthSum += s.citizens.isEmpty ? 0 : health / s.citizens.length;
+    if (s.state.benefitCut < 1 - 1e-9) r.benefitCutDays++;
+    r.treasuryMin = math.min(r.treasuryMin, s.state.money);
     final care = s.services['soins']!;
     r.waitSum += care.wait;
     r.queueSum += care.queue;
@@ -730,6 +736,9 @@ const Map<String, String> _aggLabels = {
   'sauf_healthMean': 'Filets sauf --sauf : santé moyenne',
   'waitMean': 'Hôpital public : attente moyenne (j, sans filets)',
   'net_bailout_hopital': 'Renflouements de l’hôpital / 50 j',
+  'benefitCutDays': 'Jours de prestations réduites (sans filets, toutes graines)',
+  'treasuryMin': 'Trésor de l’État le plus bas (sans filets, \$)',
+  'withNets_benefitCutDays': 'Avec filets : jours de prestations réduites',
   'sauf_net_bailout_hopital': 'Filets sauf --sauf : renflouements de l’hôpital / 50 j',
 };
 
@@ -751,6 +760,9 @@ String _fmtAgg(String k, dynamic v) {
       return pc(d, 3);
     case 'invMax':
       return d.toStringAsExponential(1);
+    case 'benefitCutDays':
+    case 'withNets_benefitCutDays':
+    case 'treasuryMin':
     case 'criticalOpened':
     case 'sauf_criticalOpened':
     case 'alertsTotal':
@@ -774,6 +786,8 @@ Map<String, dynamic> buildSummary(
     agg['giniMean'] = mean(base, (r) => r.giniMean);
     agg['inflMean'] = mean(base, (r) => r.inflMean);
     agg['healthMean'] = mean(base, (r) => r.healthMean);
+    agg['benefitCutDays'] = base.fold(0, (a, r) => a + r.benefitCutDays);
+    agg['treasuryMin'] = base.fold(double.infinity, (a, r) => math.min(a, r.treasuryMin));
     agg['waitMean'] = mean(base, (r) => r.waitMean);
     agg['criticalOpened'] = base.fold(0, (a, r) => a + r.criticalOpened);
     agg['alertsTotal'] = base.fold(0, (a, r) => a + r.alertsTotal);
@@ -788,6 +802,7 @@ Map<String, dynamic> buildSummary(
     agg['withNets_homelessMean'] = mean(withNets, (r) => r.homelessMean);
     agg['withNets_giniMean'] = mean(withNets, (r) => r.giniMean);
     agg['withNets_healthMean'] = mean(withNets, (r) => r.healthMean);
+    agg['withNets_benefitCutDays'] = withNets.fold(0, (a, r) => a + r.benefitCutDays);
     agg['net_bailout_hopital'] = mean(withNets, (r) => r.bailoutRate('hopital'));
   }
   if (sauf.isNotEmpty) {

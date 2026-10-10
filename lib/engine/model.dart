@@ -304,6 +304,24 @@ class Params {
   // nécessaire. Raison : la règle d'embauche exige 8 jours de salaire par employé en caisse ; 2 jours de plus laissent
   // une marge pour les intrants et les services. Au-delà de 1,5 fois cette trésorerie, l'excédent revient au trésor.
   double publicCashDays = 10;
+  // Assurance-emploi (I3), repères du régime canadien en 2025 (canada.ca) ; un jour de jeu = un jour.
+  // Prestation : 55 % de la rémunération assurable.
+  double eiReplacement = 0.55;
+  // Rémunération assurable plafonnée : 65 700 $ par an en 2025, soit ~1 263 $ par semaine, à peu près la rémunération
+  // hebdomadaire moyenne (1 293 $ en mai 2025, Statistique Canada). Ici : plafond = 1 × le salaire moyen de l'économie.
+  double eiInsurableCap = 1.0;
+  // Cotisation : 1,64 $ par 100 $ de rémunération assurable pour l'employé et 1,4 fois plus pour l'employeur (2,296 $),
+  // soit 3,94 %. Prélevée avec l'impôt sur le salaire : dans le modèle, le salaire est le coût total du travail, la part
+  // de l'employeur est donc supportée par le salaire (hypothèse d'incidence usuelle).
+  double eiRate = 0.0394;
+  // Durée : pour un emploi à plein temps toute l'année (1 820 heures et plus), 36 semaines quand le chômage est de 6 %
+  // ou moins, jusqu'à 45 semaines à 16 % et plus (Loi sur l'assurance-emploi, annexe I) ; interpolation linéaire entre
+  // les deux, au taux de chômage du jour de la demande.
+  int eiDaysLow = 252;
+  int eiDaysHigh = 315;
+  // Admissibilité : au moins 420 heures d'emploi assurable (le minimum, exigé dans les régions au chômage le plus élevé),
+  // soit 12 semaines à 35 heures : 84 jours employés depuis la dernière demande.
+  int eiQualifyingDays = 84;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
@@ -331,6 +349,11 @@ class Modules {
   // Repère : au Canada, les hôpitaux sont surtout financés par un budget global versé par la province (Fraser
   // Institute, 2021), et non à la visite. Ne joue que si la santé (ou l'éducation) publique est active.
   bool publicBudget = true;
+  // I3. Assurance-emploi indexée, puis aide sociale. La prestation suit le dernier salaire (55 %, plafonnée) pendant une
+  // durée limitée qui s'allonge quand le chômage est élevé ; elle est financée par une cotisation prélevée avec l'impôt.
+  // Après la durée maximale, ou sans emploi assurable suffisant, l'aide sociale verse le panier de survie.
+  // Repères : régime canadien de 2025 (paramètres « ei… » ci-dessous).
+  bool insurance = true;
 
   Modules();
 
@@ -350,11 +373,11 @@ class Modules {
   }
 
   /// Institutions qui remplacent un filet de sécurité (voir rapports/stabilisation.md).
-  static const List<String> institutions = ['dividendTest', 'publicBudget'];
+  static const List<String> institutions = ['dividendTest', 'publicBudget', 'insurance'];
 
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
-    'entry', 'dividendTest', 'publicBudget',
+    'entry', 'dividendTest', 'publicBudget', 'insurance',
   ];
   static const Map<String, String> labels = {
     'credit': 'Crédit bancaire (Caisse)',
@@ -369,6 +392,7 @@ class Modules {
     'entry': 'Entrée et sortie d’entreprises',
     'dividendTest': 'Dividendes : test de solvabilité',
     'publicBudget': 'Hôpital et école publics : enveloppe et file d’attente',
+    'insurance': 'Assurance-emploi indexée et aide sociale',
   };
 
   bool get(String k) {
@@ -397,6 +421,8 @@ class Modules {
         return dividendTest;
       case 'publicBudget':
         return publicBudget;
+      case 'insurance':
+        return insurance;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -427,6 +453,8 @@ class Modules {
         dividendTest = v;
       case 'publicBudget':
         publicBudget = v;
+      case 'insurance':
+        insurance = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -700,6 +728,10 @@ class Citizen extends Account {
   double spend = 0;
   int daysUnemployed = 0;
   int? careSince; // jour d'inscription dans la file de l'hôpital public (null : pas en file)
+  double lastWage = 0; // dernier salaire (assurance-emploi)
+  int insuredDays = 0; // jours d'emploi assurable depuis la dernière demande
+  int eiDaysLeft = 0; // jours de prestations restants
+  double eiBenefit = 0; // prestation quotidienne de la demande en cours
   int? schoolSince; // jour d'inscription dans la file de l'école publique
   Citizen(this.id, this.name, super.money, this.skill, this.ambition);
 
@@ -715,6 +747,13 @@ class StateAccount extends Account {
   double paidToday = 0;
   double healthPaid = 0;
   double educationPaid = 0;
+  // assurance-emploi et aide sociale (I3) : compte des opérations, comme le compte notionnel canadien
+  double eiPremiums = 0; // cotisations perçues (total)
+  double eiPaid = 0; // prestations versées (total)
+  double assistPaid = 0; // aide sociale versée (total)
+  int eiClaimants = 0; // prestataires aujourd'hui
+  int assistRecipients = 0; // bénéficiaires de l'aide sociale aujourd'hui
+  double benefitCut = 1; // part des prestations dues versée aujourd'hui (1 : toutes ; moins : trésor insuffisant)
   StateAccount(super.money);
 }
 

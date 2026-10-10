@@ -910,8 +910,12 @@ class Sim {
     }
     // assurance-emploi payée par l'État, au prorata si la caisse est vide
     final idle = citizens.where((c) => c.employer == null).toList();
-    if (idle.isNotEmpty && params.benefit > 0) {
+    state.benefitCut = 1;
+    if (modules.insurance) {
+      _insurance(idle);
+    } else if (idle.isNotEmpty && params.benefit > 0) {
       final each = math.min(params.benefit, state.money / idle.length);
+      state.benefitCut = each / params.benefit;
       if (each > eps) {
         var total = 0.0;
         for (final c in idle) {
@@ -924,6 +928,73 @@ class Sim {
         _flow('E', 'M', '\$prestations', idle.length.toDouble(), total);
       }
     }
+  }
+
+  /// Rémunération assurable maximale : le salaire moyen de l'économie (I3).
+  double insurableCap() {
+    final w = avgWage > 0 ? avgWage : (history.isNotEmpty && history.last.wage > 0 ? history.last.wage : params.startWage);
+    return params.eiInsurableCap * w;
+  }
+
+  /// Jours de prestations d'une demande, selon le taux de chômage du jour : de 36 semaines (6 % ou moins) à 45 (16 % et
+  /// plus), comme pour un emploi à plein temps dans la table de la Loi sur l'assurance-emploi.
+  int eiDuration(double unemp) {
+    final p = params;
+    final x = ((unemp - 0.06) / 0.10).clamp(0.0, 1.0);
+    return (p.eiDaysLow + (p.eiDaysHigh - p.eiDaysLow) * x).round();
+  }
+
+  /// Assurance-emploi indexée puis aide sociale (institution I3). Au premier jour sans emploi, le citoyen qui a assez
+  /// d'emploi assurable ouvre une demande : 55 % de son dernier salaire (plafonné) pendant une durée qui dépend du
+  /// chômage. Sinon, ou une fois la durée épuisée, l'aide sociale lui verse le panier de survie. Si le trésor ne suffit
+  /// pas, toutes les prestations baissent dans la même proportion.
+  void _insurance(List<Citizen> idle) {
+    final p = params;
+    final st = state;
+    st.eiClaimants = 0;
+    st.assistRecipients = 0;
+    st.benefitCut = 1;
+    if (idle.isEmpty) return;
+    final unemp = idle.length / math.max(1, citizens.length);
+    final cap = insurableCap();
+    final due = <double>[];
+    var total = 0.0;
+    for (final c in idle) {
+      if (c.daysUnemployed == 1) {
+        if (c.insuredDays >= p.eiQualifyingDays && c.lastWage > 0) {
+          c.eiDaysLeft = eiDuration(unemp);
+          c.eiBenefit = p.eiReplacement * math.min(c.lastWage, cap);
+          c.insuredDays = 0;
+        } else {
+          c.eiDaysLeft = 0;
+        }
+      }
+      final a = c.eiDaysLeft > 0 ? c.eiBenefit : needCost; // aide sociale : le panier de survie
+      due.add(a);
+      total += a;
+    }
+    final k = total > st.money ? st.money / total : 1.0;
+    st.benefitCut = k;
+    var ei = 0.0, assist = 0.0;
+    for (var i = 0; i < idle.length; i++) {
+      final c = idle[i];
+      final a = transfer(st, c, due[i] * k);
+      c.income += a;
+      if (c.eiDaysLeft > 0) {
+        c.eiDaysLeft--;
+        ei += a;
+        st.eiClaimants++;
+      } else {
+        assist += a;
+        st.assistRecipients++;
+      }
+    }
+    st.eiPaid += ei;
+    st.assistPaid += assist;
+    st.paid += ei + assist;
+    st.paidToday += ei + assist;
+    if (ei > 0) _flow('E', 'M', '\$assurance-emploi', st.eiClaimants.toDouble(), ei);
+    if (assist > 0) _flow('E', 'M', '\$aide sociale', st.assistRecipients.toDouble(), assist);
   }
 
   void _produce() {
@@ -982,18 +1053,27 @@ class Sim {
       final bill = f.wage * n;
       final each = f.money >= bill ? f.wage : f.money / n;
       final t = params.taxRate;
-      var net = 0.0, tax = 0.0;
+      // assurance-emploi (I3) : cotisation sur la rémunération assurable, plafonnée au salaire moyen
+      final ins = modules.insurance;
+      final cot = ins ? math.min(each, insurableCap()) * params.eiRate : 0.0;
+      var net = 0.0, tax = 0.0, premiums = 0.0;
       for (final id in f.workers) {
         final c = _cmap[id]!;
-        final a = transfer(f, c, each * (1 - t));
+        final a = transfer(f, c, each * (1 - t) - cot);
         net += a;
         tax += transfer(f, state, each * t);
+        if (ins) {
+          premiums += transfer(f, state, cot);
+          c.lastWage = f.wage;
+          c.insuredDays++;
+        }
         c.income += a;
       }
-      f.wagesPaid = net + tax;
-      f.costs += net + tax;
+      f.wagesPaid = net + tax + premiums;
+      f.costs += net + tax + premiums;
       state.taxes += tax;
       state.taxesToday += tax;
+      state.eiPremiums += premiums;
       if (each > 0) {
         _flow(f.id.toString(), 'M', '\$salaires', n.toDouble(), net);
         if (tax > 0) _flow('M', 'E', '\$impôts', 1, tax);

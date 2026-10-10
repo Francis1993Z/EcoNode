@@ -752,3 +752,82 @@ les intrants de ce qu'elle peut produire.
 I2 remplace le renflouement de l'hôpital là où l'hôpital peut fonctionner. Sans filets, il bute sur A2 : un hôpital
 financé mais privé d'intrants ne soigne pas, et son enveloppe nourrit la trésorerie bloquée relevée en I1. Les deux
 suites possibles relèvent de décisions réservées : importations de dépannage (A2) et usure de la santé sans maladie.
+
+### I3. Assurance-emploi indexée, puis aide sociale (10 octobre 2026)
+
+Rapports : [`i3-assurance-complet.md`](i3-assurance-complet.md) et [`i3-assurance-noyau.md`](i3-assurance-noyau.md),
+comparés au même code interrupteur coupé (`i3-assurance-avant-*.md`), étape « sauf anti-famine » (I3 vise la part
+« pas de revenu » de ce filet).
+
+**Ce qui a changé** (module `insurance`, actif par défaut ; il remplace la prestation fixe de 80 $/j) :
+
+- **Cotisation** prélevée avec l'impôt sur chaque salaire : 3,94 % de la rémunération assurable, plafonnée au salaire
+  moyen. Le salaire étant le coût total du travail dans le modèle, la part de l'employeur est supportée par le salaire.
+- **Demande de prestations** au premier jour sans emploi, si le citoyen a au moins 84 jours d'emploi assurable depuis
+  sa dernière demande : 55 % de son dernier salaire, plafonné à 55 % du salaire moyen.
+- **Durée** fixée à la demande selon le chômage du jour : 252 jours (36 semaines) à 6 % ou moins, jusqu'à 315 jours
+  (45 semaines) à 16 % et plus, en ligne droite entre les deux.
+- **Aide sociale** ensuite, ou sans emploi assurable suffisant : le panier de survie du jour (`needCost` : l'aliment le
+  moins cher par point de faim et une nuitée).
+- **Trésor insuffisant** : toutes les prestations baissent dans la même proportion. Nouveau détecteur « Prestations
+  réduites faute de trésor » (dans les deux régimes, pour comparer). Compte des opérations (cotisations, prestations,
+  aide sociale) dans l'inspecteur de l'État, comme le compte notionnel canadien de l'assurance-emploi.
+
+**Paramètres et sources** (régime canadien de 2025, canada.ca ; un jour de jeu = un jour) :
+
+- `eiReplacement` = 0,55 : taux de base des prestations régulières, 55 % de la rémunération assurable.
+- `eiInsurableCap` = 1,0 × le salaire moyen : maximum de la rémunération assurable de 65 700 $ par an, soit ~1 263 $ par
+  semaine, à peu près la rémunération hebdomadaire moyenne (1 293 $ en mai 2025, Statistique Canada).
+- `eiRate` = 3,94 % : 1,64 $ par 100 $ pour l'employé, 1,4 fois plus pour l'employeur (2,296 $).
+- `eiDaysLow` = 252 et `eiDaysHigh` = 315 : 36 semaines à 6 % de chômage ou moins, 45 semaines à 16 % et plus, pour un
+  emploi à plein temps toute l'année (1 820 heures et plus ; Loi sur l'assurance-emploi, annexe I).
+- `eiQualifyingDays` = 84 : 420 heures d'emploi assurable au minimum, soit 12 semaines à 35 heures.
+
+**Résultats** (5 graines × 1 500 jours) :
+
+| Indicateur | Avant (I1 + I2) | I3 |
+|---|---|---|
+| Sans filets : chômage moyen | 22,2 % | **8,7 %** |
+| Sans filets : faim moyenne | 20,2 % | **5,0 %** |
+| Sans filets : sans-abri moyen | 16,9 % | **2,4 %** |
+| Sans filets : santé moyenne | 0,20 | 0,33 |
+| Sans filets : jours de prestations réduites (5 graines) | 1 283 | **0** |
+| Sans filets : trésor de l'État le plus bas | 6 $ | **66 148 $** |
+| Sans filets : jours de faim répandue / de sans-abri nombreux | 1 574 / 1 631 | 520 / 745 |
+| Sans filets : alertes critiques | 129 | 137 |
+| Avec filets : anti-famine / 50 j | 6,0 | **0,14** ✅ |
+| Avec filets : renflouements / 50 j | 16,8 | 13,4 |
+| Avec filets : plancher de logement / 50 j | 0,01 | 9,9 ❌ |
+| Avec filets : chômage moyen | 7,2 % | 8,0 % |
+| Avec filets : santé moyenne | 0,73 | **0,87** |
+| Sauf anti-famine : faim moyenne | 0,4 % | **0,0 %** |
+| Sauf anti-famine : chômage moyen | 7,2 % | 8,0 % (g1 10,4 %, g4 10,1 %) |
+| Chocs résorbés < 200 j (sans / avec filets) | 3 / 3 | 0 / 4 |
+| Noyau, sans filets : chômage moyen | 5,2 % | 4,3 % |
+| Noyau : renflouements / 50 j | 13,4 | 8,9 |
+| Écart comptable max | 0 exact | 0 exact |
+
+**Lecture.**
+
+- **I3 règle l'effondrement de fin de partie (A4).** Le trésor ne se vide plus (66 000 $ au plus bas, contre 6 $) et
+  les prestations ne sont plus jamais réduites (1 283 jours avant). La graine 4, qui s'effondrait définitivement depuis
+  I2, tient : sonde, chômage de 8 à 19 %, trésor jamais sous 83 000 $. Les cotisations dépassent les prestations
+  (graine 4 : 2,75 M$ contre 1,96 M$), et l'excédent rejoint le trésor général.
+- **L'anti-famine passe sous 1 déclenchement par 50 jours** (6,0 → 0,14), et la faim disparaît quand on coupe ce filet.
+- **Effet secondaire : des sans-logis à l'aide sociale.** Le plancher de logement passe de 0,01 à 9,9 déclenchements par
+  50 jours (89 % « prix trop élevé » ; graines 1 et 4 surtout). Ces sans-logis touchent l'aide sociale (graine 1 : 1 882
+  jours-sans-logis sur 2 208). Le panier de survie (14 à 63 $/j selon la graine et le moment) est plus bas que l'ancienne prestation fixe
+  (80 $/j), et
+  il suppose l'aliment le moins cher par point de faim. Or un ménage choisit ses aliments selon ses goûts, et il mange
+  avant de se loger. Exemple, graine 1 : un bénéficiaire reçoit 36 à 49 $/j, en dépense 38 à 42 en nourriture, et ne peut
+  plus payer la nuitée à 9,60 $, alors que 12 nuitées restent invendues.
+
+**Critère de réussite.**
+
+- Anti-famine coupé : faim et sans-abri < 2 % ✅ ; chômage ≤ 10 % ❌ de justesse (g1 10,4 %, g4 10,1 %).
+- Avec filets, anti-famine sous 1 par 50 jours ✅ (0,14).
+- Indicateurs sans filets non dégradés : ✅ (chômage, faim, sans-abri, santé, trésor), sauf le nombre d'alertes
+  critiques (129 → 137 : plus d'épisodes, beaucoup plus courts).
+
+Suite possible, hors de ce mandat : une aide sociale qui couvre le panier tel que les ménages le composent, ou un choix
+des aliments qui tienne compte du loyer quand l'argent manque.

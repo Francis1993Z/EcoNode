@@ -653,6 +653,17 @@ class _StateView extends StatelessWidget {
         KV('Impôts aujourd’hui', money0(st.taxesToday)),
         KV('Versements aujourd’hui', money0(st.paidToday)),
       ]),
+      if (m.insurance)
+        Section('Assurance-emploi et aide sociale', [
+          KV('Cotisations perçues (total)', money0(st.eiPremiums)),
+          KV('Prestations versées (total)', money0(st.eiPaid)),
+          KV('Solde du compte (cotisations − prestations)', money0(st.eiPremiums - st.eiPaid),
+              color: st.eiPremiums < st.eiPaid ? pal.warn : null),
+          KV('Aide sociale versée (total)', money0(st.assistPaid)),
+          KV('Prestataires aujourd’hui', '${st.eiClaimants}'),
+          KV('Aide sociale aujourd’hui', '${st.assistRecipients} personne(s) · ${money0(sim.needCost)} chacune'),
+          KV('Part des prestations versée', pct(st.benefitCut), color: st.benefitCut < 1 ? pal.bad : null),
+        ]),
       if (sim.publicGood('soins') || sim.publicGood('cours'))
         Section('Services publics gratuits', [
           for (final g in const ['soins', 'cours'])
@@ -674,7 +685,8 @@ class _StateView extends StatelessWidget {
               p.taxRate = v;
               ctrl.touch();
             }),
-        ParamSlider(
+        if (!m.insurance)
+          ParamSlider(
             label: 'Prestation de chômage / jour',
             value: p.benefit,
             min: 0,
