@@ -1777,7 +1777,8 @@ class Sim {
         }
         final pressure = 1 + 2 * math.min(1.0, um / math.max(f.sold[g] ?? 0, 1.0));
         final stepSize = p.priceStep * (0.5 + rng());
-        var mk = f.markup[g]!;
+        final mkOld = f.markup[g]!;
+        var mk = mkOld;
         if (dir > 0) {
           mk += stepSize * pressure;
         } else if (dir < 0) {
@@ -1786,10 +1787,21 @@ class Sim {
           mk += (baseMk - mk) * 0.03; // la concurrence ramène la marge vers la normale
         }
         mk = math.max(-0.4, math.min(3.0, mk));
-        f.markup[g] = mk;
         final target = cost[g]! * (1 + mk);
         final old = f.price[g]!;
         var np = old + (target - old) * 0.25;
+        final hi = old * (1 + p.priceMaxDaily), lo = old * (1 - p.priceMaxDaily);
+        // anti-emballement : tant que le prix est bridé dans un sens, la marge visée cesse d'aller dans ce sens ;
+        // sinon elle continuerait de monter pendant la pénurie et ferait grimper les prix pendant des semaines.
+        // Les hausses de coût, elles, continuent de se répercuter.
+        if (np > hi) {
+          np = hi;
+          if (mk > mkOld) mk = mkOld;
+        } else if (np < lo) {
+          np = lo;
+          if (mk < mkOld) mk = mkOld;
+        }
+        f.markup[g] = mk;
         np = _capDrift(f, old, np, 'prix', goods[g]!.label.toLowerCase());
         f.price[g] = np < 0.01 ? 0.01 : np;
       }
@@ -1823,14 +1835,15 @@ class Sim {
       if (!f.lockWage) {
         final old = f.wage;
         var w = old;
-        // postes vacants : on monte le salaire, plus vite si des clients repartent les mains vides
+        // postes vacants depuis 2 jours : on monte le salaire chaque jour, plus vite si des clients repartent les
+        // mains vides (avant : un jour sur deux, par à-coups de 1,5 à 6 %)
         if (f.vacancies > 0 && f.unfilledDays >= 2) {
           w *= 1 + p.wageStep * (1 + 3 * math.min(1.0, f.urgency));
-          f.unfilledDays = 0;
         } else if (f.vacancies == 0 && unemp > 0.08) {
           w *= 1 - p.wageStep * 0.1;
         }
         w += (norm[f.template.skill] - w) * 0.01; // les écarts de salaire se résorbent lentement
+        w = w.clamp(old * (1 - p.wageMaxDaily), old * (1 + p.wageMaxDaily)).toDouble();
         if (w < math.max(1.0, p.minWage)) w = math.max(1.0, p.minWage);
         // le salaire minimum est une loi : le plafond de dérive ne s'y applique pas
         f.wage = w > p.minWage ? math.max(p.minWage, _capDrift(f, old, w, 'salaire', 'salaire')) : w;
@@ -1993,7 +2006,11 @@ class Sim {
     final prices = <String, double>{};
     for (final g in goods.keys) {
       final ms = marketStats[g];
-      prices[g] = ms != null && ms.qty > eps ? ms.value / ms.qty : bestPrice(g);
+      // sans transaction aujourd'hui, on reprend le dernier prix observé (comme les instituts statistiques) :
+      // un bien qui ne se vend pas ne fait pas bouger l'indice quand son vendeur ferme ou change d'affiche
+      prices[g] = ms != null && ms.qty > eps
+          ? ms.value / ms.qty
+          : (history.isNotEmpty ? history.last.prices[g] ?? bestPrice(g) : bestPrice(g));
     }
     var basket = 0.0;
     for (final e in cpiWeights.entries) {

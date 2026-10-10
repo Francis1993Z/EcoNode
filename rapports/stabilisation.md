@@ -1,5 +1,8 @@
 # ÉcoNodes : état des lieux et plan de stabilisation
 
+> Mise à jour du 10 octobre 2026 : nouvel état des lieux du modèle, des filets et des anomalies dans
+> [`etat-des-lieux.md`](etat-des-lieux.md).
+
 Date : 3 octobre 2026. Moteur : Dart (`lib/engine/`), modèle v2. Les chiffres viennent de
 [`stabilite-avant.md`](stabilite-avant.md) (modèle complet) et [`stabilite-noyau.md`](stabilite-noyau.md)
 (tous les modules coupés), produits par `tool/stabilite.dart`.
@@ -444,3 +447,61 @@ et plafond de dérive (95,7 / 50 j).
 3. **Caisse insolvable sans filets** (graine 5, 839 jours) : le plancher de fonds propres n'est appliqué que par le
    filet anti-crédit-fou ; il devrait faire partie de la politique normale de la Caisse.
 4. **Famine avec filets dans la graine 3** (575 aides) : concurrence pour la main-d'œuvre au plein emploi.
+
+### Tâche 3 — Prix et salaires limités à la source (6 octobre 2026)
+
+Rapport : [`tache3-complet.md`](tache3-complet.md) (comparé à `tache5-complet.json`).
+
+**Diagnostic.** Dans l'état de la tâche 5, les entreprises voulaient changer leur prix de 5,5 % par jour en médiane
+(27 % au 90e centile), surtout à la hausse et dans tous les secteurs : l'économie absorbait ses pénuries par des sauts
+de prix, que le plafond de dérive (filet) bridait 262 fois par 50 jours. Par ailleurs, les sauts d'« inflation
+quotidienne » (l'alerte critique la plus fréquente) venaient surtout des ordinateurs, qui ne se vendaient pas :
+sans transaction, l'indice prenait le prix affiché, qui sautait quand le producteur fermait (5 039 → 1 560 $).
+
+**Ce qui a changé :**
+
+- **Limite quotidienne dans le comportement des entreprises** (`priceMaxDaily`, `wageMaxDaily` = 1,5 %/j, sous le
+  plafond de 2 % du filet, qui devient un garde-fou). C'est la correction demandée par le cahier des charges
+  (« les hausses de prix/salaires doivent être limitées par jour »).
+- **Anti-emballement de la marge** (intégration conditionnelle). Sans lui, la limite faisait s'effondrer 3 graines
+  sans filets : pendant que le prix était bridé, la marge visée continuait de monter (jusqu'à +300 %) et les prix
+  grimpaient à la limite pendant des semaines (indice ×3,6 en 220 jours). Désormais, tant que le prix est bridé dans un
+  sens, la marge visée cesse d'aller dans ce sens ; les hausses de coût continuent de se répercuter. Un premier essai
+  (recaler la marge sur le prix affiché à chaque jour) était pire : il effaçait la répercussion des coûts.
+- **Salaires : hausse quotidienne** tant que des postes restent vacants depuis 2 jours, dans la limite de 1,5 %/j
+  (avant : un jour sur deux, par à-coups de 1,5 à 6 %). Mesuré : avec l'ancienne règle et les limites, chômage moyen
+  sans filets de 43 % (effondrements) contre 9 %.
+- **Indice des prix : sans transaction, on reprend le dernier prix observé** (pratique des instituts statistiques).
+
+**Résultats** (5 graines × 1 500 jours) :
+
+| Indicateur | Tâche 5 | Tâche 3 |
+|---|---|---|
+| Plafond de dérive / 50 j | 262,3 ❌ | **0,0** ✅ |
+| Anti-famine / 50 j | 4,8 ❌ | **0,5** ✅ |
+| Anti-crédit-fou / 50 j | 0,0 ✅ | 0,2 ✅ |
+| Renflouements / 50 j | 27,6 ❌ | 25,7 ❌ |
+| Plancher de logement / 50 j | 2,7 ❌ | 5,6 ❌ |
+| Avec filets : chômage | 2,4–4,6 % | 3,1–5,3 % |
+| Avec filets : faim moyenne | 0–1,6 % | **0–0,2 %** |
+| Avec filets : sans-abri moyen | 0,2–0,6 % | 0–0,9 % |
+| Sans filets : chômage moyen | **5,3 %** | 9,2 % (5,3–10,6 %) |
+| Sans filets : faim moyenne | **1,2 %** | 5,7 % |
+| Sans filets : sans-abri moyen | 2,6 % | 2,9 % |
+| Sans filets : Gini moyen | 0,38 | 0,37 |
+| Alertes critiques (sans filets) | 135 | 99 |
+| Chocs résorbés en < 200 j (sans / avec filets) | 3 / 6 | 0 / 6 |
+| Écart comptable max | 0 exact | 0 exact |
+
+**Lecture.** Dans la partie avec filets, trois filets sur cinq sont désormais sous un déclenchement par 50 jours et la
+faim a presque disparu. Sans filets, l'économie ne s'effondre plus nulle part, mais elle est moins bonne qu'à la tâche 5 :
+des prix plus lents absorbent moins vite les pénuries. La faim sans filets est presque entièrement physique (« pas de
+producteur ») : au départ, au plein emploi, la ferme ne trouve pas d'employés et ses prix montent trop lentement pour
+surenchérir sur les salaires ; plus tard, la ferme a des clients qui attendent mais pas de trésorerie, et la Caisse ne
+prête qu'aux entreprises rentables en moyenne. Avec filets, c'est le renflouement par le propriétaire qui débloque la
+situation, d'où ses 25 déclenchements par 50 jours.
+
+**Suite proposée :** un **apport en capital du propriétaire** comme comportement normal (et non comme filet) quand
+une entreprise a des clients qui attendent, vend au-dessus de son coût et manque de trésorerie pour embaucher. C'est
+la part « investissement » de ce que fait aujourd'hui le filet de renflouement ; elle devrait réduire à la fois la faim
+sans filets et les renflouements.

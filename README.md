@@ -34,7 +34,8 @@ se coupe : onglet Diagnostic → Modules.
 - **Détecteurs d'anomalies** (chômage, faim, sans-abri, Gini, richesse médiane, inflation, stocks, entreprises sans
   employé ou sans client, invariant comptable) : alertes avec valeur, seuil, durée et agents impliqués.
 - **Protocole** sans interface : 5 graines × 1 500 jours sans puis avec filets, chocs standard, critères de sortie.
-- État des lieux et plan : [`rapports/stabilisation.md`](rapports/stabilisation.md).
+- Plan et journal des corrections : [`rapports/stabilisation.md`](rapports/stabilisation.md) ; état des lieux du
+  10 octobre : [`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md).
 
 ```bash
 dart run tool/stabilite.dart --out rapports/stabilite.md --save rapports/stabilite.json
@@ -89,16 +90,17 @@ flutter build web
 
 ## État
 
-`flutter analyze` ne signale rien et `flutter test` passe (10 tests). Tâches 1, 2, 4, 5, 7 et 8 du plan de
-stabilisation faites (coût de revient réel, intrants secondaires non bloquants, consommation stock-flux, entrée et
-sortie d'entreprises, fonds de roulement, Caisse capitalisée et prudente). Sans filets, le modèle complet ne s'effondre
-plus : chômage moyen 5 % (contre 87 % à l'origine), faim 1 %, sans-abri 3 %. Avec filets, la partie est jouable
-(chômage 2 à 5 %, Gini 0,15 à 0,29). Restent surtout des sauts d'inflation d'un jour et des filets encore trop actifs :
-voir le journal des corrections dans [`rapports/stabilisation.md`](rapports/stabilisation.md). La version Android n'a
-pas encore été lancée sur un appareil.
+`flutter analyze` ne signale rien et `flutter test` passe (10 tests). Tâches 1, 2, 3, 4, 5, 7 et 8 du plan de
+stabilisation faites (coût de revient réel, intrants secondaires non bloquants, prix et salaires limités à 1,5 %/j,
+consommation stock-flux, entrée et sortie d'entreprises, fonds de roulement, Caisse capitalisée et prudente). Avec
+filets, la partie est jouable (chômage 3 à 5 %, faim ≤ 0,2 %), mais grâce aux renflouements. Sans filets, le modèle
+complet ne s'effondre plus au démarrage (chômage moyen 9 %, contre 87 % à l'origine), mais la santé de la population
+s'effondre et trois graines sur cinq s'effondrent en fin de partie : voir l'état des lieux du 10 octobre dans
+[`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md). La version Android n'a pas encore été lancée sur un appareil.
 
 ## À faire
 
-- Stabilisation : tâches 3, 6, 9 et 10 de [`rapports/stabilisation.md`](rapports/stabilisation.md), en commençant par la 3 (lissage des prix).
+- Stabilisation, dans l'ordre de [`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md) : détecteurs de santé,
+  de pénurie de main-d'œuvre et de prix aberrants ; hôpital ; ferme ; puis les tâches 6, 9 et 10 du plan.
 - Ensuite, dans l'ordre : cohortes d'âge, services publics avec files d'attente, naissances et décès, logement détaillé.
 - Sauvegarde locale de la partie.

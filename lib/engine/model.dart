@@ -250,6 +250,10 @@ class Params {
   double ubi = 0;
   double priceStep = 0.02;
   double wageStep = 0.015;
+  // Variation quotidienne maximale des prix et salaires décidée par les entreprises elles-mêmes (coûts d'étiquetage,
+  // contrats, réputation). Elle est sous le plafond de 2 %/j du filet, qui ne sert plus que de garde-fou.
+  double priceMaxDaily = 0.015;
+  double wageMaxDaily = 0.015;
   double dividendRate = 0.08;
   double invTargetDays = 4;
   double jobSwitch = 0.03;
