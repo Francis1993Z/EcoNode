@@ -354,6 +354,11 @@ class Modules {
   // Après la durée maximale, ou sans emploi assurable suffisant, l'aide sociale verse le panier de survie.
   // Repères : régime canadien de 2025 (paramètres « ei… » ci-dessous).
   bool insurance = true;
+  // I4. Règles prudentielles dans la politique normale de la Caisse : fonds propres d'au moins 11,5 % des prêts et
+  // paiements de la dette d'un emprunteur au plus 35 % de sa valeur ajoutée (seuils de Safeguards.minCapitalRatio et
+  // maxPaymentRatio, déjà documentés). Avant, ils n'existaient que dans le filet anti-crédit-fou ; le filet ne fait
+  // plus que compter les refus.
+  bool bankRegulation = true;
 
   Modules();
 
@@ -373,11 +378,11 @@ class Modules {
   }
 
   /// Institutions qui remplacent un filet de sécurité (voir rapports/stabilisation.md).
-  static const List<String> institutions = ['dividendTest', 'publicBudget', 'insurance'];
+  static const List<String> institutions = ['dividendTest', 'publicBudget', 'insurance', 'bankRegulation'];
 
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
-    'entry', 'dividendTest', 'publicBudget', 'insurance',
+    'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation',
   ];
   static const Map<String, String> labels = {
     'credit': 'Crédit bancaire (Caisse)',
@@ -393,6 +398,7 @@ class Modules {
     'dividendTest': 'Dividendes : test de solvabilité',
     'publicBudget': 'Hôpital et école publics : enveloppe et file d’attente',
     'insurance': 'Assurance-emploi indexée et aide sociale',
+    'bankRegulation': 'Caisse : règles prudentielles',
   };
 
   bool get(String k) {
@@ -423,6 +429,8 @@ class Modules {
         return publicBudget;
       case 'insurance':
         return insurance;
+      case 'bankRegulation':
+        return bankRegulation;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -455,6 +463,8 @@ class Modules {
         publicBudget = v;
       case 'insurance':
         insurance = v;
+      case 'bankRegulation':
+        bankRegulation = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -772,6 +782,7 @@ class BankAccount extends Account {
   double reserves = 0; // tenu par les flux : départ + god mode + exportations − importations
   double equity = 0; // tenu par les flux : intérêts + intérêts capitalisés − radiations − ristournes + god mode
   double capital = 0; // parts sociales de départ, jamais ristournées
+  int refusals = 0; // prêts refusés par les règles prudentielles (ou le filet)
   BankAccount(super.money);
 }
 

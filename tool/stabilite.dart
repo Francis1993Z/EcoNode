@@ -142,6 +142,9 @@ class RunStats {
   Map<String, int> bailoutByType = {}; // renflouements en régime, par type d'entreprise
   int benefitCutDays = 0; // jours où les prestations aux sans-emploi n'ont été versées qu'en partie
   double treasuryMin = double.infinity; // trésor de l'État le plus bas (régime)
+  int bankNegDays = 0; // jours où les fonds propres de la Caisse sont négatifs (insolvable)
+  double bankEquityMin = double.infinity;
+  int refusals = 0; // prêts refusés (règles prudentielles ou filet), sur toute la partie
   double inflMaxAbs = 0, infl100MaxAbs = 0;
   double cpiAtWarmup = 1, cpiEnd = 1;
   double invMax = 0;
@@ -195,6 +198,9 @@ class RunStats {
         'bailoutByType': bailoutByType,
         'benefitCutDays': benefitCutDays,
         'treasuryMin': treasuryMin.isFinite ? treasuryMin : null,
+        'bankNegDays': bankNegDays,
+        'bankEquityMin': bankEquityMin.isFinite ? bankEquityMin : null,
+        'refusals': refusals,
         'inflMean': inflMean,
         'inflMaxAbs': inflMaxAbs,
         'infl100MaxAbs': infl100MaxAbs,
@@ -247,6 +253,8 @@ void observe(Sim s, RunStats r, int warmup) {
     r.healthSum += s.citizens.isEmpty ? 0 : health / s.citizens.length;
     if (s.state.benefitCut < 1 - 1e-9) r.benefitCutDays++;
     r.treasuryMin = math.min(r.treasuryMin, s.state.money);
+    if (s.bank.equity < 0) r.bankNegDays++;
+    r.bankEquityMin = math.min(r.bankEquityMin, s.bank.equity);
     final care = s.services['soins']!;
     r.waitSum += care.wait;
     r.queueSum += care.queue;
@@ -284,6 +292,7 @@ void finish(Sim s, RunStats r) {
   final tot = emp.fold(0, (a, b) => a + b);
   r.sectorShare = [for (final e in emp) tot > 0 ? e / tot : 0.0];
   r.debtEnd = s.totalDebt();
+  r.refusals = s.bank.refusals;
   r.lent = s.bank.lent;
   r.writtenOff = s.bank.writtenOff;
 }
@@ -739,6 +748,10 @@ const Map<String, String> _aggLabels = {
   'benefitCutDays': 'Jours de prestations réduites (sans filets, toutes graines)',
   'treasuryMin': 'Trésor de l’État le plus bas (sans filets, \$)',
   'withNets_benefitCutDays': 'Avec filets : jours de prestations réduites',
+  'bankNegDays': 'Caisse insolvable : jours (sans filets, toutes graines)',
+  'bankEquityMin': 'Fonds propres de la Caisse les plus bas (sans filets, \$)',
+  'refusals': 'Prêts refusés (sans filets, toutes graines)',
+  'writtenOff': 'Créances radiées (sans filets, moyenne, \$)',
   'sauf_net_bailout_hopital': 'Filets sauf --sauf : renflouements de l’hôpital / 50 j',
 };
 
@@ -763,6 +776,10 @@ String _fmtAgg(String k, dynamic v) {
     case 'benefitCutDays':
     case 'withNets_benefitCutDays':
     case 'treasuryMin':
+    case 'bankNegDays':
+    case 'bankEquityMin':
+    case 'refusals':
+    case 'writtenOff':
     case 'criticalOpened':
     case 'sauf_criticalOpened':
     case 'alertsTotal':
@@ -788,6 +805,10 @@ Map<String, dynamic> buildSummary(
     agg['healthMean'] = mean(base, (r) => r.healthMean);
     agg['benefitCutDays'] = base.fold(0, (a, r) => a + r.benefitCutDays);
     agg['treasuryMin'] = base.fold(double.infinity, (a, r) => math.min(a, r.treasuryMin));
+    agg['bankNegDays'] = base.fold(0, (a, r) => a + r.bankNegDays);
+    agg['bankEquityMin'] = base.fold(double.infinity, (a, r) => math.min(a, r.bankEquityMin));
+    agg['refusals'] = base.fold(0, (a, r) => a + r.refusals);
+    agg['writtenOff'] = mean(base, (r) => r.writtenOff);
     agg['waitMean'] = mean(base, (r) => r.waitMean);
     agg['criticalOpened'] = base.fold(0, (a, r) => a + r.criticalOpened);
     agg['alertsTotal'] = base.fold(0, (a, r) => a + r.alertsTotal);

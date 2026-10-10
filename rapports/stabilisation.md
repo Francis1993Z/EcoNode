@@ -831,3 +831,52 @@ comparés au même code interrupteur coupé (`i3-assurance-avant-*.md`), étape 
 
 Suite possible, hors de ce mandat : une aide sociale qui couvre le panier tel que les ménages le composent, ou un choix
 des aliments qui tienne compte du loyer quand l'argent manque.
+
+### I4. Règles prudentielles dans la politique de la Caisse (10 octobre 2026)
+
+Rapports : [`i4-caisse-complet.md`](i4-caisse-complet.md) et [`i4-caisse-noyau.md`](i4-caisse-noyau.md), comparés au
+même code interrupteur coupé (`i4-caisse-avant-*.md`), étape « sauf anti-crédit-fou ».
+
+**Ce qui a changé** (module `bankRegulation`, actif par défaut) :
+
+- Les deux règles de l'anti-crédit-fou s'appliquent toujours, avec ou sans filet. Fonds propres de la Caisse d'au moins
+  11,5 % des prêts (prêt demandé compris) ; paiements de la dette d'un emprunteur d'au plus 35 % de sa valeur ajoutée.
+- Le filet devient un détecteur : quand il est actif, il compte les refus (le même nombre qu'avant) mais n'a plus d'effet
+  propre. La Caisse compte ses refus (`BankAccount.refusals`), affichés dans son inspecteur, avec un interrupteur.
+- Aucun paramètre nouveau : les seuils de 11,5 % et 35 % existaient (11,5 % : ratio de fonds propres attendu des grandes
+  banques).
+
+**Résultats** (modèle complet ; le noyau est inchangé, le crédit y étant coupé) :
+
+| Indicateur | Avant (I1 à I3) | I4 |
+|---|---|---|
+| Avec filets : tous les indicateurs | — | identiques (le filet appliquait déjà ces règles) |
+| Sauf anti-crédit-fou : chômage / faim / sans-abri | 8,0 % / 0,0 % / 0,3 % | identiques |
+| Sans filets : jours de Caisse insolvable (5 graines) | 1 303 | 1 303 ❌ |
+| Sans filets : fonds propres les plus bas | −13 814 $ | **−4 285 $** |
+| Sans filets : prêts refusés | 0 | 235 |
+| Sans filets : créances radiées (moyenne par partie) | 18 076 $ | 16 057 $ |
+| Sans filets : chômage / faim / sans-abri, graine 5 | 4,4 % / 0,5 % / 0,5 % | 6,8 % / 9,1 % / 5,1 % |
+| Sans filets : graines 1 à 4 | — | identiques (aucun refus) |
+| Écart comptable max | 0 exact | 0 exact |
+
+**Lecture.**
+
+- **Avec filets, rien ne change** : les règles sont celles que le filet appliquait. Coupé, le filet ne manque plus.
+- **Sans filets, une seule graine est concernée, la 5, et la Caisse y reste insolvable.** Pendant la crise du
+  démarrage, elle perd 26 600 $ sur 65 900 $ prêtés, alors que ses fonds propres respectent encore le plancher. Au jour
+  198, une radiation de 5 910 $ les fait passer sous zéro. Les règles bloquent alors tout nouveau prêt (235 refus).
+  Sans prêts, la Caisse ne touche plus d'intérêts et ne peut pas reconstituer ses fonds propres : elle reste à −4 267 $
+  jusqu'à la fin. Sans les règles, elle continuait de prêter : ses pertes se creusaient (−13 814 $), mais le crédit
+  soutenait l'économie. Avec les règles, la graine 5 perd ce soutien (faim 0,5 → 9,1 %).
+
+**Critère de réussite.**
+
+- Anti-crédit-fou coupé, l'économie tient comme avec filets ✅ ; chômage ≤ 10 % ❌ (g1 10,4 %, g4 10,1 %, comme avant).
+- Avec filets, l'anti-crédit-fou reste à 0 déclenchement par 50 jours ✅.
+- Indicateurs sans filets non dégradés : ❌ dans la graine 5 ; Caisse jamais insolvable : ❌.
+
+Un plancher de fonds propres limite les pertes ; il n'empêche pas l'insolvabilité quand les défauts arrivent dans les
+limites permises, et il ne dit pas comment une Caisse insolvable se recapitalise. Il manque une provision pour pertes ou
+une procédure de résolution (recapitalisation par les membres, assurance-dépôts), hors du mandat de I1 à I5. La faillite
+ordonnée (I5) vise une partie de ces radiations : la dette remboursée par la trésorerie des entreprises qui ferment.

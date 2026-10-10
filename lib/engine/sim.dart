@@ -1832,7 +1832,7 @@ class Sim {
       if (!modules.credit || day < f.creditBanUntil || f.profitEma <= 0 || publicService(f)) return;
       final need = price - math.max(0.0, cash);
       if (f.debt + need > 0.8 * (f.machines + 1) * price) return; // garantie : 80 % de la valeur des machines
-      if (safeguards.credit && !_creditOk(f, need)) return;
+      if ((modules.bankRegulation || safeguards.credit) && !_creditOk(f, need)) return;
       _lend(f, need);
     }
     final r = buy(f, f.id.toString(), 'machines', 1, f.money, true);
@@ -1855,7 +1855,7 @@ class Sim {
     final room = p.workingCapitalDays * f.revenueEma - f.debt;
     final amt = math.min(need, room);
     if (amt < f.wage * 8) return; // pas même de quoi ouvrir un poste
-    if (safeguards.credit && !_creditOk(f, amt)) return;
+    if ((modules.bankRegulation || safeguards.credit) && !_creditOk(f, amt)) return;
     _lend(f, amt, working: true);
   }
 
@@ -1866,17 +1866,24 @@ class Sim {
     final pay = (f.debt + need) * (loanRate(f) / 365 + 1 / p.loanTermDays);
     final added = math.max(0.0, f.revenueEma - f.inputSpendEma);
     if (pay > sg.maxPaymentRatio * added) {
-      _net('credit', f.name, need, 'paiements > ${fmtPct(sg.maxPaymentRatio, 0)} de la valeur ajoutée',
+      _refuse(f, need, 'paiements > ${fmtPct(sg.maxPaymentRatio, 0)} de la valeur ajoutée',
           '${fmtMoney0(pay)}/j pour ${fmtMoney0(added)}/j de valeur ajoutée');
       return false;
     }
     final loans = totalDebt() + need;
     if (bank.equity < sg.minCapitalRatio * loans) {
-      _net('credit', f.name, need, 'fonds propres de la Caisse insuffisants',
+      _refuse(f, need, 'fonds propres de la Caisse insuffisants',
           '${fmtMoney0(bank.equity)} pour ${fmtMoney0(loans)} de prêts (minimum ${fmtPct(sg.minCapitalRatio)})');
       return false;
     }
     return true;
+  }
+
+  /// Un prêt refusé : compté par la Caisse ; le filet anti-crédit-fou, s'il est actif, le compte aussi. Avec les règles
+  /// prudentielles (I4), le filet n'a plus d'effet propre : c'est la Caisse qui refuse.
+  void _refuse(Firm f, double need, String cause, String detail) {
+    bank.refusals++;
+    if (safeguards.credit) _net('credit', f.name, need, cause, detail);
   }
 
   void _lend(Firm f, double amt, {bool working = false}) {

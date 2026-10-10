@@ -801,6 +801,7 @@ class _BankView extends StatelessWidget {
         KV('Intérêts impayés capitalisés', money0(b.capitalized)),
         KV('Créances radiées', money0(b.writtenOff), color: b.writtenOff > 0 ? pal.warn : null),
         KV('Ristournes versées', money0(b.rebates)),
+        KV('Prêts refusés (règles prudentielles)', '${b.refusals}'),
         KV('Encaisse de la Caisse', money0(b.money)),
       ]),
       Section('Politique de crédit', [
@@ -810,6 +811,17 @@ class _BankView extends StatelessWidget {
           value: sim.modules.credit,
           onChanged: (v) {
             sim.modules.credit = v;
+            ctrl.touch();
+          },
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Règles prudentielles'),
+          subtitle: Text('Fonds propres d’au moins ${pct(sim.safeguards.minCapitalRatio)} des prêts ; paiements d’un '
+              'emprunteur au plus ${pct(sim.safeguards.maxPaymentRatio)} de sa valeur ajoutée.'),
+          value: sim.modules.bankRegulation,
+          onChanged: (v) {
+            sim.modules.bankRegulation = v;
             ctrl.touch();
           },
         ),

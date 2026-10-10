@@ -262,6 +262,21 @@ void main() {
     expect(s.inv.worst, 0);
   });
 
+  test('I4 : sans filet, la Caisse applique ses règles prudentielles', () {
+    double lentAfter(bool regulation) {
+      final s = Sim(seed: 1, safeguards: Safeguards.none(), modules: Modules()..bankRegulation = regulation, devChecks: true);
+      run(s, 50);
+      s.godMoney(const Target('bank'), -s.bank.money); // la Caisse perd ses fonds propres
+      final lent = s.bank.lent;
+      run(s, 100);
+      if (regulation) expect(s.bank.refusals, greaterThan(0));
+      return s.bank.lent - lent;
+    }
+
+    expect(lentAfter(true), 0); // fonds propres sous 11,5 % des prêts : aucun nouveau prêt
+    expect(lentAfter(false), greaterThan(0)); // avant : le plancher n'existait que dans le filet
+  });
+
   test('modules coupés : ni machines, ni dette, ni publicité, invariants exacts', () {
     final s = Sim(seed: 10, modules: Modules.none(), devChecks: true);
     run(s, 300);
