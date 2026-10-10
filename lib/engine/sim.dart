@@ -1004,6 +1004,9 @@ class Sim {
   /// nouveaux compris.
   static const int hireCashDays = 8;
 
+  /// Règle d'embauche : au plus ce nombre de postes ouverts par jour.
+  static const int maxPostsPerDay = 3;
+
   /// Postes que la trésorerie permet d'ouvrir (négatif si elle ne couvre même pas l'équipe actuelle).
   int affordablePosts(Firm f) => (f.money / (f.wage * hireCashDays)).floor() - f.workers.length;
 
@@ -1842,11 +1845,11 @@ class Sim {
         _fire(f, _cmap[f.workers[nw - 1]]);
       } else if (desired > nw) {
         var affordable = affordablePosts(f);
-        if (affordable < math.min(desired - nw, 3)) {
-          _workingCapital(f, math.min(desired - nw, 3));
+        if (affordable < math.min(desired - nw, maxPostsPerDay)) {
+          _workingCapital(f, math.min(desired - nw, maxPostsPerDay));
           affordable = affordablePosts(f);
         }
-        f.vacancies = math.max(0, math.min(desired - nw, math.min(3, affordable)));
+        f.vacancies = math.max(0, math.min(desired - nw, math.min(maxPostsPerDay, affordable)));
       } else if (desired < nw - 1) {
         final k = math.min(nw - desired - 1, math.max(1, (nw * 0.08).ceil()));
         for (var i = 0; i < k; i++) {
@@ -1874,21 +1877,26 @@ class Sim {
 
       // ------- profits et dividendes
       final profit = f.revenue - f.costs;
+      f.retained += profit;
       f.profitEma = 0.9 * f.profitEma + 0.1 * profit;
       f.inputSpendEma = 0.9 * f.inputSpendEma + 0.1 * f.inputSpend;
       final reserve = 8 * (f.wage * f.workers.length + f.inputSpendEma + f.overheadEma) + f.debt * 0.1;
       final owner = f.ownerId != null ? _cmap[f.ownerId!] : null;
       f.dividends = 0;
       if (owner != null && f.money > reserve) {
-        final d = (f.money - reserve) * p.dividendRate;
-        final net = transfer(f, owner, d * (1 - p.taxRate));
-        final tax = transfer(f, state, d * p.taxRate);
-        state.taxes += tax;
-        state.taxesToday += tax;
-        owner.income += net;
-        f.dividends = net + tax;
-        _flow(f.id.toString(), 'M', '\$dividendes', 1, net);
-        if (tax > 0) _flow('M', 'E', '\$impôts', 1, tax);
+        var d = (f.money - reserve) * p.dividendRate;
+        if (modules.dividendTest) d = solventDividend(f, d);
+        if (d > 0) {
+          final net = transfer(f, owner, d * (1 - p.taxRate));
+          final tax = transfer(f, state, d * p.taxRate);
+          state.taxes += tax;
+          state.taxesToday += tax;
+          owner.income += net;
+          f.dividends = net + tax;
+          f.retained -= f.dividends;
+          _flow(f.id.toString(), 'M', '\$dividendes', 1, net);
+          if (tax > 0) _flow('M', 'E', '\$impôts', 1, tax);
+        }
       }
     }
 
@@ -1912,6 +1920,18 @@ class Sim {
       cur.value += 0.2 * e.value.value;
     }
     flowsEma.removeWhere((k, v) => v.value < 0.5 && !flows.containsKey(k));
+  }
+
+  /// Test de solvabilité avant dividende (institution I1, LCSA art. 42) : pas de dividende sans bénéfice lissé ; pas de
+  /// dividende qui laisserait en caisse moins que le seuil d'embauche des postes voulus (8 jours de salaire par employé,
+  /// nouveaux compris, pour les postes que la règle d'embauche ouvrirait aujourd'hui) ; jamais plus que le bénéfice
+  /// lissé du jour.
+  double solventDividend(Firm f, double d) {
+    if (f.profitEma <= 0) return 0;
+    final want = math.min(f.desired - f.workers.length, maxPostsPerDay);
+    final hire = want > 0 ? hireCashDays * f.wage * (f.workers.length + want) : 0.0;
+    final cap = params.dividendFromRetained ? f.retained : f.profitEma;
+    return math.max(0.0, math.min(d, math.min(cap, f.money - hire)));
   }
 
   /// Renflouement par les propriétaires (filet), rachats, redistribution du surplus de l'État.

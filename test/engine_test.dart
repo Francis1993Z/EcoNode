@@ -182,6 +182,24 @@ void main() {
     expect(q.monitor.active[key]?.value, greaterThan(5));
   });
 
+  test('I1 : une entreprise neuve sans bénéfice ne rend pas son capital en dividendes', () {
+    double paid(bool on) {
+      final s = Sim(seed: 5, modules: Modules()..dividendTest = on);
+      run(s, 50);
+      final f = s.addFirm('hopital', 'Clinique test', 20000, s.citizens.first.id, 600, 300);
+      var total = 0.0;
+      for (var i = 0; i < 20; i++) {
+        s.step();
+        total += f.dividends;
+        if (on) expect(f.dividends == 0 || f.profitEma > 0, isTrue);
+      }
+      return total;
+    }
+
+    expect(paid(false), greaterThan(1000)); // ancienne règle : 8 %/j de la trésorerie au-delà de la réserve
+    expect(paid(true), 0);
+  });
+
   test('modules coupés : ni machines, ni dette, ni publicité, invariants exacts', () {
     final s = Sim(seed: 10, modules: Modules.none(), devChecks: true);
     run(s, 300);

@@ -591,3 +591,78 @@ mais laisse actives les institutions (`Modules.noyau()`) : chacune est ainsi mes
 
 **Méthode pour chaque institution.** Même code, interrupteur coupé (« avant ») puis actif (« après »), modèle complet et
 noyau, avec l'étape 2 bis sur le filet visé. L'interrupteur coupé reproduit exactement le commit précédent.
+
+### I1. Test de solvabilité des dividendes (10 octobre 2026)
+
+Rapports : [`i1-dividendes-complet.md`](i1-dividendes-complet.md) et [`i1-dividendes-noyau.md`](i1-dividendes-noyau.md),
+comparés au même code interrupteur coupé ([`i1-dividendes-avant-complet.md`](i1-dividendes-avant-complet.md),
+[`i1-dividendes-avant-noyau.md`](i1-dividendes-avant-noyau.md)), avec l'étape « sauf renflouement ». L'interrupteur
+coupé reproduit exactement la référence d'avant les institutions (mêmes chiffres).
+
+**Ce qui a changé** (module `dividendTest`, actif par défaut). Avant, une entreprise versait chaque jour 8 % de sa
+trésorerie au-delà de sa réserve, même en perte : un hôpital fondé avec 18 500 $ rendait son capital à son fondateur en
+trois semaines. Désormais :
+
+- pas de dividende si le bénéfice lissé est nul ou négatif ;
+- pas de dividende qui laisserait en caisse moins que le seuil d'embauche des postes voulus (8 jours de salaire par
+  employé, nouveaux compris, pour les postes que la règle d'embauche ouvrirait aujourd'hui, au plus 3) ;
+- le dividende du jour ne dépasse pas le bénéfice lissé : min(8 % × excédent de trésorerie, bénéfice lissé).
+
+**Paramètres.** Aucun nouveau : le taux de 8 % et le seuil de 8 jours existaient. Repère juridique vérifié : LCSA,
+art. 42 (pas de dividende s'il y a des motifs raisonnables de croire que la société ne pourrait plus acquitter son passif
+à échéance, ou que la valeur de réalisation de son actif deviendrait inférieure à son passif et à son capital déclaré).
+Une variante est disponible, `dividendFromRetained` (faux par défaut), pour mesurer l'autre lecture de l'art. 42 b
+(dividende ≤ bénéfices non répartis) ; elle demande de suivre les bénéfices non répartis (`Firm.retained`). Rapports de
+la variante : [`i1-dividendes-variante-complet.md`](i1-dividendes-variante-complet.md) et
+[`i1-dividendes-variante-noyau.md`](i1-dividendes-variante-noyau.md).
+
+**Résultats** (5 graines × 1 500 jours) :
+
+| Indicateur | Avant | I1 | Variante « bénéfices non répartis » |
+|---|---|---|---|
+| Sans filets : chômage moyen | 9,2 % | **8,2 %** | 8,9 % |
+| Sans filets : faim moyenne | 5,7 % | **5,0 %** | 6,5 % |
+| Sans filets : sans-abri moyen | 2,9 % | **1,5 %** | 2,6 % |
+| Sans filets : Gini moyen | 0,37 | 0,33 | 0,39 |
+| Sans filets : alertes critiques | 104 | 117 | 156 |
+| Avec filets : chômage moyen | **4,0 %** | 7,8 % | 6,2 % |
+| Renflouements / 50 j | **25,7** | 28,4 | 34,2 |
+| Plancher de logement / 50 j | 5,6 | **1,0** | 10,1 |
+| Anti-famine / 50 j | **0,5** | 1,5 | 3,5 |
+| Sauf renflouement : chômage moyen | **7,3 %** | 8,6 % | 8,2 % |
+| Sauf renflouement : faim moyenne | **3,4 %** | 5,0 % | 4,2 % |
+| Chocs résorbés < 200 j (sans / avec filets) | 0 / **11** | 0 / 3 | 0 / 10 |
+| Noyau : renflouements / 50 j | 19,8 | 13,4 | **10,9** |
+| Noyau : alertes critiques (sans filets) | 5 | **1** | 5 |
+| Noyau : chômage moyen (sans filets) | **5,0 %** | 5,2 % | 6,1 % |
+| Écart comptable max | 0 exact | 0 exact | 0 exact |
+
+Mesures ciblées (sonde, 5 graines) : sans filets, les dividendes versés par des entreprises en perte passent de 0,5 à
+1,5 M$ par partie à 0, et les hôpitaux créés de 16–22 à 8–17 par partie. Avec filets, l'hôpital est renfloué autant
+qu'avant (131–295 fois par partie avant, 54–337 après) : il perd de l'argent pour d'autres raisons (A8), que vise I2.
+
+**Lecture.**
+
+- **Sans filets, I1 réduit la détresse** : plus d'alerte « chômage très élevé » (3 graines avant), jours de faim
+  répandue de 800 à 523, jours de sans-abri nombreux de 1 065 à 528. Les alertes critiques augmentent quand même, à
+  cause de sauts d'inflation d'un jour (4 → 34) : à revoir avec les prix aberrants (A7).
+- **Avec filets, l'économie se dégrade, parce que l'argent reste coincé dans les entreprises.** Graines 1 à 3 :
+  1,0 à 1,17 M$ dans les entreprises au lieu de 0,64 à 0,76, et 0,30 à 0,45 M$ chez les ménages au lieu de 0,67 à 0,77.
+  La règle « dividende ≤ bénéfice lissé » empêche de distribuer une trésorerie accumulée en période faste. Exemple : le
+  bar garde 300 000 $ pour un bénéfice de ~1 000 $/j, alors que l'ancienne règle aurait versé 8 % de l'excédent par jour.
+  Moins de revenus de dividendes, c'est moins de dépenses de loisirs, donc plus de chômage.
+- **La variante « bénéfices non répartis » ne règle pas le problème** : elle libère cette trésorerie et garde les chocs
+  résorbés avec filets (10 sur 15), mais elle est la pire sans filets. Aucune des deux lectures ne domine ; la règle du
+  cahier des charges reste celle par défaut.
+
+**Critère de réussite.**
+
+- Renflouement coupé : chômage ≤ 10 % dans toutes les graines ✅, mais faim > 2 % dans toutes les graines ❌ (c'était
+  déjà le cas avant ; 3,4 % → 5,0 %).
+- Avec filets, renflouements sous 1 par 50 jours : ❌ (25,7 → 28,4).
+- Indicateurs sans filets non dégradés : ✅ pour le chômage, la faim, les sans-abri et le Gini ; ❌ pour le nombre
+  d'alertes critiques (sauts d'inflation).
+
+I1 supprime les dividendes versés en perte (la boucle des hôpitaux) et retient la trésorerie des entreprises qui veulent
+embaucher (point 2 de A3). Il ne suffit pas à remplacer le renflouement, et il fait apparaître un nouveau défaut : la
+trésorerie accumulée des entreprises ne recircule plus.

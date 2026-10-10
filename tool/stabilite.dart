@@ -13,6 +13,7 @@
 //   --shock-nets both        chocs sans filets (off), avec filets (on) ou les deux (both)
 //   --modules credit=0,...   coupe (0) ou active (1) des modules
 //   --noyau                  coupe tous les modules ajoutés au modèle de base (les institutions restent actives)
+//   --param nom=valeur       change un paramètre (variantes mesurées ; voir applyParam)
 //   --key raffinerie         type de la « firme clé » mise en faillite
 //   --out rapport.md         écrit le rapport Markdown (sinon : sortie standard)
 //   --save synthese.json     enregistre la synthèse chiffrée
@@ -41,7 +42,16 @@ class Options {
   int shockHorizon = 500;
   Set<String> shockNets = {'off', 'on'};
   Set<String> sauf = {}; // filets coupés à l'étape 2 bis
+  Map<String, String> params = {}; // paramètres changés (--param)
   Modules modules = Modules();
+
+  Params newParams() {
+    final p = Params();
+    for (final e in params.entries) {
+      applyParam(p, e.key, e.value);
+    }
+    return p;
+  }
   String keyFirm = 'raffinerie';
   String? out;
   String? save;
@@ -83,6 +93,13 @@ class Options {
             final p = kv.split('=');
             modules.set(p[0], p.length < 2 || p[1] != '0');
           }
+        case '--param':
+          for (final kv in next().split(',')) {
+            final i = kv.indexOf('=');
+            if (i < 0) throw ArgumentError('Paramètre sans valeur : $kv');
+            params[kv.substring(0, i)] = kv.substring(i + 1);
+            applyParam(Params(), kv.substring(0, i), kv.substring(i + 1)); // nom inconnu : erreur tout de suite
+          }
         case '--key':
           keyFirm = next();
         case '--out':
@@ -95,6 +112,17 @@ class Options {
           throw ArgumentError('Option inconnue : $a');
       }
     }
+  }
+}
+
+/// Paramètres modifiables en ligne de commande, pour mesurer une variante.
+void applyParam(Params p, String k, String v) {
+  bool b() => v == '1' || v == 'true';
+  switch (k) {
+    case 'dividendFromRetained':
+      p.dividendFromRetained = b();
+    default:
+      throw ArgumentError('Paramètre inconnu : $k');
   }
 }
 
@@ -231,7 +259,7 @@ RunStats runBase(int seed, Options o, bool nets, {Set<String> except = const {}}
   for (final k in except) {
     sg.set(k, false);
   }
-  final s = Sim(seed: seed, modules: o.modules.copy(), safeguards: sg);
+  final s = Sim(seed: seed, params: o.newParams(), modules: o.modules.copy(), safeguards: sg);
   final r = RunStats(seed, nets);
   try {
     for (var d = 1; d <= o.days; d++) {
@@ -306,7 +334,7 @@ bool _inBand(List<_Day> w) {
 }
 
 ShockStats runShock(String kind, int seed, Options o, bool nets) {
-  final s = Sim(seed: seed, modules: o.modules.copy(), safeguards: nets ? Safeguards() : Safeguards.none());
+  final s = Sim(seed: seed, params: o.newParams(), modules: o.modules.copy(), safeguards: nets ? Safeguards() : Safeguards.none());
   final r = ShockStats(kind, seed, nets);
   const window = 30;
   try {
@@ -450,6 +478,9 @@ String report(Options o, List<RunStats> base, List<RunStats> withNets, List<RunS
   b.writeln('- Date : ${DateTime.now().toIso8601String().substring(0, 16).replaceAll('T', ' ')}');
   b.writeln('- Graines : ${o.seeds.join(', ')} · ${o.days} jours · régime mesuré après le jour ${o.warmup}');
   b.writeln('- Modules coupés : ${off.isEmpty ? 'aucun' : off.map((k) => Modules.labels[k]).join(', ')}');
+  if (o.params.isNotEmpty) {
+    b.writeln('- Paramètres changés : ${o.params.entries.map((e) => '${e.key} = ${e.value}').join(', ')}');
+  }
   b.writeln();
 
   void indicators(List<RunStats> rs) {

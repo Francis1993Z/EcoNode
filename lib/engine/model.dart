@@ -296,6 +296,10 @@ class Params {
   double eduRate = 0.25; // chance quotidienne de suivre un cours, × ambition
   double learnRate = 0.02; // qualification gagnée par cours
   int computerLife = 365;
+  // Test de solvabilité (I1) : plafond du dividende du jour. Faux : le bénéfice lissé du jour (règle du cahier des
+  // charges). Vrai : les bénéfices non répartis (lecture de la LCSA, art. 42 b : le dividende ne doit pas entamer le
+  // capital déclaré).
+  bool dividendFromRetained = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
@@ -312,6 +316,12 @@ class Modules {
   bool publicHealth = true; // l'État paie les soins
   bool publicEducation = true; // l'État paie les cours
   bool entry = true; // une entreprise sans employé ferme ; un bien qui manque attire une nouvelle entreprise
+  // Institutions qui remplacent un filet de sécurité :
+  // I1. Test de solvabilité avant dividende. Repère : Loi canadienne sur les sociétés par actions, art. 42 (une société
+  // ne peut déclarer ni verser de dividende s'il y a des motifs raisonnables de croire qu'elle ne pourrait plus
+  // acquitter son passif à échéance). Ici : pas de dividende sans bénéfice lissé, ni s'il empêche d'ouvrir les postes
+  // voulus ; jamais plus que le bénéfice lissé du jour. Aucun paramètre nouveau.
+  bool dividendTest = true;
 
   Modules();
 
@@ -331,11 +341,11 @@ class Modules {
   }
 
   /// Institutions qui remplacent un filet de sécurité (voir rapports/stabilisation.md).
-  static const List<String> institutions = [];
+  static const List<String> institutions = ['dividendTest'];
 
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
-    'entry',
+    'entry', 'dividendTest',
   ];
   static const Map<String, String> labels = {
     'credit': 'Crédit bancaire (Caisse)',
@@ -348,6 +358,7 @@ class Modules {
     'publicHealth': 'Santé publique (l’État paie)',
     'publicEducation': 'Éducation publique (l’État paie)',
     'entry': 'Entrée et sortie d’entreprises',
+    'dividendTest': 'Dividendes : test de solvabilité',
   };
 
   bool get(String k) {
@@ -372,6 +383,8 @@ class Modules {
         return publicEducation;
       case 'entry':
         return entry;
+      case 'dividendTest':
+        return dividendTest;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -398,6 +411,8 @@ class Modules {
         publicEducation = v;
       case 'entry':
         entry = v;
+      case 'dividendTest':
+        dividendTest = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -729,6 +744,7 @@ class Firm extends Account {
   double revenue = 0;
   double costs = 0;
   double profitEma = 0;
+  double retained = 0; // bénéfices non répartis : bénéfices cumulés moins dividendes versés (le capital apporté n'en fait pas partie)
   double revenueEma = 0;
   double inputSpendEma = 0;
   double inputSpend = 0;
