@@ -1783,6 +1783,20 @@ class Sim {
     }
   }
 
+  /// Faillite ordonnée (I5) : la trésorerie rembourse d'abord la dette envers la Caisse. Comme tout remboursement de
+  /// capital, il détruit la monnaie créée par le prêt. Rend le montant remboursé ; le solde éventuel sera radié.
+  double _repayFromCash(Firm f) {
+    if (f.debt <= 0 || f.money <= 0) return 0;
+    final repaid = transfer(f, null, math.min(f.money, f.debt));
+    if (repaid <= 0) return 0;
+    ledgerCredit -= repaid;
+    f.debt -= repaid;
+    bank.repaid += repaid;
+    dayFlows.repaid += repaid;
+    _flow(f.id.toString(), 'B', '\$remboursements', 1, repaid);
+    return repaid;
+  }
+
   /// La Caisse renonce à la créance : la perte est imputée à ses fonds propres, la monnaie déjà créée reste.
   void _writeOff(Firm f) {
     if (f.debt <= 0) return;
@@ -2008,10 +2022,15 @@ class Sim {
 
   /// Fermeture faute d'activité : la trésorerie revient au propriétaire, la dette est radiée, la place est libérée.
   void _close(Firm f) {
+    final repaid = modules.bankruptcy ? _repayFromCash(f) : 0.0;
+    final lost = f.debt;
     _writeOff(f);
     final owner = f.ownerId != null ? _cmap[f.ownerId!] : null;
     final left = f.money;
     if (left > 0) transfer(f, owner ?? state, left);
+    if (repaid > 0 || lost > 0) {
+      _log('info', '${f.name} : ${fmtMoney0(repaid)} de dette remboursés par sa trésorerie, ${fmtMoney0(lost)} radiés.');
+    }
     _slots[f.type] = [f.x, f.y];
     firms.remove(f);
     _fmap.remove(f.id);
@@ -2615,11 +2634,14 @@ class Sim {
     for (final wid in List<int>.from(f.workers)) {
       _fire(f, _cmap[wid]);
     }
+    if (modules.bankruptcy) _repayFromCash(f);
     final hadDebt = f.debt > 0;
     _writeOff(f);
     final owner = f.ownerId != null ? _cmap[f.ownerId!] : null;
     if (owner != null) {
       transfer(f, owner, f.money);
+    } else if (modules.bankruptcy) {
+      transfer(f, state, f.money); // sans propriétaire (établissement public), le reste revient à l'État
     } else {
       _godIn(-f.money);
       f.money = 0;

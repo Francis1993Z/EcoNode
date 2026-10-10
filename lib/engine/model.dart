@@ -359,6 +359,11 @@ class Modules {
   // maxPaymentRatio, déjà documentés). Avant, ils n'existaient que dans le filet anti-crédit-fou ; le filet ne fait
   // plus que compter les refus.
   bool bankRegulation = true;
+  // I5. Faillite ordonnée : à la fermeture, la trésorerie rembourse d'abord la dette envers la Caisse (la monnaie est
+  // détruite), seul le solde impayé est radié, le reste va au propriétaire ou, s'il n'y en a pas, à l'État. Avant, la
+  // dette était radiée avant que la trésorerie revienne au propriétaire : l'argent d'un prêt finissait chez lui et la
+  // Caisse encaissait la perte. Aucun paramètre.
+  bool bankruptcy = true;
 
   Modules();
 
@@ -378,11 +383,13 @@ class Modules {
   }
 
   /// Institutions qui remplacent un filet de sécurité (voir rapports/stabilisation.md).
-  static const List<String> institutions = ['dividendTest', 'publicBudget', 'insurance', 'bankRegulation'];
+  static const List<String> institutions = [
+    'dividendTest', 'publicBudget', 'insurance', 'bankRegulation', 'bankruptcy',
+  ];
 
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
-    'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation',
+    'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation', 'bankruptcy',
   ];
   static const Map<String, String> labels = {
     'credit': 'Crédit bancaire (Caisse)',
@@ -399,6 +406,7 @@ class Modules {
     'publicBudget': 'Hôpital et école publics : enveloppe et file d’attente',
     'insurance': 'Assurance-emploi indexée et aide sociale',
     'bankRegulation': 'Caisse : règles prudentielles',
+    'bankruptcy': 'Faillite ordonnée',
   };
 
   bool get(String k) {
@@ -431,6 +439,8 @@ class Modules {
         return insurance;
       case 'bankRegulation':
         return bankRegulation;
+      case 'bankruptcy':
+        return bankruptcy;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -465,6 +475,8 @@ class Modules {
         insurance = v;
       case 'bankRegulation':
         bankRegulation = v;
+      case 'bankruptcy':
+        bankruptcy = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }

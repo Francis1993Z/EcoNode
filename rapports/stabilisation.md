@@ -880,3 +880,98 @@ Un plancher de fonds propres limite les pertes ; il n'empêche pas l'insolvabili
 limites permises, et il ne dit pas comment une Caisse insolvable se recapitalise. Il manque une provision pour pertes ou
 une procédure de résolution (recapitalisation par les membres, assurance-dépôts), hors du mandat de I1 à I5. La faillite
 ordonnée (I5) vise une partie de ces radiations : la dette remboursée par la trésorerie des entreprises qui ferment.
+
+### I5. Faillite ordonnée (10 octobre 2026)
+
+Rapports : [`i5-faillite-complet.md`](i5-faillite-complet.md) et [`i5-faillite-noyau.md`](i5-faillite-noyau.md),
+comparés au même code interrupteur coupé (`i5-faillite-avant-*.md`). I5 ne remplace pas de filet : pas d'étape « sauf ».
+
+**Ce qui a changé** (module `bankruptcy`, actif par défaut) : quand une entreprise ferme (`_close`, faute d'employés
+depuis 30 jours) ou est supprimée par le god mode (`removeFirm`), sa trésorerie rembourse d'abord sa dette envers la
+Caisse. C'est un remboursement de capital ordinaire : la monnaie est détruite, et `ledgerCredit`, `bank.repaid` et
+`dayFlows.repaid` sont mis à jour. Seul le solde impayé est radié. Le reste de la trésorerie va au propriétaire ou, s'il
+n'y en a pas, à l'État (avant, `removeFirm` détruisait cet argent par le god mode). Le bogue corrigé : la dette était
+radiée avant que la trésorerie revienne au propriétaire, si bien que l'argent d'un prêt finissait chez lui et que la
+Caisse encaissait la perte. Aucun paramètre. Test ajouté : fermeture d'une entreprise endettée, remboursement et
+radiation exacts, invariants à 0 au bit près.
+
+**Résultats** (modèle complet ; avec filets et dans le noyau, tous les indicateurs sont identiques) :
+
+| Indicateur, sans filets | Avant (I1 à I4) | I5 |
+|---|---|---|
+| Chômage moyen | 9,2 % | 8,0 % |
+| Faim moyenne | 6,7 % | 5,5 % |
+| Sans-abri moyen | 3,3 % | 2,0 % |
+| Gini moyen | 0,37 | 0,32 |
+| Alertes critiques | 154 | 135 |
+| Chocs résorbés < 200 j | 0 | 3 |
+| Jours de Caisse insolvable | 1 303 | 1 277 |
+| Fonds propres les plus bas | −4 285 $ | −2 177 $ |
+| Créances radiées (moyenne par partie) | 16 057 $ | 18 668 $ |
+| Trésor de l'État le plus bas | 66 148 $ | 12 931 $ |
+| Écart comptable max | 0 exact | 0 exact |
+
+Mesure ciblée (sonde, 5 graines sans filets) : les entreprises qui ferment endettées (2 à 9 par partie) n'ont plus que
+0,3 à 5,5 k$ de trésorerie pour 7,8 à 29 k$ de dette. La faillite ordonnée rembourse donc 0,3 à 4,8 k$ par partie.
+
+**Lecture.**
+
+- **I5 corrige l'ordre des comptes, mais son effet direct est petit.** Une entreprise ne ferme qu'après 30 jours sans
+  employé, et sa trésorerie est presque vide à ce moment-là. Ce que la Caisse récupère est faible devant ce qu'elle
+  radie : environ 7 % de la dette des entreprises qui ferment (1 à 19 % selon la graine).
+- **Les écarts des indicateurs viennent surtout de trajectoires qui divergent.** Quelques milliers de dollars détruits
+  au lieu d'être versés à un propriétaire suffisent à changer la suite de la partie (graine 1 : chômage 9,4 → 5,8 % ;
+  graines 2 à 4 : davantage de fermetures endettées, d'où des radiations plus élevées). Avec I4, seule la graine où la
+  règle mordait avait bougé. Il faut donc lire les petits effets de toutes les institutions avec prudence : sur 5
+  graines, la sensibilité de l'économie aux perturbations pèse autant que l'effet mesuré. Plus de graines
+  départageraient.
+
+**Critère de réussite.** Pas de filet remplacé. Indicateurs sans filets non dégradés ✅ (tous meilleurs, sauf le trésor
+le plus bas, dans une graine, et les radiations) ; invariants exacts ✅ ; Caisse toujours insolvable dans la graine 5 ❌
+(voir I4).
+
+**Interface** (vérifiée dans la version web : liste des modules, fiche de l'hôpital public, vues de l'État et de la
+Caisse). Deux retouches : un service public affiche « gratuit » au lieu d'un prix ; la confirmation de fermeture d'une
+entreprise décrit la faillite ordonnée.
+
+### Bilan des institutions I1 à I5 (10 octobre 2026)
+
+Référence avant les institutions ([`institutions-avant-complet.md`](institutions-avant-complet.md)) comparée à l'état
+après I5 ([`i5-faillite-complet.md`](i5-faillite-complet.md)), 5 graines × 1 500 jours :
+
+| Indicateur | Avant les institutions | Après I5 |
+|---|---|---|
+| Sans filets : chômage moyen | 9,2 % | 8,0 % |
+| Sans filets : faim moyenne | 5,7 % | 5,5 % |
+| Sans filets : sans-abri moyen | 2,9 % | 2,0 % |
+| Sans filets : Gini moyen | 0,37 | 0,32 |
+| Sans filets : alertes critiques | 104 | 135 |
+| Avec filets : chômage moyen | 4,0 % | 8,0 % |
+| Avec filets : renflouements / 50 j | 25,7 | 13,4 |
+| Avec filets : anti-famine / 50 j | 0,48 | 0,14 |
+| Avec filets : plancher de logement / 50 j | 5,6 | 9,9 |
+| Avec filets : anti-crédit-fou / 50 j | 0,19 | 0 |
+| Chocs résorbés < 200 j (sans / avec filets) | 0 / 11 | 3 / 4 |
+| Noyau : chômage moyen (sans filets) | 5,0 % | 4,3 % |
+| Noyau : renflouements / 50 j | 19,8 | 8,9 |
+| Noyau : alertes critiques (sans filets) | 5 | 2 |
+| Écart comptable max | 0 exact | 0 exact |
+
+**Ce qui marche.** L'assurance-emploi (I3) est la seule institution qui transforme l'économie sans filets : plus
+d'effondrement de fin de partie, trésor jamais vide, anti-famine sous 1 par 50 jours. L'enveloppe (I2) supprime les
+renflouements de l'hôpital là où il peut soigner. Les renflouements baissent de moitié dans le modèle complet et dans le
+noyau. L'anti-crédit-fou ne sert plus (I4).
+
+**Ce que les institutions ont fait apparaître** (à décider avant d'aller plus loin) :
+
+1. **Trésorerie bloquée dans les entreprises** (I1). La règle « dividende ≤ bénéfice lissé » empêche de distribuer une
+   trésorerie accumulée. Avec filets, le chômage double (4,0 → 8,0 %) et les chocs résorbés passent de 11 à 4. La
+   variante « bénéfices non répartis » libère cet argent mais dégrade l'économie sans filets.
+2. **L'hôpital sans intrants** (I2, anomalie A2). Sans filets, il reste privé d'électronique et de plastique : la file
+   d'attente atteint 240 personnes, et l'enveloppe paie des professionnels qui ne peuvent pas soigner. Décision réservée :
+   importations de dépannage.
+3. **L'aide sociale au panier de survie laisse des sans-logis** (I3) : plancher de logement à 9,9 par 50 jours.
+4. **La Caisse ne se recapitalise pas** (I4) : une fois insolvable, elle ne prête plus, ne touche plus d'intérêts et reste
+   insolvable (graine 5).
+5. **Mesure.** Sur 5 graines, la sensibilité de l'économie aux petites perturbations pèse autant que l'effet des petites
+   institutions (I5) : plus de graines départageraient.

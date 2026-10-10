@@ -277,6 +277,25 @@ void main() {
     expect(lentAfter(false), greaterThan(0)); // avant : le plancher n'existait que dans le filet
   });
 
+  test('I5 : faillite ordonnée, la trésorerie rembourse la dette avant le propriétaire', () {
+    final s = Sim(seed: 5, devChecks: true);
+    Firm? f;
+    for (var i = 0; i < 800 && f == null; i++) {
+      s.step();
+      final l = s.firms.where((x) => x.debt > 0 && x.money > 1).toList();
+      if (l.isNotEmpty) f = l.first;
+    }
+    expect(f, isNotNull);
+    final debt = f!.debt, cash = f.money;
+    final repaid0 = s.bank.repaid, off0 = s.bank.writtenOff;
+    s.removeFirm(f.id);
+    final repaid = s.bank.repaid - repaid0;
+    expect(repaid, cash < debt ? cash : debt);
+    expect(s.bank.writtenOff - off0, debt - repaid);
+    s.step(); // invariants vérifiés au bit près (mode développement)
+    expect(s.inv.worst, 0);
+  });
+
   test('modules coupés : ni machines, ni dette, ni publicité, invariants exacts', () {
     final s = Sim(seed: 10, modules: Modules.none(), devChecks: true);
     run(s, 300);

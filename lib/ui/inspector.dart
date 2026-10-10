@@ -296,7 +296,11 @@ class _FirmView extends StatelessWidget {
           Text(isOut ? 'produit' : 'intrant', style: TextStyle(color: pal.ink3, fontSize: 11)),
         ]),
         KV('Stock', '${qty(f.inv[g] ?? 0.0)} ${gd.unit}'),
-        if (isOut) ...[
+        if (isOut && ctrl.sim.publicGood(g)) ...[
+          const KV('Prix', 'gratuit (service public)'),
+          KV('Servi hier', '${qty(f.sold[g] ?? 0.0)} ${gd.unit}'),
+          KV('Produit hier', '${qty(f.produced[g] ?? 0.0)} ${gd.unit}'),
+        ] else if (isOut) ...[
           KV('Prix affiché', money(f.price[g] ?? 0.0)),
           KV('Marge visée', pct(f.markup[g] ?? 0.0)),
           KV('Vendu hier', '${qty(f.sold[g] ?? 0.0)} ${gd.unit}'),
@@ -314,7 +318,10 @@ class _FirmView extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Fermer ${f.name} ?'),
-        content: const Text('Les employés sont mis à pied, la caisse retourne au propriétaire et la dette est radiée.'),
+        content: Text(ctrl.sim.modules.bankruptcy
+            ? 'Les employés sont mis à pied. La trésorerie rembourse d’abord la dette envers la Caisse, le solde '
+                'impayé est radié, le reste va au propriétaire (ou à l’État).'
+            : 'Les employés sont mis à pied, la caisse retourne au propriétaire et la dette est radiée.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
           TextButton(

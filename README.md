@@ -34,6 +34,9 @@ se coupe : onglet Diagnostic → Modules.
 - **Détecteurs d'anomalies** (chômage, faim, sans-abri, santé, productivité du travail, pénurie de main-d'œuvre,
   embauches bloquées faute de moyens, Gini, richesse médiane, inflation, prix aberrants, stocks, entreprises sans
   employé ou sans client, Caisse, invariant comptable) : alertes avec valeur, seuil, durée et agents impliqués.
+- **Institutions** qui remplacent les filets, chacune derrière un interrupteur (Diagnostic → Modules) : test de
+  solvabilité des dividendes (I1), hôpital et école publics avec enveloppe et file d'attente (I2), assurance-emploi
+  indexée et aide sociale (I3), règles prudentielles de la Caisse (I4), faillite ordonnée (I5).
 - **Protocole** sans interface : 5 graines × 1 500 jours sans puis avec filets, chocs standard, critères de sortie.
 - Plan et journal des corrections : [`rapports/stabilisation.md`](rapports/stabilisation.md) ; état des lieux du
   10 octobre : [`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md).
@@ -92,17 +95,21 @@ flutter build web
 
 ## État
 
-`flutter analyze` ne signale rien et `flutter test` passe (11 tests). Tâches 1, 2, 3, 4, 5, 7 et 8 du plan de
+`flutter analyze` ne signale rien et `flutter test` passe (16 tests). Tâches 1, 2, 3, 4, 5, 7 et 8 du plan de
 stabilisation faites (coût de revient réel, intrants secondaires non bloquants, prix et salaires limités à 1,5 %/j,
 consommation stock-flux, entrée et sortie d'entreprises, fonds de roulement, Caisse capitalisée et prudente). Avec
-filets, la partie est jouable (chômage 3 à 5 %, faim ≤ 0,2 %), mais grâce aux renflouements. Sans filets, le modèle
-complet ne s'effondre plus au démarrage (chômage moyen 9 %, contre 87 % à l'origine), mais la santé de la population
-s'effondre et trois graines sur cinq s'effondrent en fin de partie : voir l'état des lieux du 10 octobre dans
-[`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md). La version Android n'a pas encore été lancée sur un appareil.
+filets, la partie est jouable (chômage 8 %, faim ≈ 0 %). Les institutions I1 à I5 sont en place : sans filets, le
+modèle complet ne s'effondre plus en fin de partie (chômage moyen 8 %, faim 5,5 %, sans-abri 2 %) et les renflouements
+ont baissé de moitié ; restent la santé sans filets (l'hôpital manque d'intrants), la trésorerie bloquée dans les
+entreprises et une aide sociale qui laisse des sans-logis. Voir l'état des lieux
+([`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md)) et le bilan des institutions dans le journal de
+[`rapports/stabilisation.md`](rapports/stabilisation.md). La version Android n'a pas encore été lancée sur un appareil.
 
 ## À faire
 
-- Stabilisation, dans l'ordre de [`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md) : hôpital ; ferme ; puis
-  les tâches 6, 9 et 10 du plan (détecteurs de santé, de pénurie de main-d'œuvre et de prix aberrants : faits).
+- Décisions en attente : importations de dépannage (A2), usure de la santé sans maladie ; suites des institutions
+  (trésorerie bloquée par I1, aide sociale de I3, recapitalisation de la Caisse) ; institutions au-delà de I5 (douane,
+  dette publique, migration).
+- Stabilisation : la ferme (coproduit, A3), puis les tâches 6, 9 et 10 du plan.
 - Ensuite, dans l'ordre : cohortes d'âge, services publics avec files d'attente, naissances et décès, logement détaillé.
 - Sauvegarde locale de la partie.
