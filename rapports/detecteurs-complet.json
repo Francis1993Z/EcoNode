@@ -1,0 +1,1338 @@
+{
+  "date": "2026-10-10T12:41:57.489948",
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "days": 1500,
+  "modulesOff": [],
+  "aggregate": {
+    "unempMean": 0.09217797619047624,
+    "hungerMean": 0.056994642857142855,
+    "homelessMean": 0.02901964285714286,
+    "giniMean": 0.37244563244603,
+    "inflMean": 0.00048329527497554815,
+    "criticalOpened": 104,
+    "alertsTotal": 2281,
+    "invMax": 0.0,
+    "net_famine": 0.47857142857142854,
+    "net_bailout": 25.692857142857143,
+    "net_shelter": 5.564285714285715,
+    "net_drift": 0.0,
+    "net_credit": 0.18571428571428572,
+    "shocksRecovered": 0,
+    "shocksRecoveredNets": 6
+  },
+  "base": [
+    {
+      "seed": 1,
+      "nets": false,
+      "unempMean": 0.09934821428571439,
+      "unempMax": 0.5958333333333333,
+      "hungerMean": 0.050294642857142864,
+      "hungerMax": 0.8875,
+      "homelessMean": 0.01933630952380952,
+      "homelessMax": 0.3416666666666667,
+      "giniMean": 0.2576147303125944,
+      "giniEnd": 0.8563120202437813,
+      "happyMean": 0.7953331866823131,
+      "inflMean": 0.0006082133661504674,
+      "inflMaxAbs": 0.15083454278943442,
+      "infl100MaxAbs": 1.5541214805243482,
+      "invMax": 0.0,
+      "criticalOpened": 26,
+      "alertsTotal": 477,
+      "alertsOpened": {
+        "stockVide": 116,
+        "stockPlein": 17,
+        "sansClient": 137,
+        "sansEmploye": 142,
+        "sansAbri": 12,
+        "penurieTravail": 14,
+        "inflation100": 3,
+        "inflationJour": 4,
+        "prixAberrant": 21,
+        "sante": 1,
+        "caisse": 2,
+        "efficacite": 1,
+        "faim": 5,
+        "chomageHaut": 1,
+        "gini": 1
+      },
+      "netsSteady": {
+        "famine": 0,
+        "bailout": 0,
+        "shelter": 0,
+        "drift": 0,
+        "credit": 0
+      },
+      "netsTotal": {},
+      "netsCauses": {},
+      "netRates": {
+        "famine": 0.0,
+        "bailout": 0.0,
+        "shelter": 0.0,
+        "drift": 0.0,
+        "credit": 0.0
+      },
+      "sectorShare": [
+        0.030612244897959183,
+        0.45918367346938777,
+        0.5102040816326531
+      ],
+      "crash": null
+    },
+    {
+      "seed": 2,
+      "nets": false,
+      "unempMean": 0.0532559523809523,
+      "unempMax": 0.12083333333333333,
+      "hungerMean": 0.0,
+      "hungerMax": 0.30416666666666664,
+      "homelessMean": 0.005955357142857153,
+      "homelessMax": 0.4,
+      "giniMean": 0.3872170136820411,
+      "giniEnd": 0.3251379222213471,
+      "happyMean": 0.8293047132567863,
+      "inflMean": 0.0007184867758758262,
+      "inflMaxAbs": 0.04794739287516392,
+      "infl100MaxAbs": 1.0856805660334028,
+      "invMax": 0.0,
+      "criticalOpened": 6,
+      "alertsTotal": 159,
+      "alertsOpened": {
+        "stockVide": 36,
+        "stockPlein": 9,
+        "faim": 2,
+        "sansAbri": 2,
+        "sansEmploye": 51,
+        "sansClient": 47,
+        "penurieTravail": 2,
+        "inflation100": 1,
+        "sante": 1,
+        "efficacite": 1,
+        "prixAberrant": 7
+      },
+      "netsSteady": {
+        "famine": 0,
+        "bailout": 0,
+        "shelter": 0,
+        "drift": 0,
+        "credit": 0
+      },
+      "netsTotal": {},
+      "netsCauses": {},
+      "netRates": {
+        "famine": 0.0,
+        "bailout": 0.0,
+        "shelter": 0.0,
+        "drift": 0.0,
+        "credit": 0.0
+      },
+      "sectorShare": [
+        0.08547008547008547,
+        0.18803418803418803,
+        0.7264957264957265
+      ],
+      "crash": null
+    },
+    {
+      "seed": 3,
+      "nets": false,
+      "unempMean": 0.1001071428571428,
+      "unempMax": 0.7708333333333334,
+      "hungerMean": 0.07640178571428574,
+      "hungerMax": 0.9541666666666667,
+      "homelessMean": 0.037782738095238085,
+      "homelessMax": 0.49583333333333335,
+      "giniMean": 0.4045721931592632,
+      "giniEnd": 0.8975672785429865,
+      "happyMean": 0.7909089996008557,
+      "inflMean": 0.0003495891465168377,
+      "inflMaxAbs": 0.024282534595688077,
+      "infl100MaxAbs": 1.037215215232401,
+      "invMax": 0.0,
+      "criticalOpened": 24,
+      "alertsTotal": 331,
+      "alertsOpened": {
+        "stockVide": 64,
+        "sansAbri": 12,
+        "stockPlein": 16,
+        "sansEmploye": 101,
+        "sansClient": 98,
+        "penurieTravail": 10,
+        "faim": 9,
+        "inflation100": 1,
+        "caisse": 1,
+        "sante": 1,
+        "efficacite": 1,
+        "prixAberrant": 11,
+        "gini": 4,
+        "chomageHaut": 1,
+        "mediane": 1
+      },
+      "netsSteady": {
+        "famine": 0,
+        "bailout": 0,
+        "shelter": 0,
+        "drift": 0,
+        "credit": 0
+      },
+      "netsTotal": {},
+      "netsCauses": {},
+      "netRates": {
+        "famine": 0.0,
+        "bailout": 0.0,
+        "shelter": 0.0,
+        "drift": 0.0,
+        "credit": 0.0
+      },
+      "sectorShare": [
+        0.03636363636363636,
+        0.23636363636363636,
+        0.7272727272727273
+      ],
+      "crash": null
+    },
+    {
+      "seed": 4,
+      "nets": false,
+      "unempMean": 0.10624404761904793,
+      "unempMax": 0.29583333333333334,
+      "hungerMean": 0.03863988095238094,
+      "hungerMax": 0.8791666666666667,
+      "homelessMean": 0.04141369047619049,
+      "homelessMax": 0.6625,
+      "giniMean": 0.39785000062940645,
+      "giniEnd": 0.24121807123227867,
+      "happyMean": 0.7900856253202796,
+      "inflMean": 0.00024185943913113128,
+      "inflMaxAbs": 0.049899338088070566,
+      "infl100MaxAbs": 1.2127977652288502,
+      "invMax": 0.0,
+      "criticalOpened": 23,
+      "alertsTotal": 587,
+      "alertsOpened": {
+        "stockVide": 132,
+        "stockPlein": 22,
+        "sansAbri": 12,
+        "sansEmploye": 188,
+        "faim": 9,
+        "sansClient": 186,
+        "penurieTravail": 13,
+        "inflation100": 1,
+        "sante": 1,
+        "efficacite": 1,
+        "prixAberrant": 19,
+        "gini": 2,
+        "mediane": 1
+      },
+      "netsSteady": {
+        "famine": 0,
+        "bailout": 0,
+        "shelter": 0,
+        "drift": 0,
+        "credit": 0
+      },
+      "netsTotal": {},
+      "netsCauses": {},
+      "netRates": {
+        "famine": 0.0,
+        "bailout": 0.0,
+        "shelter": 0.0,
+        "drift": 0.0,
+        "credit": 0.0
+      },
+      "sectorShare": [
+        0.11403508771929824,
+        0.17982456140350878,
+        0.706140350877193
+      ],
+      "crash": null
+    },
+    {
+      "seed": 5,
+      "nets": false,
+      "unempMean": 0.1019345238095238,
+      "unempMax": 0.5458333333333333,
+      "hungerMean": 0.11963690476190471,
+      "hungerMax": 0.9791666666666666,
+      "homelessMean": 0.040610119047619034,
+      "homelessMax": 0.7166666666666667,
+      "giniMean": 0.41497422444684484,
+      "giniEnd": 0.8491390050877132,
+      "happyMean": 0.7666102034689506,
+      "inflMean": 0.0004983276472034781,
+      "inflMaxAbs": 0.04442533321128472,
+      "infl100MaxAbs": 1.7777494467051835,
+      "invMax": 0.0,
+      "criticalOpened": 25,
+      "alertsTotal": 727,
+      "alertsOpened": {
+        "stockVide": 179,
+        "stockPlein": 32,
+        "sansAbri": 14,
+        "sansEmploye": 223,
+        "sansClient": 230,
+        "faim": 8,
+        "penurieTravail": 7,
+        "efficacite": 1,
+        "inflation100": 1,
+        "sante": 1,
+        "prixAberrant": 24,
+        "caisse": 1,
+        "gini": 5,
+        "chomageHaut": 1
+      },
+      "netsSteady": {
+        "famine": 0,
+        "bailout": 0,
+        "shelter": 0,
+        "drift": 0,
+        "credit": 0
+      },
+      "netsTotal": {},
+      "netsCauses": {},
+      "netRates": {
+        "famine": 0.0,
+        "bailout": 0.0,
+        "shelter": 0.0,
+        "drift": 0.0,
+        "credit": 0.0
+      },
+      "sectorShare": [
+        0.12903225806451613,
+        0.3467741935483871,
+        0.5241935483870968
+      ],
+      "crash": null
+    }
+  ],
+  "nets": [
+    {
+      "seed": 1,
+      "nets": true,
+      "unempMean": 0.03072023809523769,
+      "unempMax": 0.1125,
+      "hungerMean": 0.0,
+      "hungerMax": 0.1,
+      "homelessMean": 0.0,
+      "homelessMax": 0.2375,
+      "giniMean": 0.14132859213116852,
+      "giniEnd": 0.14872824545805385,
+      "happyMean": 0.9764731432772146,
+      "inflMean": 0.000040957675988329,
+      "inflMaxAbs": 0.5897850322655374,
+      "infl100MaxAbs": 1.1196678349081584,
+      "invMax": 0.0,
+      "criticalOpened": 6,
+      "alertsTotal": 87,
+      "alertsOpened": {
+        "stockVide": 17,
+        "stockPlein": 12,
+        "faim": 1,
+        "sansAbri": 1,
+        "sansClient": 19,
+        "penurieTravail": 1,
+        "sansEmploye": 16,
+        "prixAberrant": 16,
+        "inflation100": 2,
+        "inflationJour": 2
+      },
+      "netsSteady": {
+        "famine": 0,
+        "bailout": 650,
+        "shelter": 0,
+        "drift": 0,
+        "credit": 0
+      },
+      "netsTotal": {
+        "bailout": 695,
+        "shelter": 18
+      },
+      "netsCauses": {
+        "bailout": {
+          "par le propriétaire": 670,
+          "après rachat": 25
+        },
+        "shelter": {
+          "parc plein": 18
+        }
+      },
+      "netRates": {
+        "famine": 0.0,
+        "bailout": 23.214285714285715,
+        "shelter": 0.0,
+        "drift": 0.0,
+        "credit": 0.0
+      },
+      "sectorShare": [
+        0.0603448275862069,
+        0.09482758620689655,
+        0.8448275862068966
+      ],
+      "crash": null
+    },
+    {
+      "seed": 2,
+      "nets": true,
+      "unempMean": 0.03420238095238087,
+      "unempMax": 0.1375,
+      "hungerMean": 0.0017172619047619046,
+      "hungerMax": 0.625,
+      "homelessMean": 0.00001785714285714286,
+      "homelessMax": 0.2125,
+      "giniMean": 0.15868859578442243,
+      "giniEnd": 0.15609140244800623,
+      "happyMean": 0.9753821182466269,
+      "inflMean": 0.0001968045536560048,
+      "inflMaxAbs": 0.7394921433998762,
+      "infl100MaxAbs": 0.8634252985330331,
+      "invMax": 0.0,
+      "criticalOpened": 4,
+      "alertsTotal": 105,
+      "alertsOpened": {
+        "stockVide": 24,
+        "stockPlein": 18,
+        "sansAbri": 2,
+        "sansClient": 18,
+        "sansEmploye": 21,
+        "penurieTravail": 1,
+        "prixAberrant": 19,
+        "inflationJour": 1,
+        "faim": 1
+      },
+      "netsSteady": {
+        "famine": 53,
+        "bailout": 851,
+        "shelter": 0,
+        "drift": 0,
+        "credit": 0
+      },
+      "netsTotal": {
+        "bailout": 912,
+        "shelter": 15,
+        "famine": 53
+      },
+      "netsCauses": {
+        "bailout": {
+          "par le propriétaire": 880,
+          "après rachat": 32
+        },
+        "shelter": {
+          "parc plein": 15
+        },
+        "famine": {
+          "pas de producteur": 53
+        }
+      },
+      "netRates": {
+        "famine": 1.8928571428571428,
+        "bailout": 30.392857142857142,
+        "shelter": 0.0,
+        "drift": 0.0,
+        "credit": 0.0
+      },
+      "sectorShare": [
+        0.0815450643776824,
+        0.1630901287553648,
+        0.7553648068669528
+      ],
+      "crash": null
+    },
+    {
+      "seed": 3,
+      "nets": true,
+      "unempMean": 0.03654166666666678,
+      "unempMax": 0.225,
+      "hungerMean": 0.0,
+      "hungerMax": 0.20833333333333334,
+      "homelessMean": 0.0,
+      "homelessMax": 0.4375,
+      "giniMean": 0.1680172766969919,
+      "giniEnd": 0.1518331427671964,
+      "happyMean": 0.9769073485007672,
+      "inflMean": -0.000059044415554376783,
+      "inflMaxAbs": 0.5271185549639156,
+      "infl100MaxAbs": 1.3598445640916395,
+      "invMax": 0.0,
+      "criticalOpened": 9,
+      "alertsTotal": 122,
+      "alertsOpened": {
+        "stockVide": 32,
+        "sansAbri": 1,
+        "stockPlein": 19,
+        "sansClient": 27,
+        "faim": 3,
+        "penurieTravail": 1,
+        "sansEmploye": 22,
+        "inflation100": 1,
+        "prixAberrant": 12,
+        "inflationJour": 4
+      },
+      "netsSteady": {
+        "famine": 0,
+        "bailout": 691,
+        "shelter": 0,
+        "drift": 0,
+        "credit": 0
+      },
+      "netsTotal": {
+        "bailout": 782,
+        "shelter": 260,
+        "famine": 4
+      },
+      "netsCauses": {
+        "bailout": {
+          "par le propriétaire": 749,
+          "après rachat": 33
+        },
+        "shelter": {
+          "parc plein": 260
+        },
+        "famine": {
+          "pas de producteur": 4
+        }
+      },
+      "netRates": {
+        "famine": 0.0,
+        "bailout": 24.678571428571427,
+        "shelter": 0.0,
+        "drift": 0.0,
+        "credit": 0.0
+      },
+      "sectorShare": [
+        0.0759493670886076,
+        0.11392405063291139,
+        0.810126582278481
+      ],
+      "crash": null
+    },
+    {
+      "seed": 4,
+      "nets": true,
+      "unempMean": 0.05271130952380925,
+      "unempMax": 0.14583333333333334,
+      "hungerMean": 0.0,
+      "hungerMax": 0.3375,
+      "homelessMean": 0.009455357142857133,
+      "homelessMax": 0.5708333333333333,
+      "giniMean": 0.3093222869884274,
+      "giniEnd": 0.30869840489310896,
+      "happyMean": 0.8240386784813255,
+      "inflMean": 0.0003695551123248375,
+      "inflMaxAbs": 0.03945162892449483,
+      "infl100MaxAbs": 1.0066030000797834,
+      "invMax": 0.0,
+      "criticalOpened": 4,
+      "alertsTotal": 77,
+      "alertsOpened": {
+        "stockVide": 29,
+        "stockPlein": 6,
+        "sansAbri": 1,
+        "penurieTravail": 3,
+        "sansEmploye": 16,
+        "faim": 1,
+        "sansClient": 12,
+        "inflation100": 1,
+        "sante": 1,
+        "efficacite": 1,
+        "prixAberrant": 6
+      },
+      "netsSteady": {
+        "famine": 0,
+        "bailout": 586,
+        "shelter": 773,
+        "drift": 0,
+        "credit": 0
+      },
+      "netsTotal": {
+        "bailout": 652,
+        "shelter": 1801,
+        "famine": 45
+      },
+      "netsCauses": {
+        "bailout": {
+          "par le propriétaire": 619,
+          "après rachat": 33
+        },
+        "shelter": {
+          "parc plein": 1028,
+          "prix trop élevé": 773
+        },
+        "famine": {
+          "pas de producteur": 45
+        }
+      },
+      "netRates": {
+        "famine": 0.0,
+        "bailout": 20.928571428571427,
+        "shelter": 27.607142857142858,
+        "drift": 0.0,
+        "credit": 0.0
+      },
+      "sectorShare": [
+        0.09210526315789473,
+        0.09649122807017543,
+        0.8114035087719298
+      ],
+      "crash": null
+    },
+    {
+      "seed": 5,
+      "nets": true,
+      "unempMean": 0.04601488095238082,
+      "unempMax": 0.16666666666666666,
+      "hungerMean": 0.0009970238095238096,
+      "hungerMax": 0.4666666666666667,
+      "homelessMean": 0.0011726190476190478,
+      "homelessMax": 0.3541666666666667,
+      "giniMean": 0.16442599396277066,
+      "giniEnd": 0.09739268218932096,
+      "happyMean": 0.9752550337640035,
+      "inflMean": 0.00039571157624607167,
+      "inflMaxAbs": 0.5854397774301998,
+      "infl100MaxAbs": 1.5420199933402388,
+      "invMax": 0.0,
+      "criticalOpened": 12,
+      "alertsTotal": 155,
+      "alertsOpened": {
+        "stockVide": 26,
+        "stockPlein": 30,
+        "sansAbri": 3,
+        "penurieTravail": 2,
+        "sansEmploye": 30,
+        "faim": 4,
+        "sansClient": 37,
+        "inflation100": 1,
+        "inflationJour": 4,
+        "prixAberrant": 17,
+        "caisse": 1
+      },
+      "netsSteady": {
+        "famine": 14,
+        "bailout": 819,
+        "shelter": 6,
+        "drift": 0,
+        "credit": 26
+      },
+      "netsTotal": {
+        "bailout": 872,
+        "shelter": 63,
+        "famine": 19,
+        "credit": 26
+      },
+      "netsCauses": {
+        "bailout": {
+          "par le propriétaire": 838,
+          "après rachat": 34
+        },
+        "shelter": {
+          "parc plein": 63
+        },
+        "famine": {
+          "pas de producteur": 19
+        },
+        "credit": {
+          "fonds propres de la Caisse insuffisants": 26
+        }
+      },
+      "netRates": {
+        "famine": 0.5,
+        "bailout": 29.25,
+        "shelter": 0.21428571428571427,
+        "drift": 0.0,
+        "credit": 0.9285714285714286
+      },
+      "sectorShare": [
+        0.07079646017699115,
+        0.13274336283185842,
+        0.7964601769911505
+      ],
+      "crash": null
+    }
+  ],
+  "shocks": [
+    {
+      "kind": "helico",
+      "seed": 1,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 36,
+        "sansClient": 59,
+        "sansEmploye": 57,
+        "sansAbri": 5,
+        "penurieTravail": 6,
+        "inflationJour": 2,
+        "prixAberrant": 6,
+        "caisse": 1,
+        "faim": 2,
+        "gini": 2
+      },
+      "recoverAbs": null,
+      "recoverRel": 42,
+      "preInBand": false,
+      "peakUnemp": 0.21666666666666667,
+      "peakHunger": 0.9083333333333333,
+      "peakHomeless": 0.4,
+      "crash": null
+    },
+    {
+      "kind": "helico",
+      "seed": 2,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 24,
+        "faim": 1,
+        "sansAbri": 2,
+        "sansEmploye": 36,
+        "sansClient": 35,
+        "penurieTravail": 3,
+        "prixAberrant": 2,
+        "inflationJour": 1,
+        "gini": 3
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": false,
+      "peakUnemp": 0.17083333333333334,
+      "peakHunger": 0.8458333333333333,
+      "peakHomeless": 0.37916666666666665,
+      "crash": null
+    },
+    {
+      "kind": "helico",
+      "seed": 3,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 15,
+        "sansAbri": 1,
+        "sansEmploye": 36,
+        "sansClient": 37,
+        "penurieTravail": 3,
+        "faim": 1,
+        "prixAberrant": 5,
+        "inflationJour": 1,
+        "gini": 1
+      },
+      "recoverAbs": null,
+      "recoverRel": 377,
+      "preInBand": false,
+      "peakUnemp": 0.2125,
+      "peakHunger": 0.2625,
+      "peakHomeless": 0.7041666666666667,
+      "crash": null
+    },
+    {
+      "kind": "immigrants",
+      "seed": 1,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 61,
+        "stockPlein": 5,
+        "sansClient": 89,
+        "sansEmploye": 81,
+        "sansAbri": 5,
+        "penurieTravail": 5,
+        "prixAberrant": 9,
+        "caisse": 1,
+        "faim": 2,
+        "chomageHaut": 1,
+        "gini": 1,
+        "mediane": 1
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": false,
+      "peakUnemp": 0.7849056603773585,
+      "peakHunger": 0.9584905660377359,
+      "peakHomeless": 0.720754716981132,
+      "crash": null
+    },
+    {
+      "kind": "immigrants",
+      "seed": 2,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 49,
+        "stockPlein": 6,
+        "faim": 2,
+        "sansAbri": 10,
+        "sansEmploye": 47,
+        "sansClient": 49,
+        "penurieTravail": 5,
+        "prixAberrant": 11,
+        "gini": 1
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": false,
+      "peakUnemp": 0.32452830188679244,
+      "peakHunger": 0.8867924528301887,
+      "peakHomeless": 0.28679245283018867,
+      "crash": null
+    },
+    {
+      "kind": "immigrants",
+      "seed": 3,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 26,
+        "sansAbri": 5,
+        "stockPlein": 1,
+        "sansEmploye": 47,
+        "sansClient": 47,
+        "penurieTravail": 7,
+        "prixAberrant": 5,
+        "gini": 1
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": false,
+      "peakUnemp": 0.22641509433962265,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.11320754716981132,
+      "crash": null
+    },
+    {
+      "kind": "salaireMin",
+      "seed": 1,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 40,
+        "stockPlein": 2,
+        "sansClient": 50,
+        "sansEmploye": 49,
+        "sansAbri": 8,
+        "penurieTravail": 4,
+        "prixAberrant": 7,
+        "caisse": 1,
+        "faim": 1
+      },
+      "recoverAbs": null,
+      "recoverRel": 372,
+      "preInBand": false,
+      "peakUnemp": 0.3125,
+      "peakHunger": 0.8583333333333333,
+      "peakHomeless": 0.2708333333333333,
+      "crash": null
+    },
+    {
+      "kind": "salaireMin",
+      "seed": 2,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 2,
+        "stockPlein": 2,
+        "sansEmploye": 10,
+        "sansClient": 10,
+        "prixAberrant": 2
+      },
+      "recoverAbs": null,
+      "recoverRel": 208,
+      "preInBand": false,
+      "peakUnemp": 0.1125,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.07083333333333333,
+      "crash": null
+    },
+    {
+      "kind": "salaireMin",
+      "seed": 3,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 1,
+        "sansEmploye": 11,
+        "sansClient": 11,
+        "prixAberrant": 3
+      },
+      "recoverAbs": null,
+      "recoverRel": 1,
+      "preInBand": false,
+      "peakUnemp": 0.1,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.0625,
+      "crash": null
+    },
+    {
+      "kind": "ferme",
+      "seed": 1,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 45,
+        "sansClient": 86,
+        "sansEmploye": 81,
+        "sansAbri": 1,
+        "penurieTravail": 7,
+        "inflationJour": 1,
+        "prixAberrant": 3,
+        "caisse": 1,
+        "faim": 1,
+        "chomageHaut": 1
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": false,
+      "peakUnemp": 0.9833333333333333,
+      "peakHunger": 1.0,
+      "peakHomeless": 1.0,
+      "crash": null
+    },
+    {
+      "kind": "ferme",
+      "seed": 2,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 36,
+        "faim": 1,
+        "sansAbri": 1,
+        "sansEmploye": 60,
+        "sansClient": 62,
+        "penurieTravail": 7,
+        "efficacite": 1,
+        "prixAberrant": 1,
+        "caisse": 1,
+        "chomageHaut": 1,
+        "inflationJour": 2
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": false,
+      "peakUnemp": 1.0,
+      "peakHunger": 1.0,
+      "peakHomeless": 1.0,
+      "crash": null
+    },
+    {
+      "kind": "ferme",
+      "seed": 3,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 36,
+        "sansAbri": 1,
+        "sansEmploye": 62,
+        "sansClient": 62,
+        "penurieTravail": 2,
+        "faim": 1,
+        "efficacite": 1,
+        "chomageHaut": 1,
+        "inflationJour": 2
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": false,
+      "peakUnemp": 1.0,
+      "peakHunger": 1.0,
+      "peakHomeless": 1.0,
+      "crash": null
+    },
+    {
+      "kind": "faillite",
+      "seed": 1,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 45,
+        "stockPlein": 5,
+        "sansClient": 53,
+        "sansEmploye": 56,
+        "sansAbri": 8,
+        "penurieTravail": 5,
+        "prixAberrant": 8,
+        "caisse": 1,
+        "faim": 1
+      },
+      "recoverAbs": null,
+      "recoverRel": 304,
+      "preInBand": false,
+      "peakUnemp": 0.3125,
+      "peakHunger": 0.8583333333333333,
+      "peakHomeless": 0.2708333333333333,
+      "crash": null
+    },
+    {
+      "kind": "faillite",
+      "seed": 2,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 2,
+        "stockPlein": 2,
+        "sansEmploye": 10,
+        "sansClient": 10,
+        "prixAberrant": 2
+      },
+      "recoverAbs": null,
+      "recoverRel": 208,
+      "preInBand": false,
+      "peakUnemp": 0.1125,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.07083333333333333,
+      "crash": null
+    },
+    {
+      "kind": "faillite",
+      "seed": 3,
+      "nets": false,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 1,
+        "sansEmploye": 11,
+        "sansClient": 11,
+        "prixAberrant": 3
+      },
+      "recoverAbs": null,
+      "recoverRel": 1,
+      "preInBand": false,
+      "peakUnemp": 0.1,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.0625,
+      "crash": null
+    },
+    {
+      "kind": "helico",
+      "seed": 1,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 24,
+        "stockPlein": 6,
+        "faim": 1,
+        "sansAbri": 1,
+        "sansClient": 16,
+        "penurieTravail": 1,
+        "sansEmploye": 12,
+        "prixAberrant": 6,
+        "inflation100": 1,
+        "sante": 1,
+        "efficacite": 1,
+        "caisse": 2,
+        "inflationJour": 1
+      },
+      "recoverAbs": 132,
+      "recoverRel": null,
+      "preInBand": true,
+      "peakUnemp": 0.1125,
+      "peakHunger": 0.5791666666666667,
+      "peakHomeless": 0.6166666666666667,
+      "crash": null
+    },
+    {
+      "kind": "helico",
+      "seed": 2,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 39,
+        "stockPlein": 11,
+        "sansAbri": 3,
+        "sansClient": 31,
+        "sansEmploye": 22,
+        "penurieTravail": 3,
+        "prixAberrant": 8,
+        "faim": 3,
+        "inflationJour": 7,
+        "efficacite": 1,
+        "sante": 1,
+        "caisse": 1
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": true,
+      "peakUnemp": 0.29583333333333334,
+      "peakHunger": 0.6916666666666667,
+      "peakHomeless": 0.6416666666666667,
+      "crash": null
+    },
+    {
+      "kind": "helico",
+      "seed": 3,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 30,
+        "sansAbri": 5,
+        "stockPlein": 6,
+        "sansClient": 18,
+        "faim": 3,
+        "penurieTravail": 2,
+        "sansEmploye": 14,
+        "inflation100": 1,
+        "prixAberrant": 5,
+        "pleinEmploi": 1,
+        "sante": 1,
+        "efficacite": 1
+      },
+      "recoverAbs": null,
+      "recoverRel": 95,
+      "preInBand": false,
+      "peakUnemp": 0.25,
+      "peakHunger": 0.44166666666666665,
+      "peakHomeless": 0.6083333333333333,
+      "crash": null
+    },
+    {
+      "kind": "immigrants",
+      "seed": 1,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 8,
+        "stockPlein": 1,
+        "sansClient": 3,
+        "sansEmploye": 2,
+        "prixAberrant": 6
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": true,
+      "peakUnemp": 0.13962264150943396,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.06037735849056604,
+      "crash": null
+    },
+    {
+      "kind": "immigrants",
+      "seed": 2,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 2,
+        "stockPlein": 1,
+        "sansClient": 1,
+        "sansEmploye": 1,
+        "prixAberrant": 2
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": true,
+      "peakUnemp": 0.15849056603773584,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.06415094339622641,
+      "crash": null
+    },
+    {
+      "kind": "immigrants",
+      "seed": 3,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "sansEmploye": 1,
+        "prixAberrant": 4
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": false,
+      "peakUnemp": 0.12452830188679245,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.06415094339622641,
+      "crash": null
+    },
+    {
+      "kind": "salaireMin",
+      "seed": 1,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 6,
+        "stockPlein": 2,
+        "sansClient": 5,
+        "sansEmploye": 4,
+        "prixAberrant": 5,
+        "inflation100": 2
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": true,
+      "peakUnemp": 0.05416666666666667,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.0,
+      "crash": null
+    },
+    {
+      "kind": "salaireMin",
+      "seed": 2,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 5,
+        "stockPlein": 4,
+        "sansClient": 5,
+        "sansEmploye": 5,
+        "prixAberrant": 3
+      },
+      "recoverAbs": null,
+      "recoverRel": null,
+      "preInBand": true,
+      "peakUnemp": 0.07083333333333333,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.0,
+      "crash": null
+    },
+    {
+      "kind": "salaireMin",
+      "seed": 3,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 7,
+        "stockPlein": 5,
+        "sansClient": 4,
+        "sansEmploye": 3,
+        "prixAberrant": 5,
+        "inflationJour": 2
+      },
+      "recoverAbs": 418,
+      "recoverRel": 1,
+      "preInBand": false,
+      "peakUnemp": 0.08333333333333333,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.0,
+      "crash": null
+    },
+    {
+      "kind": "ferme",
+      "seed": 1,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 10,
+        "stockPlein": 8,
+        "sansClient": 11,
+        "penurieTravail": 1,
+        "sansEmploye": 7,
+        "prixAberrant": 8,
+        "inflationJour": 2
+      },
+      "recoverAbs": 320,
+      "recoverRel": null,
+      "preInBand": true,
+      "peakUnemp": 0.08333333333333333,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.0125,
+      "crash": null
+    },
+    {
+      "kind": "ferme",
+      "seed": 2,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 10,
+        "stockPlein": 5,
+        "sansClient": 8,
+        "sansEmploye": 6,
+        "penurieTravail": 2,
+        "prixAberrant": 5,
+        "inflation100": 1
+      },
+      "recoverAbs": 72,
+      "recoverRel": 401,
+      "preInBand": true,
+      "peakUnemp": 0.10416666666666667,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.0,
+      "crash": null
+    },
+    {
+      "kind": "ferme",
+      "seed": 3,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 8,
+        "stockPlein": 5,
+        "sansClient": 7,
+        "faim": 1,
+        "penurieTravail": 1,
+        "sansEmploye": 5,
+        "prixAberrant": 1,
+        "caisse": 1
+      },
+      "recoverAbs": 93,
+      "recoverRel": 46,
+      "preInBand": false,
+      "peakUnemp": 0.1375,
+      "peakHunger": 0.6916666666666667,
+      "peakHomeless": 0.2,
+      "crash": null
+    },
+    {
+      "kind": "faillite",
+      "seed": 1,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 5,
+        "stockPlein": 5,
+        "sansClient": 7,
+        "sansEmploye": 6,
+        "prixAberrant": 7,
+        "inflationJour": 1
+      },
+      "recoverAbs": 183,
+      "recoverRel": null,
+      "preInBand": true,
+      "peakUnemp": 0.0625,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.008333333333333333,
+      "crash": null
+    },
+    {
+      "kind": "faillite",
+      "seed": 2,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 3,
+        "stockPlein": 6,
+        "sansClient": 3,
+        "sansEmploye": 1,
+        "penurieTravail": 2,
+        "prixAberrant": 4
+      },
+      "recoverAbs": 79,
+      "recoverRel": 79,
+      "preInBand": true,
+      "peakUnemp": 0.07916666666666666,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.0,
+      "crash": null
+    },
+    {
+      "kind": "faillite",
+      "seed": 3,
+      "nets": true,
+      "collapsedBefore": false,
+      "alerts": {
+        "stockVide": 8,
+        "stockPlein": 3,
+        "sansClient": 3,
+        "sansEmploye": 3,
+        "prixAberrant": 4
+      },
+      "recoverAbs": 76,
+      "recoverRel": 1,
+      "preInBand": false,
+      "peakUnemp": 0.09583333333333334,
+      "peakHunger": 0.0,
+      "peakHomeless": 0.0125,
+      "crash": null
+    }
+  ]
+}

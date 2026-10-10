@@ -28,6 +28,21 @@ class MonitorConfig {
   int noStaffDays = 15; // sans employé pendant plus de 15 jours
   int noClientDays = 15; // sans client pendant plus de 15 jours
   double invariantTol = 1e-6; // écart comptable toléré ($)
+  // causes plutôt que conséquences (état des lieux du 10 octobre 2026)
+  double healthLow = 0.5; // santé moyenne de la population < 0,5…
+  int healthDays = 30; // … pendant 30 jours
+  double efficiencyLow = 0.7; // efficacité moyenne des employés < 0,7…
+  int efficiencyDays = 30; // … pendant 30 jours
+  // Postes ouverts restés non pourvus > 5 % de la demande de travail (employés + postes non pourvus)… Repère : le taux
+  // de postes vacants record au Canada, 5,7 % au 2e trimestre 2022, période décrite comme une pénurie (Statistique Canada).
+  double laborShortage = 0.05;
+  int laborShortageDays = 30; // … pendant 30 jours
+  // Postes voulus mais non ouverts faute de trésorerie > 10 % de la population (le seuil de départ du détecteur de
+  // pénurie, qui mesurait surtout ce cas : dans le noyau, des entreprises sans employé ni argent)…
+  double blockedHiring = 0.10;
+  int blockedHiringDays = 30; // … pendant 30 jours
+  double priceAberrant = 5; // prix > 5 fois le prix de référence corrigé des salaires…
+  int priceAberrantDays = 30; // … pendant 30 jours (entreprise active)
 }
 
 const Map<String, String> alertLabels = {
@@ -45,10 +60,18 @@ const Map<String, String> alertLabels = {
   'sansClient': 'Entreprise sans client',
   'invariant': 'Invariant comptable rompu',
   'caisse': 'Caisse insolvable',
+  'sante': 'Santé de la population effondrée',
+  'efficacite': 'Productivité du travail effondrée',
+  'penurieTravail': 'Pénurie de main-d’œuvre',
+  'embaucheBloquee': 'Embauches bloquées faute de moyens',
+  'prixAberrant': 'Prix aberrant',
 };
 
 /// Alertes critiques : aucune ne doit apparaître dans une partie stable.
-const Set<String> criticalAlerts = {'chomageHaut', 'faim', 'sansAbri', 'inflationJour', 'inflation100', 'invariant'};
+/// La santé effondrée est une détresse de la population, comme la faim : elle est critique.
+const Set<String> criticalAlerts = {
+  'chomageHaut', 'faim', 'sansAbri', 'sante', 'inflationJour', 'inflation100', 'invariant',
+};
 
 class Monitor {
   MonitorConfig cfg = MonitorConfig();
@@ -122,6 +145,62 @@ class Monitor {
           () => _people(homeless, (x) => x.homelessDays, s.shelterCause));
     }
 
+    // ---- santé et productivité du travail
+    if (n > 0 && s.modules.health) {
+      var sum = 0.0;
+      var low = 0;
+      for (final x in s.citizens) {
+        sum += x.health;
+        if (x.health < 0.75) low++;
+      }
+      final avg = sum / n;
+      cond('sante', 'sante', avg < c.healthLow, c.healthDays, avg, c.healthLow,
+          () => 'santé moyenne ${_dec(avg, 2)} (seuil ${_dec(c.healthLow, 2)}, ${c.healthDays} j de suite) ; '
+              '${fmtPct(low / n, 0)} des citoyens ont besoin de soins',
+          () => _hospitals(s));
+    }
+    final employed = s.citizens.where((x) => x.employer != null).toList();
+    if (employed.isNotEmpty) {
+      var eff = 0.0, faim = 0.0, logement = 0.0, sante = 0.0, moral = 0.0;
+      for (final x in employed) {
+        final k = s.efficiencyFactors(x);
+        eff += k.faim * k.logement * k.sante * k.moral;
+        faim += k.faim;
+        logement += k.logement;
+        sante += k.sante;
+        moral += k.moral;
+      }
+      final m = employed.length;
+      final avg = eff / m;
+      cond('efficacite', 'efficacite', avg < c.efficiencyLow, c.efficiencyDays, avg, c.efficiencyLow,
+          () => 'efficacité moyenne des employés ${_dec(avg, 2)} (seuil ${_dec(c.efficiencyLow, 2)}, '
+              '${c.efficiencyDays} j de suite) : un poste demande ${_dec(1 / avg, 1)} employé(s)',
+          () => _factors({'santé': sante / m, 'faim': faim / m, 'logement': logement / m, 'moral': moral / m}));
+    }
+
+    // ---- marché du travail : postes ouverts que personne ne vient pourvoir (pénurie), et postes voulus que les
+    // entreprises n'ont pas les moyens d'ouvrir (problème de financement, pas de main-d'œuvre)
+    if (n > 0) {
+      var unfilled = 0, blocked = 0;
+      for (final f in s.firms) {
+        if (f.vacancies > 0 && f.unfilledDays >= 1) unfilled += f.vacancies;
+        final gap = f.desired - f.workers.length;
+        if (gap > f.vacancies && s.affordablePosts(f) < math.min(gap, 3)) blocked += gap - f.vacancies;
+      }
+      final employed = s.citizens.where((x) => x.employer != null).length;
+      final rate = unfilled > 0 ? unfilled / (employed + unfilled) : 0.0;
+      final idle = n - employed;
+      cond('penurieTravail', 'penurieTravail', rate > c.laborShortage, c.laborShortageDays, rate, c.laborShortage,
+          () => '$unfilled postes ouverts restent non pourvus : ${fmtPct(rate)} de la demande de travail '
+              '(seuil ${fmtPct(c.laborShortage, 0)}) ; $idle chômeur(s)',
+          () => _unfilled(s));
+      final share = blocked / n;
+      cond('embaucheBloquee', 'embaucheBloquee', share > c.blockedHiring, c.blockedHiringDays, share, c.blockedHiring,
+          () => 'les entreprises voudraient $blocked employés de plus sans avoir en caisse de quoi ouvrir les postes '
+              '(${fmtPct(share, 0)} de la population, seuil ${fmtPct(c.blockedHiring, 0)})',
+          () => _blocked(s));
+    }
+
     // ---- inégalités et richesse médiane
     cond('gini', 'gini', h.gini > c.giniHigh || h.gini < c.giniLow, c.giniDays, h.gini,
         h.gini > c.giniHigh ? c.giniHigh : c.giniLow,
@@ -174,6 +253,20 @@ class Monitor {
       }
       cond('sansClient:${f.id}', 'sansClient', sold <= eps, c.noClientDays + 1, 0, 0,
           () => '${f.name} n’a rien vendu depuis plus de ${c.noClientDays} j', () => [f.name]);
+      // prix aberrant : bien au-dessus du prix d'équilibre du départ, corrigé de la hausse des salaires
+      if (f.workers.isNotEmpty) {
+        final ref = s.referencePrice(g);
+        final ratio = ref > 0 ? f.price[g]! / ref : 0.0;
+        cond('prixAberrant:${f.id}', 'prixAberrant', ratio > c.priceAberrant, c.priceAberrantDays, ratio,
+            c.priceAberrant, () {
+          final cap = math.max(1, f.workers.length) * s.perWorker(f);
+          final util = cap > 0 ? f.outputEma / cap : 0.0;
+          return '${f.name} : ${goods[g]!.label.toLowerCase()} à ${_money(f.price[g]!)}, ${_dec(ratio, 1)} fois la '
+              'référence (${_money(ref)}, corrigée des salaires) depuis ${c.priceAberrantDays} j ; coût de revient '
+              '${_money(f.unitCostCache[g] ?? 0)}, équipe utilisée à ${fmtPct(math.min(util, 9.99), 0)}'
+              '${f.inputLimited ? ', limitée par ses intrants' : ''}';
+        }, () => [f.name]);
+      }
     }
 
     // ---- Caisse : fonds propres négatifs (radiations supérieures au capital et aux intérêts retenus)
@@ -225,6 +318,62 @@ class Monitor {
     }
     final l = drops.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     return [for (final e in l.take(4)) '${e.key.name} (−${e.value} empl. en 30 j)'];
+  }
+
+  static String _money(double v) => v < 100 ? '${_dec(v, 1)} \$' : fmtMoney0(v);
+
+  /// Hôpitaux : effectifs, visites produites et demandées, intrants qui manquent.
+  static List<String> _hospitals(Sim s) {
+    final hs = s.firms.where((f) => f.outputs.containsKey('soins')).toList();
+    if (hs.isEmpty) return const ['aucun hôpital'];
+    return [
+      for (final f in hs.take(3))
+        '${f.name} : ${f.workers.length} employé(s) pour ${f.desired} voulus, '
+            '${_dec(f.produced['soins'] ?? 0, 1)} visite(s)/j pour ${_dec(f.demandEma['soins'] ?? 0, 0)} demandées'
+            '${f.inputLimited ? ' ; limité par ses intrants${_short(s, f)}' : ''}',
+    ];
+  }
+
+  /// Intrants dont le stock ne couvre pas une journée du plan de production.
+  static String _short(Sim s, Firm f) {
+    final need = math.max(1.0, s.plannedBatches(f));
+    final l = [
+      for (final e in f.inputs.entries)
+        if ((f.inv[e.key] ?? 0) < e.value * need) goods[e.key]!.label.toLowerCase(),
+    ];
+    return l.isEmpty ? '' : ' (${l.join(', ')})';
+  }
+
+  /// Facteurs d'efficacité, du plus pénalisant au moins pénalisant.
+  static List<String> _factors(Map<String, double> k) {
+    final l = k.entries.toList()..sort((a, b) => a.value.compareTo(b.value));
+    return [for (final e in l) '${e.key} ×${_dec(e.value, 2)}'];
+  }
+
+  /// Entreprises dont des postes ouverts restent non pourvus, les plus anciens d'abord.
+  static List<String> _unfilled(Sim s) {
+    final l = s.firms.where((f) => f.vacancies > 0 && f.unfilledDays >= 1).toList()
+      ..sort((a, b) => b.unfilledDays.compareTo(a.unfilledDays));
+    return [
+      for (final f in l.take(4))
+        '${f.name} : ${f.vacancies} poste(s) de ${classLabels[f.template.skill].toLowerCase()} ouvert(s) depuis '
+            '${f.unfilledDays} j',
+    ];
+  }
+
+  /// Entreprises qui voudraient embaucher sans en avoir les moyens.
+  static List<String> _blocked(Sim s) {
+    final l = s.firms.where((f) {
+      final gap = f.desired - f.workers.length;
+      return gap > f.vacancies && s.affordablePosts(f) < math.min(gap, 3);
+    }).toList()
+      ..sort((a, b) => (b.desired - b.workers.length).compareTo(a.desired - a.workers.length));
+    return [
+      for (final f in l.take(4))
+        '${f.name} : ${f.workers.length} employé(s), ${f.desired} voulus, caisse de '
+            '${_dec(f.money / math.max(1.0, f.wage * math.max(1, f.workers.length)), 1)} j de salaires '
+            '(il en faut ${Sim.hireCashDays} par employé, nouveaux compris)',
+    ];
   }
 
   /// Entreprises qui cherchent à embaucher.

@@ -125,8 +125,13 @@ branche de l'économie qui ne tient pas seule. C'est le « cache-misère » que 
 | **Total** | **3 / 9** | **4 / 9** | **5 / 7** |
 
 Dans la variante sans « Maladies et soins », les 12 alertes critiques restantes sont surtout une vague de sans-abri au
-démarrage (une par graine, 28 à 53 jours : anomalie A5). Pour le noyau, la tâche 3 a fait passer les alertes critiques
-de 33 à 5.
+démarrage (une par graine, 28 à 53 jours : anomalie A5).
+
+*Correction du 10 octobre :* la première version disait que, dans le noyau, la tâche 3 avait fait passer les alertes
+critiques de 33 à 5. Cette comparaison mélangeait deux configurations : le noyau de la tâche 5 avait l'entrée et la
+sortie d'entreprises actives, celui de la tâche 3 non. Dans la même configuration (entrée active,
+[`tache3-noyau-entree.md`](tache3-noyau-entree.md)), la tâche 3 fait passer les alertes critiques du noyau de **33 à 8**.
+Depuis, le critère de chômage est « ≤ 10 % » (décision du 10 octobre) au lieu de « 3–10 % ».
 
 ## 4. Anomalies, de la plus lourde à la plus légère
 
@@ -283,6 +288,9 @@ proposition.
 Les détecteurs actuels voient les conséquences (faim, sans-abri, chômage), pas les causes. Les détecteurs proposés
 ci-dessous sont des instruments de diagnostic, sans effet sur l'économie ; leurs seuils sont indicatifs.
 
+*Mise à jour du 10 octobre :* santé, efficacité, pénurie de main-d'œuvre et prix aberrants sont faits (voir le journal
+de [`stabilisation.md`](stabilisation.md)) ; les trois autres restent proposés.
+
 | Anomalie | Détecteur proposé |
 |---|---|
 | A1 | Santé moyenne < 0,5, ou efficacité moyenne < 0,7, pendant 30 jours |
@@ -308,8 +316,9 @@ ci-dessous sont des instruments de diagnostic, sans effet sur l'économie ; leur
 
 ## 7. Conséquences pour la suite
 
-**Tâche 3.** Elle a atteint sa cible : plafond de dérive de 262 à 0, anti-famine de 4,8 à 0,5, et dans le noyau, alertes
-critiques de 33 à 5. La dégradation sans filets passe par A1 et A3, qui existaient déjà.
+**Tâche 3.** Elle a atteint sa cible : plafond de dérive de 262 à 0, anti-famine de 4,8 à 0,5, et dans le noyau (entrée
+active, même configuration que la tâche 5), alertes critiques de 33 à 8. La dégradation sans filets passe par A1 et A3,
+qui existaient déjà.
 
 **Ordre proposé** (une correction à la fois, mesurée par le protocole) :
 

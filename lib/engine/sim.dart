@@ -146,6 +146,7 @@ class Sim {
   late double m0;
   double needCost = 0;
   double avgWage = 0;
+  double wage0 = 1; // salaire moyen au départ : base de l'indice des salaires (prix de référence corrigés)
   Map<String, double> hype = {}; // notoriété cumulée des vendeurs de chaque bien
   double adsBoost = 1; // hausse de la dépense des ménages due à la publicité
   // diagnostic
@@ -309,7 +310,16 @@ class Sim {
     _depositsAtCheck = deposits();
     needCost = _needCost();
     _record();
+    wage0 = history.last.wage > 0 ? history.last.wage : p.startWage;
     _checkInvariants();
+  }
+
+  /// Prix de référence d'un bien aujourd'hui : son prix d'équilibre au départ, corrigé de la hausse des salaires
+  /// (le travail est le principal coût). Un prix bien au-dessus n'est pas de l'inflation, c'est une rente ou un coût
+  /// de revient gonflé par une équipe sous-employée.
+  double referencePrice(String good) {
+    final w = history.isNotEmpty ? history.last.wage : 0.0;
+    return worldPrice[good]! * (w > 0 && wage0 > 0 ? w / wage0 : 1.0);
   }
 
   /// Résout prix et effectifs de départ : la demande des ménages (besoins de base + une part discrétionnaire
@@ -591,18 +601,21 @@ class Sim {
     return best;
   }
 
+  /// Facteurs du rendement d'un employé ; leur produit est son efficacité (hors bonus de qualification).
+  ({double faim, double logement, double sante, double moral}) efficiencyFactors(Citizen c) {
+    final fun = math.min(1.0, c.sat['divertissement']! + 0.5 * c.sat['luxe']!);
+    return (
+      faim: c.hungerDays >= 2 ? 0.5 : (c.hungerDays == 1 ? 0.85 : 1.0),
+      logement: c.homeless ? 0.8 : 1.0,
+      sante: modules.health ? 0.4 + 0.6 * c.health : 1.0,
+      moral: 0.85 + 0.15 * fun,
+    );
+  }
+
   /// Rendement d'un employé : faim, logement, santé, moral, et un bonus s'il est plus qualifié que le poste.
   double efficiency(Citizen c, [Firm? f]) {
-    var e = 1.0;
-    if (c.hungerDays >= 2) {
-      e *= 0.5;
-    } else if (c.hungerDays == 1) {
-      e *= 0.85;
-    }
-    if (c.homeless) e *= 0.8;
-    if (modules.health) e *= 0.4 + 0.6 * c.health;
-    final fun = math.min(1.0, c.sat['divertissement']! + 0.5 * c.sat['luxe']!);
-    e *= 0.85 + 0.15 * fun;
+    final k = efficiencyFactors(c);
+    var e = k.faim * k.logement * k.sante * k.moral;
     if (f != null) e *= 1 + 0.05 * math.min(3.0, math.max(0.0, c.skill - f.template.skill));
     return e;
   }
@@ -983,6 +996,16 @@ class Sim {
       }
     }
   }
+
+  /// Lots que l'entreprise prévoit de produire (demande prévue et réassort du stock visé).
+  double plannedBatches(Firm f) => _plannedBatches(f);
+
+  /// Règle d'embauche : pour ouvrir un poste, il faut en caisse ce nombre de jours de salaire pour chaque employé,
+  /// nouveaux compris.
+  static const int hireCashDays = 8;
+
+  /// Postes que la trésorerie permet d'ouvrir (négatif si elle ne couvre même pas l'équipe actuelle).
+  int affordablePosts(Firm f) => (f.money / (f.wage * hireCashDays)).floor() - f.workers.length;
 
   double _plannedBatches(Firm f) {
     final g0 = f.g0;
@@ -1818,10 +1841,10 @@ class Sim {
       if (nw > 0 && f.money < bill * 2) {
         _fire(f, _cmap[f.workers[nw - 1]]);
       } else if (desired > nw) {
-        var affordable = (f.money / (f.wage * 8)).floor() - nw;
+        var affordable = affordablePosts(f);
         if (affordable < math.min(desired - nw, 3)) {
           _workingCapital(f, math.min(desired - nw, 3));
-          affordable = (f.money / (f.wage * 8)).floor() - nw;
+          affordable = affordablePosts(f);
         }
         f.vacancies = math.max(0, math.min(desired - nw, math.min(3, affordable)));
       } else if (desired < nw - 1) {

@@ -135,6 +135,53 @@ void main() {
     }
   });
 
+  test('détecteurs de causes : santé, efficacité, pénurie de main-d’œuvre, prix aberrant', () {
+    // santé : sans hôpital (ni création d'entreprise), une population mal en point ne se soigne plus
+    final s = Sim(seed: 11, modules: Modules()..entry = false);
+    run(s, 20);
+    for (final f in s.firms.where((f) => f.type == 'hopital').toList()) {
+      s.removeFirm(f.id);
+    }
+    for (final c in s.citizens) {
+      c.sat['sante'] = 0.3;
+    }
+    run(s, 35);
+    expect(s.monitor.active['sante']?.critical, isTrue);
+    expect(s.monitor.active['sante']!.agents, contains('aucun hôpital'));
+    expect(s.monitor.active.containsKey('efficacite'), isTrue);
+    expect(s.monitor.active['efficacite']!.agents.first, startsWith('santé'));
+
+    // pénurie de main-d'œuvre : des entreprises qui ont de quoi embaucher ouvrent des postes que personne ne pourvoit
+    // (persistance réduite : on teste la condition, pas la durée)
+    final p = Sim(seed: 1, modules: Modules()..entry = false);
+    run(p, 150);
+    expect(p.monitor.active.containsKey('penurieTravail'), isFalse);
+    p.monitor.cfg.laborShortageDays = 10;
+    p.godMoney(const Target('allFirms'), 100000);
+    for (final f in p.firms) {
+      p.godFirm(f.id, prodMult: 0.33);
+    }
+    run(p, 15);
+    expect(p.monitor.active.containsKey('penurieTravail'), isTrue);
+
+    // embauches bloquées : sans trésorerie, une entreprise ne peut pas rouvrir les postes qu'elle voudrait
+    final b = Sim(seed: 9, safeguards: Safeguards.none(), modules: Modules()..entry = false);
+    run(b, 30);
+    b.godBankrupt(b.firms.firstWhere((f) => f.type == 'restaurant').id);
+    run(b, 45);
+    expect(b.monitor.active['embaucheBloquee']?.value, greaterThan(0.1));
+
+    // prix aberrant : le logement vendu 8 fois son prix de référence pendant plus de 30 jours
+    final q = Sim(seed: 1, modules: Modules()..entry = false);
+    run(q, 150);
+    final im = q.firms.firstWhere((f) => f.type == 'immobilier');
+    final key = 'prixAberrant:${im.id}';
+    expect(q.monitor.active.containsKey(key), isFalse);
+    q.godFirm(im.id, prices: {'logement': 8 * q.referencePrice('logement')}, lockPrice: true);
+    run(q, 32);
+    expect(q.monitor.active[key]?.value, greaterThan(5));
+  });
+
   test('modules coupés : ni machines, ni dette, ni publicité, invariants exacts', () {
     final s = Sim(seed: 10, modules: Modules.none(), devChecks: true);
     run(s, 300);

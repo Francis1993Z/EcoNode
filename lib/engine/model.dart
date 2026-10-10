@@ -322,6 +322,17 @@ class Modules {
     }
   }
 
+  /// Le noyau du protocole : les modules économiques ajoutés au modèle de base sont coupés, les institutions qui
+  /// remplacent les filets de sécurité restent actives (on mesure chaque institution dans le noyau aussi).
+  Modules.noyau() {
+    for (final k in keys) {
+      if (!institutions.contains(k)) set(k, false);
+    }
+  }
+
+  /// Institutions qui remplacent un filet de sécurité (voir rapports/stabilisation.md).
+  static const List<String> institutions = [];
+
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
     'entry',

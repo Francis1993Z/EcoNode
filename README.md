@@ -31,8 +31,9 @@ se coupe : onglet Diagnostic → Modules.
 - **Filets de sécurité** (anti-famine, renflouement, plancher de logement, plafond de dérive des prix et salaires,
   anti-crédit-fou) : interrupteurs nommés, chaque déclenchement compté et journalisé. Ce sont des instruments
   de diagnostic : un compteur élevé signale une fuite dans le modèle.
-- **Détecteurs d'anomalies** (chômage, faim, sans-abri, Gini, richesse médiane, inflation, stocks, entreprises sans
-  employé ou sans client, invariant comptable) : alertes avec valeur, seuil, durée et agents impliqués.
+- **Détecteurs d'anomalies** (chômage, faim, sans-abri, santé, productivité du travail, pénurie de main-d'œuvre,
+  embauches bloquées faute de moyens, Gini, richesse médiane, inflation, prix aberrants, stocks, entreprises sans
+  employé ou sans client, Caisse, invariant comptable) : alertes avec valeur, seuil, durée et agents impliqués.
 - **Protocole** sans interface : 5 graines × 1 500 jours sans puis avec filets, chocs standard, critères de sortie.
 - Plan et journal des corrections : [`rapports/stabilisation.md`](rapports/stabilisation.md) ; état des lieux du
   10 octobre : [`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md).
@@ -45,8 +46,9 @@ dart run tool/stabilite.dart --out rapports/stabilite.md --save rapports/stabili
 dart run tool/stabilite.dart --compare rapports/stabilite-avant.json --out rapports/stabilite-apres.md
 ```
 
-Options : `--seeds 1,2,3`, `--days 1500`, `--phases base,nets,chocs`, `--noyau` (tous les modules coupés),
-`--modules credit=0,marketing=0`, `--key raffinerie`.
+Options : `--seeds 1,2,3`, `--days 1500`, `--phases base,nets,chocs`, `--noyau` (modules économiques coupés,
+institutions actives), `--modules credit=0,marketing=0`, `--sauf bailout` (série avec filets sauf celui-là),
+`--key raffinerie`.
 
 ## Utilisation
 
@@ -90,7 +92,7 @@ flutter build web
 
 ## État
 
-`flutter analyze` ne signale rien et `flutter test` passe (10 tests). Tâches 1, 2, 3, 4, 5, 7 et 8 du plan de
+`flutter analyze` ne signale rien et `flutter test` passe (11 tests). Tâches 1, 2, 3, 4, 5, 7 et 8 du plan de
 stabilisation faites (coût de revient réel, intrants secondaires non bloquants, prix et salaires limités à 1,5 %/j,
 consommation stock-flux, entrée et sortie d'entreprises, fonds de roulement, Caisse capitalisée et prudente). Avec
 filets, la partie est jouable (chômage 3 à 5 %, faim ≤ 0,2 %), mais grâce aux renflouements. Sans filets, le modèle
@@ -100,7 +102,7 @@ s'effondre et trois graines sur cinq s'effondrent en fin de partie : voir l'éta
 
 ## À faire
 
-- Stabilisation, dans l'ordre de [`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md) : détecteurs de santé,
-  de pénurie de main-d'œuvre et de prix aberrants ; hôpital ; ferme ; puis les tâches 6, 9 et 10 du plan.
+- Stabilisation, dans l'ordre de [`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md) : hôpital ; ferme ; puis
+  les tâches 6, 9 et 10 du plan (détecteurs de santé, de pénurie de main-d'œuvre et de prix aberrants : faits).
 - Ensuite, dans l'ordre : cohortes d'âge, services publics avec files d'attente, naissances et décès, logement détaillé.
 - Sauvegarde locale de la partie.

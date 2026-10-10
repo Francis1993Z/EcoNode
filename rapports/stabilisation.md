@@ -505,3 +505,89 @@ situation, d'où ses 25 déclenchements par 50 jours.
 une entreprise a des clients qui attendent, vend au-dessus de son coût et manque de trésorerie pour embaucher. C'est
 la part « investissement » de ce que fait aujourd'hui le filet de renflouement ; elle devrait réduire à la fois la faim
 sans filets et les renflouements.
+
+*Mise à jour du 10 octobre :* l'état des lieux ([`etat-des-lieux.md`](etat-des-lieux.md)) montre que cet apport viserait
+1 à 4 cas par partie ; la proposition est retirée. Ordre retenu : détecteurs de causes, hôpital, ferme.
+
+### Détecteurs de causes (10 octobre 2026)
+
+Rapports : [`detecteurs-complet.md`](detecteurs-complet.md) (comparé à `tache3-complet.json`) et
+[`detecteurs-noyau.md`](detecteurs-noyau.md) (comparé à `tache3-noyau.json`).
+
+Les détecteurs existants voyaient les conséquences (faim, sans-abri, chômage), pas les causes. Quatre détecteurs
+ajoutés (`lib/engine/monitor.dart`), sans effet sur l'économie : les chiffres économiques des deux rapports sont
+identiques à ceux de la tâche 3.
+
+| Détecteur | Gravité | Condition | Agents indiqués |
+|---|---|---|---|
+| Santé de la population effondrée | critique | santé moyenne < 0,5 pendant 30 jours | chaque hôpital : employés et effectif voulu, visites produites et demandées, intrants qui manquent |
+| Productivité du travail effondrée | attention | efficacité moyenne des employés < 0,7 pendant 30 jours | les facteurs (santé, faim, logement, moral), du plus pénalisant au moins pénalisant |
+| Pénurie de main-d'œuvre | attention | postes voulus non pourvus > 10 % de la population pendant 30 jours | les entreprises auxquelles il manque le plus d'employés, avec leurs postes ouverts ou leur trésorerie |
+| Prix aberrant | attention, par entreprise | prix > 5 fois le prix de référence pendant 30 jours | l'entreprise, son coût de revient, l'utilisation de son équipe, le manque d'intrants |
+
+- **Santé classée critique** : c'est une détresse de la population, comme la faim. Conséquence : les alertes critiques
+  sans filets passent de 99 à 104 (une par graine).
+- **Prix de référence** : le prix d'équilibre du départ, corrigé de la hausse du salaire moyen (le travail est le
+  principal coût). L'indice des prix ne convient pas : les prix aberrants le faussent eux-mêmes (anomalie A7).
+- Le calcul de l'efficacité est découpé en facteurs (`efficiencyFactors`), avec le même résultat au bit près.
+- Un test provoque les quatre détecteurs (11 tests).
+- *Revu le jour même :* la pénurie de main-d'œuvre est scindée en deux détecteurs (voir « Corrections de mesure avant les
+  institutions »). Le tableau ci-dessous donne la première définition.
+
+**Ce qu'ils montrent** (modèle complet, sans filets ; ouvertures · jours-alerte) :
+
+| Détecteur | g1 | g2 | g3 | g4 | g5 |
+|---|---|---|---|---|---|
+| Santé de la population effondrée | 1 · 1 329 j | 1 · 1 343 j | 1 · 1 280 j | 1 · 1 331 j | 1 · 1 354 j |
+| Productivité du travail effondrée | 1 · 1 328 j | 1 · 1 343 j | 1 · 1 280 j | 1 · 1 331 j | 1 · 1 418 j |
+| Pénurie de main-d'œuvre (première définition) | 14 · 433 j | 2 · 134 j | 10 · 385 j | 13 · 427 j | 7 · 1 017 j |
+| Prix aberrant (jours-entreprise) | 21 · 2 830 j | 7 · 796 j | 11 · 987 j | 19 · 1 986 j | 24 · 2 626 j |
+
+La santé passe sous 0,5 entre les jours 117 et 191 selon la graine et ne remonte jamais. La pénurie de main-d'œuvre s'ouvre
+au démarrage dans toutes les graines (dès le jour 3 : les entreprises veulent environ 120 à 150 employés de plus) puis à chaque
+famine. Dans le noyau (santé coupée), la graine 2 est en pénurie de main-d'œuvre presque toute la partie (1 469 jours) :
+à examiner.
+
+**Constat nouveau, en lisant les alertes : les dividendes sont versés même en perte.** Graine 5, sans filets : un
+hôpital fondé au jour 280 avec 18 500 $ embauche 3 professionnels, mais ne peut presque rien produire (plus de
+plastique). Il ne vend rien et verse pourtant ~1 000 $/j de dividendes à son fondateur : la règle verse 8 % par jour de
+la trésorerie au-delà de 8 jours de coûts, sans condition de profit. Son capital lui revient en trois semaines ;
+l'hôpital licencie, puis ferme au jour 310. Le scénario se répète à chaque création. C'est le même mécanisme que le
+point 2 de l'anomalie A3 (la ferme) : à traiter à l'étape de l'hôpital ou de la ferme.
+
+### Corrections de mesure avant les institutions (10 octobre 2026)
+
+Rapports de référence : [`institutions-avant-complet.md`](institutions-avant-complet.md) (comparé à
+`detecteurs-complet.json`) et [`institutions-avant-noyau.md`](institutions-avant-noyau.md) (comparé à
+`detecteurs-noyau.json`). Aucune de ces corrections ne touche au modèle : les chiffres économiques sont identiques.
+
+1. **Critère de chômage : « ≤ 10 % » au lieu de « 3–10 % »** (décision de Francis), dans les critères de sortie et
+   dans la zone d'équilibre des chocs (`_inBand`). Un chômage bas n'est plus compté comme un déséquilibre. Effet : les
+   chocs résorbés en moins de 200 jours avec filets passent de 6 à 11 sur 15 (complet) et de 1 à 8 (noyau) ; sans filets,
+   de 0 à 0 (complet) et de 5 à 6 (noyau).
+2. **Noyau de la tâche 3, même configuration que la tâche 5.** L'état des lieux comparait un noyau avec entrée et sortie
+   d'entreprises actives (tâche 5) à un noyau sans (tâche 3). Relancé avec l'entrée active
+   ([`tache3-noyau-entree.md`](tache3-noyau-entree.md)) : alertes critiques de 33 à **8**, et non 5. Texte corrigé dans
+   `etat-des-lieux.md`.
+3. **Pénurie de main-d'œuvre : deux comptes séparés.** Vérification dans le noyau, graine 2 : l'écart de 48 à 58 postes
+   venait à 86–100 % d'entreprises sans employé ni trésorerie, qui ne ferment pas puisque l'entrée et la sortie sont
+   coupées : Tourisme (41 à 43 postes voulus) et Ordinateurs (2 à 10). Aucun poste ouvert n'y restait non pourvu. Le
+   détecteur est donc scindé :
+   - **Pénurie de main-d'œuvre** : postes ouverts restés non pourvus au-delà de 5 % de la demande de travail (employés +
+     postes non pourvus), pendant 30 jours. Repère : 5,7 %, le taux de postes vacants record au Canada (2ᵉ trimestre
+     2022), période décrite comme une pénurie par Statistique Canada.
+   - **Embauches bloquées faute de moyens** (nouveau) : postes voulus que l'entreprise n'ouvre pas faute d'avoir en caisse
+     8 jours de salaire par employé (nouveaux compris), au-delà de 10 % de la population pendant 30 jours (le seuil de
+     départ du détecteur de pénurie, qui mesurait surtout ce cas).
+
+   Résultat, sans filets : la vraie pénurie n'apparaît qu'au démarrage (dans 4 graines sur 5, une alerte qui dure 2 à
+   10 jours au-delà des 30 jours de persistance) ; les embauches bloquées s'ouvrent 2 à 12 fois par partie dans le modèle complet, et toute la
+   partie dans la graine 2 du noyau (1 461 jours).
+
+**Protocole : étape 2 bis.** `--sauf <filet>` ajoute une série « avec filets, sauf celui-là », pour le critère de réussite
+des institutions (le filet que l'institution remplace coupé, l'économie doit tenir), avec ses propres critères dans le
+rapport et ses moyennes dans le tableau avant/après. `--noyau` coupe les modules économiques ajoutés au modèle de base,
+mais laisse actives les institutions (`Modules.noyau()`) : chacune est ainsi mesurée dans le noyau aussi.
+
+**Méthode pour chaque institution.** Même code, interrupteur coupé (« avant ») puis actif (« après »), modèle complet et
+noyau, avec l'étape 2 bis sur le filet visé. L'interrupteur coupé reproduit exactement le commit précédent.
