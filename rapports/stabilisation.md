@@ -1083,3 +1083,158 @@ statistique de la tâche 2.
 - Au plus 9 999 entreprises d'un même type par partie, pour garder des identifiants stables.
 - Un agent qui n'existe que dans une des deux parties a forcément un identifiant à lui ; la comparaison reste appariée
   pour tous les autres.
+
+### Tâche 2 — Protocole statistique (11 octobre 2026)
+
+Aucune règle économique ne change. Références : Fagiolo et al. 2017 (validation des modèles multi-agents en économie) ;
+Lee et al. 2015 (analyse des sorties de simulation).
+
+**Pourquoi.** Cinq graines et des moyennes ne séparent pas un effet du bruit. La tâche 1 l'a montré : en changeant
+seulement les tirages, le chômage moyen sans filets passait de 8,0 à 10,2 %, autant que l'effet attribué à plusieurs
+institutions.
+
+**Ce qui a changé dans `tool/stabilite.dart`.**
+
+- **`--graines N`, défaut 30** (graines 1 à N ; `--seeds` garde une liste explicite). Les chocs prennent les mêmes
+  graines par défaut.
+- **Un isolat par partie** (`Isolate.run`), au plus `--isolats P` à la fois (défaut : nombre de processeurs, 16 ici).
+  Les résultats sont rangés dans l'ordre des tâches, pas dans l'ordre d'achèvement. Le rapport affiche le temps total.
+- **Distributions, jamais de moyenne seule.** Pour chaque indicateur : médiane, écart interquartile (quantiles de type 7,
+  comme R et NumPy), min–max, et nombre de graines hors de la zone d'équilibre. Le tableau « avant / après » en moyennes
+  est supprimé. Les filets ont la même forme (médiane des déclenchements par 50 jours, graines ≥ 1 / 50 j).
+- **Nouvel indicateur : jours-alerte critiques** (pour chaque type critique, les jours où l'alerte est ouverte,
+  additionnés). Une détresse durable ne compte qu'une ouverture ; il fallait aussi sa durée (voir la question
+  prioritaire).
+- **Critères de sortie graine par graine.** Un critère est rempli si aucune graine n'est hors bande ; le rapport donne
+  les graines hors bande. Le critère des filets (« < 1 déclenchement / 50 j ») porte désormais sur chaque graine ; il
+  portait sur la moyenne des graines. Il est donc plus strict.
+- **`--compare A B`, apparié.** A et B sont des synthèses enregistrées par `--save` (l'ancien format est relu) ou des
+  configurations lancées sur place sur les mêmes graines (`ref`, `institutions=0`, `bankruptcy=0`,
+  `param:dividendFromRetained=1`, `noyau`…). Pour chaque étape présente des deux côtés et chaque indicateur :
+  - les médianes de A et de B et leurs graines hors bande ;
+  - la différence médiane par graine (médiane de B − A) et son intervalle de confiance à 95 %, par bootstrap
+    percentile (10 000 tirages des graines avec remise, générateur à graine fixe) ;
+  - le nombre de graines où B fait mieux, moins bien ou pareil.
+
+  Un effet n'est conclu que si l'intervalle exclut 0. Un second tableau compare chaque type d'alerte critique
+  (ouvertures et jours-alerte), et le rapport finit par la liste des effets concluants.
+- **Chaque étape « sauf » est comparée, graine par graine, à l'étape « avec filets »** de la même exécution.
+  `--sauf chacun` ajoute une étape par filet ; `--sauf` peut aussi se répéter.
+- **Période de chauffe.** Toujours exclue (jours 1 à 100, `--warmup`). Le rapport dit sa durée et, pour chaque
+  indicateur, s'il est mesuré après la chauffe, sur toute la partie (maxima, alertes ouvertes, prêts refusés, écart
+  comptable) ou le dernier jour (Gini final). Une ligne compte les alertes critiques ouvertes après la chauffe.
+- **`--relire synthese.json`** refait un rapport sans relancer de partie.
+
+**Vérifications.**
+
+- **Isolats.** Avec les graines 1 à 5, les 10 parties lancées en isolats sont identiques, champ par champ, à la
+  référence séquentielle de la tâche 1 (`crn-reference-complet.json`).
+- **Tests.** `test/protocole_test.dart` (4 tests) vérifie :
+  - les quantiles (valeurs de R) ;
+  - le bootstrap : reproductible, l'intervalle exclut 0 pour un décalage net, pas pour une distribution centrée ;
+  - l'appariement par numéro de graine, pas par rang ;
+  - une partie lancée en isolat, identique à la même partie lancée directement.
+- **Coût.** Le protocole complet à 30 graines, avec `--sauf chacun` et les 300 chocs, fait 510 parties : 7 min 20 s
+  pour le modèle complet, 7 min 55 s pour le noyau, 16 parties à la fois.
+
+**Bilan des institutions refait** ([`stat/`](stat/)). 30 graines × 1 500 jours, chauffe de 100 jours, modèle complet.
+Six configurations : aucune institution (`complet-sans-institutions`), puis I1, I1–I2… jusqu'à I1–I5
+(`complet-i1-i5`, la référence actuelle). Chaque institution est comparée à la configuration d'avant (`compare-complet-i1`
+à `-i5`), et toutes ensemble à aucune (`compare-complet-institutions`).
+
+Chaque case donne la différence médiane par graine et son intervalle à 95 %. Entre parenthèses : graines où l'institution
+fait mieux / moins bien, sur 30. Seuls les effets dont l'intervalle exclut 0 sont listés.
+
+| Étape | Sans filets | Avec filets | Filet qu'elle remplace coupé |
+|---|---|---|---|
+| I1 dividendes | chômage −20,8 pt [−46,7 ; −3,4] (24/6) ; faim −9,1 pt [−52,0 ; −3,5] ; sans-abri −15,3 pt [−46,8 ; −4,3] ; jours-alerte critiques −1 496 [−2 565 ; −460] ; mais alertes critiques ouvertes +6,5 [+4 ; +10,5] (5/24) | chômage +3,4 pt [+2,4 ; +5,4] (1/29) ; renflouements +4,9 / 50 j [+1,3 ; +8,3] | sans renflouement : chômage +0,9 pt [+0,3 ; +1,5] ; sans-abri −0,6 pt ; plancher de logement −10,8 / 50 j |
+| I2 enveloppe | jours-alerte critiques −96 [−223 ; −30] | renflouements −16,0 / 50 j [−20,1 ; −10,8] (29/1) | sans renflouement : jours-alerte critiques −68,5 [−116 ; −33] |
+| I3 assurance-emploi | sans-abri +1,1 pt [+0,1 ; +1,5] (10/20) | chômage −0,6 pt [−2,0 ; −0,4] ; renflouements −1,8 / 50 j ; plancher de logement +1,9 / 50 j | sans anti-famine : chômage −0,6 pt ; renflouements −2,0 / 50 j ; plancher +2,0 / 50 j |
+| I4 Caisse | aucun effet concluant ; chômage identique dans 22 graines sur 30 | aucun : chômage identique dans les 30 graines | aucun : identique |
+| I5 faillite | aucun effet concluant | aucun : chômage identique dans 28 graines | sans renflouement : aucun effet concluant |
+| Les cinq | chômage 28,5 → 8,0 % (médianes), −19,7 pt [−47,5 ; −2,2] (22/8) ; graines au chômage moyen > 10 % : 23 → 4 ; jours-alerte critiques −1 534 [−2 746 ; −406] ; alertes critiques ouvertes +10,5 [+4,5 ; +14] | chômage +2,5 pt [+1,7 ; +3,2] (1/29) ; renflouements −13,0 / 50 j [−17,4 ; −8,6] (26/4) | — |
+
+Chocs revenus à l'équilibre en moins de 200 jours : sans filets, 0 sur 150 sans institutions et 8 sur 150 avec ; avec
+filets, 107 sur 150 sans institutions et 47 sur 150 avec.
+
+**Ce que 30 graines changent au bilan à 5 graines.**
+
+- **Sans filets, les institutions comptent beaucoup plus qu'on ne le croyait.** Sans elles, 18 graines sur 30
+  s'effondrent (chômage moyen ≥ 15 %). Avec les anciens tirages, les 5 graines du bilan d'hier n'en comptaient
+  aucune. Ce bilan donnait 9,2 → 8,0 % ; la médiane sur 30 graines passe de 28,5 à 8,0 %.
+- **I1 fait presque tout.** Il sauve l'économie sans filets, et il est aussi la seule institution qui dégrade le
+  chômage avec filets (+3,4 pt, 29 graines sur 30). I2 et I3 ont des effets nets mais petits ; I4 et I5 ne mordent
+  presque jamais.
+- **Les chocs avec filets se résorbent moins bien avec les institutions** (107 → 47 sur 150), comme à 5 graines
+  (11 → 4 sur 15).
+
+**Filets coupés un par un** (référence I1–I5, chaque coupure comparée aux filets complets) :
+
+- **Seul le renflouement compte encore.** Le couper fait passer la faim médiane de 0,1 à 4,2 % (+4,0 pt [+3,4 ; +4,8],
+  28 graines sur 30). Il fait aussi monter :
+  - le chômage, de 1,0 pt [+0,2 ; +1,6] ;
+  - les sans-abri, de 1,1 pt ;
+  - l'anti-famine, de 0,18 à 131,5 déclenchements par 50 jours ;
+  - les jours-alerte critiques, de 1 293 par graine.
+
+  La santé moyenne tombe de 0,88 à 0,17.
+- **Couper l'anti-famine ou le plancher de logement ne change rien de concluant.**
+- **Le plafond de dérive et l'anti-crédit-fou ne servent plus : les 30 parties restent identiques sans eux.** Le
+  plafond de dérive ne se déclenche jamais. Avec I4, l'anti-crédit-fou ne fait plus que compter les refus de la Caisse :
+  ses 146 « déclenchements » de la graine 29 sont ces refus. La règle reste appliquée sans lui.
+
+**Question prioritaire : les alertes critiques sans filets passées de 104 à 135.**
+
+1. **Ce ne sont pas les nouveaux détecteurs.**
+   - Depuis la référence à 104 (`a4e3b73`), la liste des alertes critiques et le code de leurs détecteurs n'ont pas
+     changé. Les seuls détecteurs ajoutés depuis (attente, prestations réduites) sont de niveau « attention ».
+   - Vérifié : le code d'I5 (`3ad2070`), anciens tirages, les cinq institutions coupées, redonne graine par graine les
+     alertes critiques de la référence (26, 6, 24, 23, 25 : 104). Seules les alertes non critiques diffèrent.
+2. **Ce n'est pas du bruit.** Sur 30 graines appariées, les institutions ajoutent 10,5 ouvertures d'alertes critiques
+   par graine [+4,5 ; +14] ; 21 graines sur 30 en ont plus. L'effet vient d'I1 (+6,5 [+4 ; +10,5]) ; pour I2 à I5,
+   rien de concluant.
+3. **Ce n'est pas une dégradation de la détresse.**
+   - Les ouvertures en plus sont des alertes d'indice des prix : « inflation quotidienne » +5 par graine
+     [+4 ; +6,5] (28 graines sur 30), « inflation sur 100 jours » +1 [+0,5 ; +1,5].
+   - La faim et les sans-abri n'ouvrent pas plus d'alertes (non concluant), et « chômage très élevé » en ouvre une de
+     moins.
+   - En durée, les jours-alerte critiques sont divisés par deux : 3 030 → 1 524 par graine (médianes), −1 534
+     [−2 746 ; −406]. Dont la faim −342 jours, les sans-abri −525 et le chômage très élevé −527.
+   - Sans institutions, l'économie s'effondre et reste dans une longue alerte : peu d'ouvertures, beaucoup de jours.
+   - Dans les 9 graines qui ne s'effondrent ni avec ni sans I1, I1 ajoute encore des alertes d'inflation quotidienne
+     dans les 9 (médiane +8). L'effet sur l'indice est donc propre à I1.
+4. **D'où viennent ces sauts de l'indice** (traces de partie, voir la tâche 3).
+   - Sur 10 graines sans filets, l'indice saute de plus de 5 % en un jour 31 fois sans institutions, 68 fois avec.
+     Avec institutions, ces sauts viennent surtout des bijoux, des repas et des ordinateurs.
+   - Le mécanisme : un bien sans vente garde dans l'indice son dernier prix de transaction. Pendant ce temps, son prix
+     affiché suit le coût de revient, jusqu'à 1,5 % par jour. À la vente suivante, l'indice rattrape tout d'un coup.
+     Exemple, graine 4 : un ordinateur vendu 980,6 $ au jour 1 020, puis 3 324,3 $ au jour 1 102 ; l'indice prend
+     +5,6 % ce jour-là.
+   - Le panier est fixe en quantités : un bien dont le prix a triplé pèse plus. Au jour 147, les bijoux font 43,8 % de
+     sa valeur.
+   - Hypothèse compatible avec ces traces, non démontrée : en retenant les dividendes, I1 réduit le revenu des
+     propriétaires, donc leurs achats de luxe ; ces marchés deviennent plus rares en transactions.
+
+   **Réponse : une hausse réelle due à I1, mais des alertes d'indice, pas de détresse ; la détresse, elle, baisse de
+   moitié.** Deux choix de mesure sont à trancher, je n'ai rien changé :
+   - le prix d'un bien sans vente dans l'indice (prix affiché, ou indice chaîné) ;
+   - le critère de sortie « aucune alerte critique », qui compte des ouvertures et non des durées.
+
+**Noyau : seule la référence est mesurée** (`noyau-i1-i5`). Chômage médian 5,7 % (Q1–Q3 : 3,2–7,0 %), aucune graine
+au-dessus de 10 %, faim nulle, alertes critiques ouvertes : médiane 0, au moins une dans 11 graines sur 30. Le calcul
+des autres configurations du noyau a été arrêté avant la fin ; le bilan du noyau n'est pas refait. Pour le refaire :
+`dart run tool/stabilite.dart --noyau --modules dividendTest=0,publicBudget=0,insurance=0,bankRegulation=0,bankruptcy=0
+--phases base,nets,chocs --sauf chacun --save rapports/stat/noyau-sans-institutions.json`, et de même pour I1 à I4.
+
+**Limites.**
+
+- **Intervalles grossiers.** Le bootstrap percentile d'une médiane sur 30 graines donne des intervalles approximatifs.
+  Pour des comptages souvent égaux, l'intervalle [0 ; 0] veut dire « identique dans la plupart des graines ».
+- **Pas de correction pour comparaisons multiples.** Chaque rapport compte une quarantaine de lignes par étape ; à 5 %
+  chacune, une ou deux conclusions par tableau peuvent venir du hasard.
+- **L'appariement réduit peu le bruit** (tâche 1) : les effets qui passent par un effondrement ont des intervalles
+  très larges (−47,5 à −2,2 pt).
+- **Les chocs ne sont pas comparés en mode apparié**, seulement décrits par leurs distributions.
+- **L'attente à l'hôpital public est « moins bonne » avec les institutions par construction** : sans I2, il n'y a pas
+  de file publique.
+- **Taille.** Une synthèse pèse de 0,5 à 0,65 Mo.

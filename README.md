@@ -37,7 +37,10 @@ se coupe : onglet Diagnostic → Modules.
 - **Institutions** qui remplacent les filets, chacune derrière un interrupteur (Diagnostic → Modules) : test de
   solvabilité des dividendes (I1), hôpital et école publics avec enveloppe et file d'attente (I2), assurance-emploi
   indexée et aide sociale (I3), règles prudentielles de la Caisse (I4), faillite ordonnée (I5).
-- **Protocole** sans interface : 5 graines × 1 500 jours sans puis avec filets, chocs standard, critères de sortie.
+- **Protocole** sans interface : 30 graines × 1 500 jours sans puis avec filets, chocs standard, critères de sortie ;
+  chaque partie dans son propre isolat. Chaque indicateur est donné par sa distribution sur les graines (médiane, écart
+  interquartile, min–max, graines hors bande) ; les comparaisons sont appariées graine par graine, avec un intervalle
+  de confiance bootstrap.
 - Plan et journal des corrections : [`rapports/stabilisation.md`](rapports/stabilisation.md) ; état des lieux du
   10 octobre : [`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md).
 
@@ -45,13 +48,21 @@ se coupe : onglet Diagnostic → Modules.
 dart run tool/stabilite.dart --out rapports/stabilite.md --save rapports/stabilite.json
 ```
 
+Comparaison appariée (même graine, configuration A contre B ; A et B sont des synthèses enregistrées par `--save` ou
+des configurations lancées sur place) :
+
 ```bash
-dart run tool/stabilite.dart --compare rapports/stabilite-avant.json --out rapports/stabilite-apres.md
+dart run tool/stabilite.dart --compare institutions=0 ref --out rapports/comparaison.md
 ```
 
-Options : `--seeds 1,2,3`, `--days 1500`, `--phases base,nets,chocs`, `--noyau` (modules économiques coupés,
-institutions actives), `--modules credit=0,marketing=0`, `--sauf bailout` (série avec filets sauf celui-là),
-`--key raffinerie`.
+```bash
+dart run tool/stabilite.dart --compare rapports/stat/complet-sans-institutions.json rapports/stat/complet-i1-i5.json
+```
+
+Options : `--graines 30`, `--seeds 1,2,3`, `--isolats 16`, `--days 1500`, `--warmup 100`, `--phases base,nets,chocs`,
+`--noyau` (modules économiques coupés, institutions actives), `--modules credit=0,marketing=0`, `--sauf bailout`
+(série avec filets sauf celui-là ; `--sauf chacun` : une série par filet), `--param nom=valeur`, `--key raffinerie`,
+`--relire synthese.json` (refait un rapport sans relancer de partie).
 
 ## Utilisation
 
@@ -94,10 +105,11 @@ flutter build web
 - `rapports/` : rapports du protocole et plan de stabilisation.
 - `test/engine_test.dart` : déterminisme, invariants exacts à chaque jour, filets, détecteurs et institutions provoqués.
 - `test/hasard_test.dart` : flux de hasard (valeurs de référence VM / web, indépendance, ordre du jour stable).
+- `test/protocole_test.dart` : statistiques du protocole (quantiles, bootstrap, appariement) et parties en isolat.
 
 ## État
 
-`flutter analyze` ne signale rien et `flutter test` passe (23 tests). Le hasard est en flux indépendants (nombres
+`flutter analyze` ne signale rien et `flutter test` passe (27 tests). Le hasard est en flux indépendants (nombres
 aléatoires communs) : une même graine donne la même partie sur la VM et en JavaScript (`tool/parite.dart`). Tâches 1, 2, 3, 4, 5, 7 et 8 du plan de
 stabilisation faites (coût de revient réel, intrants secondaires non bloquants, prix et salaires limités à 1,5 %/j,
 consommation stock-flux, entrée et sortie d'entreprises, fonds de roulement, Caisse capitalisée et prudente). Avec
