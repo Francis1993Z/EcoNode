@@ -36,7 +36,7 @@ class _DiagnosticTabState extends State<DiagnosticTab> {
     return ListView(padding: const EdgeInsets.all(12), children: [
       Section('Alertes actives (${alerts.length})', [
         if (alerts.isEmpty) Text('Aucune anomalie détectée.', style: TextStyle(color: pal.ok, fontSize: 12.5)),
-        for (final a in alerts) _AlertCard(a, sim.day),
+        for (final a in alerts) _AlertCard(a, sim.day, ctrl),
       ]),
       Section('Filets de sécurité', [
         Text(
@@ -219,16 +219,25 @@ class _DiagnosticTabState extends State<DiagnosticTab> {
   }
 }
 
+/// Une alerte. Toucher la carte ouvre l'inspecteur de l'entreprise qu'elle concerne ; toucher une ligne soulignée
+/// ouvre celui de l'entreprise ou du citoyen cité.
 class _AlertCard extends StatelessWidget {
   final Alert a;
   final int day;
-  const _AlertCard(this.a, this.day);
+  final SimController ctrl;
+  const _AlertCard(this.a, this.day, this.ctrl);
+
+  /// L'agent existe encore (une entreprise fermée n'a plus d'inspecteur).
+  bool _exists(AgentRef r) => r.kind == 'firm' ? ctrl.sim.firm(r.id) != null : ctrl.sim.citizen(r.id) != null;
+
+  void _open(AgentRef r) => ctrl.select(Selection(r.kind, r.id));
 
   @override
   Widget build(BuildContext context) {
     final pal = Pal.of(context);
     final col = a.critical ? pal.bad : pal.warn;
-    return Container(
+    final subject = a.subject != null && _exists(a.subject!) ? a.subject : null;
+    final card = Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -248,9 +257,20 @@ class _AlertCard extends StatelessWidget {
         Text(a.what, style: TextStyle(color: pal.ink2, fontSize: 12.5)),
         if (a.agents.isNotEmpty) ...[
           const SizedBox(height: 4),
-          for (final x in a.agents.take(6)) Text('· $x', style: TextStyle(color: pal.ink3, fontSize: 11.5)),
+          for (var i = 0; i < a.agents.length && i < 6; i++) _line(pal, a.agents[i], i < a.refs.length ? a.refs[i] : null),
         ],
       ]),
+    );
+    if (subject == null) return card;
+    return InkWell(onTap: () => _open(subject), borderRadius: BorderRadius.circular(8), child: card);
+  }
+
+  Widget _line(Pal pal, String text, AgentRef? r) {
+    if (r == null || !_exists(r)) return Text('· $text', style: TextStyle(color: pal.ink3, fontSize: 11.5));
+    return InkWell(
+      onTap: () => _open(r),
+      child: Text('· $text',
+          style: TextStyle(color: pal.accent, fontSize: 11.5, decoration: TextDecoration.underline, decorationColor: pal.accent)),
     );
   }
 }

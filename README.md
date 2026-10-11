@@ -64,6 +64,25 @@ Options : `--graines 30`, `--seeds 1,2,3`, `--isolats 16`, `--days 1500`, `--war
 (série avec filets sauf celui-là ; `--sauf chacun` : une série par filet), `--param nom=valeur`, `--key raffinerie`,
 `--relire synthese.json` (refait un rapport sans relancer de partie).
 
+Une partie avec ses journaux complets (`evenements.jsonl`, `series.csv`, `agents_fin.csv`, `entreprises.csv`) et un
+instantané tous les 500 jours, puis la reprise depuis un instantané, puis la comparaison de deux versions du moteur :
+
+```bash
+dart run tool/partie.dart --graine 7 --filets 0 --trace traces/g7 --snapshot-every 500
+```
+
+```bash
+dart run tool/partie.dart --from-snapshot traces/g7/instantane-j00500.json --jours 1500
+```
+
+```bash
+dart run tool/partie.dart --diff travail ../econodes-autre --graine 7 --jours 600
+```
+
+```bash
+dart run tool/detresse.dart traces/g7/agents_fin.csv
+```
+
 ## Utilisation
 
 - Un doigt sur le vide : déplacer la vue. Pincement : zoom. Un doigt sur un node : le déplacer. Toucher : inspecter.
@@ -101,21 +120,24 @@ flutter build web
   `sim.dart` (simulation, filets, invariants), `monitor.dart` (détecteurs d'anomalies).
 - `lib/ui/` : contrôleur, disposition et dessin du graphe, inspecteurs, onglets Diagnostic, God mode, Économie, Modèle.
 - `tool/stabilite.dart` : protocole de stabilité en ligne de commande.
+- `tool/partie.dart` : une partie en ligne de commande, avec ses journaux complets, ses instantanés et `--diff`.
+- `tool/detresse.dart` : ce qui distingue les citoyens en détresse des autres (à partir d'`agents_fin.csv`).
 - `tool/parite.dart` : empreinte d'une partie, à comparer entre la VM et la version JavaScript.
 - `rapports/` : rapports du protocole et plan de stabilisation.
 - `test/engine_test.dart` : déterminisme, invariants exacts à chaque jour, filets, détecteurs et institutions provoqués.
 - `test/hasard_test.dart` : flux de hasard (valeurs de référence VM / web, indépendance, ordre du jour stable).
 - `test/protocole_test.dart` : statistiques du protocole (quantiles, bootstrap, appariement) et parties en isolat.
+- `test/instantane_test.dart` : reprise exacte depuis un instantané, traceur sans effet sur la partie, empreintes.
 
 ## État
 
-`flutter analyze` ne signale rien et `flutter test` passe (27 tests). Le hasard est en flux indépendants (nombres
+`flutter analyze` ne signale rien et `flutter test` passe (33 tests). Le hasard est en flux indépendants (nombres
 aléatoires communs) : une même graine donne la même partie sur la VM et en JavaScript (`tool/parite.dart`). Tâches 1, 2, 3, 4, 5, 7 et 8 du plan de
 stabilisation faites (coût de revient réel, intrants secondaires non bloquants, prix et salaires limités à 1,5 %/j,
 consommation stock-flux, entrée et sortie d'entreprises, fonds de roulement, Caisse capitalisée et prudente). Avec
-filets, la partie est jouable (chômage 8 %, faim ≈ 0 %). Les institutions I1 à I5 sont en place : sans filets, le
-modèle complet ne s'effondre plus en fin de partie (chômage moyen 8 %, faim 5,5 %, sans-abri 2 %) et les renflouements
-ont baissé de moitié ; restent la santé sans filets (l'hôpital manque d'intrants), la trésorerie bloquée dans les
+filets, la partie est jouable (chômage médian 7 %, faim ≈ 0 %, sur 30 graines). Les institutions I1 à I5 sont en
+place : sans filets, le modèle complet s'effondre dans 3 graines sur 30 au lieu de 18 (chômage médian 8 %, faim 6 %,
+sans-abri 2,6 %) et les renflouements ont baissé de moitié ; restent la santé sans filets (l'hôpital manque d'intrants), la trésorerie bloquée dans les
 entreprises et une aide sociale qui laisse des sans-logis. Voir l'état des lieux
 ([`rapports/etat-des-lieux.md`](rapports/etat-des-lieux.md)) et le bilan des institutions dans le journal de
 [`rapports/stabilisation.md`](rapports/stabilisation.md). La version Android n'a pas encore été lancée sur un appareil.

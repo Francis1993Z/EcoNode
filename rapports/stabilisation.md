@@ -1238,3 +1238,106 @@ des autres configurations du noyau a été arrêté avant la fin ; le bilan du n
 - **L'attente à l'hôpital public est « moins bonne » avec les institutions par construction** : sans I2, il n'y a pas
   de file publique.
 - **Taille.** Une synthèse pèse de 0,5 à 0,65 Mo.
+
+### Tâche 3 — Journaux exportables (11 octobre 2026)
+
+Aucune règle économique ne change. L'interface garde ses listes plafonnées (300 événements, 1 000 déclenchements de
+filets, 1 500 jours d'historique) ; l'outil en ligne de commande écrit des fichiers complets.
+
+**Ce qui a changé.**
+
+- **`tool/partie.dart`** joue une partie (`--graine`, `--jours`, `--filets 0|1`, `--sauf`, `--modules`, `--noyau`,
+  `--param`). Ses options de journal sont décrites ci-dessous.
+- **`--trace dossier/`** écrit quatre fichiers :
+  - `evenements.jsonl` : une ligne par événement (jour, catégorie, type, agent et identifiant, règle déclenchée, cause,
+    montant, détail). Catégories : compta, travail, credit, filets, institutions, entrees_sorties, et alertes (ajoutée :
+    ouverture et fermeture). `--categories` n'écrit que celles demandées. Chaque déclenchement de filet porte le montant
+    injecté et sa cause, les mêmes que les compteurs de filets.
+  - `series.csv` : une ligne par jour, 110 colonnes. On y trouve les indicateurs que lisent les détecteurs :
+    - chômage, parts d'affamés et de sans-abri, santé, efficacité, postes non pourvus et bloqués ;
+    - prestations, attentes, Gini, richesse médiane, inflation sur un jour et sur 100 jours, fonds propres de la
+      Caisse, écart comptable ;
+    - les alertes actives par type, les filets du jour, les prix, les satisfactions et les classes.
+  - `agents_fin.csv` : une ligne par citoyen en fin de partie : traits, qualification de départ et de fin, cours suivis,
+    revenu moyen, épargne, jours de faim, sans logis et sans emploi, employeur et son secteur, cause dominante de
+    détresse. La cause est jugée chaque jour de détresse par `famineCause` / `shelterCause`.
+  - `entreprises.csv` : une ligne par entreprise ayant existé : secteur, jours de création et de fermeture, cause,
+    trésorerie et effectif moyens, dividendes versés, dette radiée, prêts et renflouements reçus.
+- **Dans le moteur.** Un crochet `Sim.trace` reçoit des `TraceEvent`. Chaque appel est gardé par `trace != null` : sans
+  traceur, rien n'est calculé de plus. `lib/engine/trace.dart` écrit les fichiers ; il ne fait que lire l'état.
+- **`tool/detresse.dart agents_fin.csv`** compare les citoyens en détresse (jours de faim ou sans logis ≥ 10 % des jours,
+  `--seuil`) aux autres. Il classe :
+  - les variables numériques par leur aire sous la courbe ROC ;
+  - les variables qualitatives par l'écart de leurs proportions.
+
+  Il ne déduit aucune cause et le dit en tête de son rapport.
+- **Instantanés** (`lib/engine/snapshot.dart`) :
+  - `--snapshot-every N` et `--snapshot-at J` écrivent l'état complet en JSON ; `--from-snapshot` reprend la partie.
+  - L'instantané enregistre tout, champs privés compris. Les nombres sont écrits au plus court qui se relit à
+    l'identique, et l'ordre des clés est gardé (il fixe l'ordre des sommes).
+  - Ne sont pas enregistrés les caches recalculés : clés de hasard du jour, numéros d'achat du jour, index par
+    identifiant.
+- **`--diff vA vB`** fait tourner deux versions du moteur sur la même partie. vA et vB : un dossier, « travail », ou une
+  révision git extraite dans un dossier temporaire. L'outil procède en trois temps :
+  1. chaque version écrit chaque jour une empreinte de chaque partie de son état ;
+  2. au premier jour qui diffère, les deux parties sont rejouées jusque-là et leurs instantanés comparés, variable par
+     variable ;
+  3. il affiche les réglages qui diffèrent, puis le premier jour où la partie diverge et les premières variables d'état
+     qui diffèrent. Citoyens, entreprises et alertes y sont appariés par identifiant.
+- **Interface.** Toucher une alerte d'entreprise ouvre l'inspecteur de cette entreprise. Toucher une ligne soulignée
+  ouvre celui de l'entreprise ou du citoyen qu'elle cite. Les alertes gardent pour cela l'agent de chaque ligne et
+  l'entreprise concernée. Rien d'autre ne change.
+
+**Vérifications.**
+
+- **Rien ne change sans traceur.** Les 27 tests d'avant passent, dont l'empreinte exacte d'une partie de 150 jours. La
+  parité VM / JavaScript de `tool/parite.dart` (dart2js `-O2`) est toujours identique au bit près.
+- **`test/instantane_test.dart`** (6 tests) vérifie :
+  - la reprise depuis un instantané écrit puis relu, identique au bit près à la partie jouée d'une traite. Testé sur
+    trois configurations : modèle complet avec filets ; sans filets, frontières ouvertes, après une épidémie et des
+    immigrants ; noyau sans filets, avec des alertes ouvertes ;
+  - la partie avec traceur, identique à la partie sans traceur ; un événement par déclenchement de filet, avec montant
+    et cause ;
+  - les empreintes : identiques pour la même partie, différentes dès le premier jour si le taux d'impôt change ;
+  - chaque alerte d'entreprise, qui désigne son entreprise.
+- **En ligne de commande** (graine 7, sans filets) :
+  - reprendre depuis l'instantané du jour 500 et jouer jusqu'au jour 1 500 donne un fichier identique octet pour
+    octet à celui de la partie complète ;
+  - `--diff travail travail` : aucune divergence en 300 jours ;
+  - contre une copie où une entreprise sans employé ferme après 31 jours au lieu de 30 : réglage `exitIdleDays` 30
+    contre 31, première divergence au jour 46. Les variables listées : la mine d'or fermée dans A, encore là dans B ;
+    l'argent rendu à son propriétaire ; ses alertes.
+- **Dans le navigateur** (version web) : toucher l'alerte « Surstock » d'Ordinateurs Pelletier ouvre son inspecteur.
+
+**Exemple, graine 7, sans filets, 1 500 jours.**
+
+- **Journal d'événements : 67 869 événements (15,7 Mo).**
+  - salaires : 22 636 ;
+  - dividendes retenus par I1 : 16 493 ; dividendes versés : 11 274 ;
+  - enveloppes d'I2 : 2 907 ;
+  - embauches : 2 629 ; fins d'emploi : 2 623.
+- **Entreprises : 126 ont existé**, dont 95 créées en cours de partie et 109 fermées.
+- **Détresse.** `tool/detresse.dart` trouve 224 citoyens sur 240 en détresse au moins 10 % des jours. Cause dominante :
+  « faim : pas de producteur » (217). Variables qui les distinguent le plus :
+  - l'argent de départ, plus haut en détresse (AUC 0,65) ;
+  - la part de jours sans emploi (0,64) ;
+  - le revenu moyen, plus bas en détresse (0,35) ;
+  - l'emploi dans le secondaire : 21 % des citoyens en détresse contre 44 % des autres.
+- **Même graine avec filets.** 678 déclenchements : 324 renflouements (511 101 $) et 354 nuitées d'urgence (2 849 $) ;
+  aucun citoyen en détresse.
+- **Coût.** 1 500 jours en 9,1 s sans trace, 9,7 s avec la trace complète. Un instantané pèse de 1,3 à 2,8 Mo, selon la
+  longueur de l'historique.
+
+**Limites.**
+
+- **`--diff` ne remonte pas avant cette tâche.** Il faut que les deux versions connaissent `tool/partie.dart`. La
+  révision actuelle `3ad2070` ne le connaît pas : l'outil le dit et s'arrête.
+- **Empreintes.** Elles sont des hachages FNV de 32 bits par partie de l'état : une collision est possible mais
+  improbable. Ce qui fait foi est la comparaison complète des instantanés du jour trouvé.
+- **Cause de détresse approchée.** Elle est jugée en fin de journée, aux prix du soir.
+- **`cours_suivis` approché.** Il se déduit des hausses de qualification : une formation du god mode y compte comme des
+  cours.
+- **Ancien format illisible.** Un instantané porte un numéro de version : si l'état gagne un champ, les instantanés
+  d'avant ne se relisent plus.
+- **Agents disparus.** Une entreprise fermée ou un citoyen parti n'ont plus d'inspecteur ; leurs lignes ne sont pas
+  cliquables.

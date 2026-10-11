@@ -4,10 +4,13 @@
 // Les montants sont des multiples de 2⁻¹⁰ $ : additions et soustractions sont exactes en virgule flottante,
 // si bien que les invariants comptables tiennent au bit près (tout écart non nul est un bogue).
 
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'model.dart';
 import 'monitor.dart';
+
+part 'snapshot.dart';
 
 /// mulberry32 (arithmétique 32 bits non signée) : même graine, même partie.
 class Mulberry32 {
@@ -214,6 +217,14 @@ class Sim {
   double _depositsAtCheck = 0;
   Map<String, double> cpiWeights = {}; // panier par citoyen pour l'indice des prix
   double _cpiBase = 1;
+  // Journal complet (outil en ligne de commande, trace.dart) : reçoit chaque événement ; null dans l'interface. Il ne
+  // change aucun calcul : chaque appel est gardé par « trace != null », les textes ne sont construits que s'il écoute.
+  void Function(TraceEvent e)? trace;
+
+  void _t(String category, String type, String agent, int? id, String rule, String cause, double amount,
+      [String detail = '']) {
+    trace!(TraceEvent(day, category, type, agent, id, rule, cause, amount, detail));
+  }
 
   Sim(
       {int seed = 42,
@@ -685,20 +696,22 @@ class Sim {
     e.value += value;
   }
 
-  void _hire(Firm f, Citizen c) {
+  void _hire(Firm f, Citizen c, [String why = 'poste ouvert']) {
     if (c.employer != null) {
       final old = firm(c.employer!);
-      if (old != null) _fire(old, c);
+      if (old != null) _fire(old, c, 'départ pour un autre emploi');
     }
     c.employer = f.id;
     c.daysUnemployed = 0;
     f.workers.add(c.id);
+    if (trace != null) _t('travail', 'embauche', c.name, c.id, why, f.name, f.wage, 'entreprise ${f.id}');
   }
 
-  void _fire(Firm? f, Citizen? c) {
+  void _fire(Firm? f, Citizen? c, [String why = '']) {
     if (f == null || c == null) return;
     f.workers.remove(c.id);
     c.employer = null;
+    if (trace != null) _t('travail', 'fin_emploi', c.name, c.id, why, f.name, f.wage, 'entreprise ${f.id}');
   }
 
   /// Candidat admissible le moins surqualifié (garde les plus qualifiés pour les postes qui les exigent).
@@ -903,6 +916,12 @@ class Sim {
   /// Journal des alertes (ouverture et fermeture), appelé par le moniteur.
   void logAlert(Alert a, {required bool opened}) {
     final label = alertLabels[a.type] ?? a.type;
+    if (trace != null) {
+      final sub = a.subject;
+      final name = sub == null ? '' : (sub.kind == 'firm' ? firm(sub.id)?.name : citizen(sub.id)?.name) ?? '';
+      _t('alertes', opened ? 'ouverture' : 'fermeture', name, sub?.id, label, a.what, a.value,
+          '${a.critical ? 'critique' : 'attention'} ; seuil ${a.threshold}${opened ? '' : ' ; ${(a.until ?? day) - a.since} j'}');
+    }
     if (opened) {
       final who = a.agents.isEmpty ? '' : ' — ${a.agents.take(3).join(' ; ')}';
       _log('alert', '${a.critical ? '⛔' : '⚠'} $label : ${a.what}$who');
@@ -999,7 +1018,7 @@ class Sim {
         final c = _pickWorker(unemployed, f.template.skill);
         if (c == null) break;
         unemployed.remove(c);
-        _hire(f, c);
+        _hire(f, c, 'marché du travail : candidat admissible le moins surqualifié');
         f.vacancies--;
       }
       f.unfilledDays = f.vacancies > 0 ? f.unfilledDays + 1 : 0;
@@ -1016,7 +1035,7 @@ class Sim {
           if (best == null || b.wage > best.wage) best = b;
         }
         if (cur != null && best != null && !identical(best, cur) && best.wage > cur.wage * 1.08) {
-          _hire(best, c);
+          _hire(best, c, 'mobilité : salaire plus de 8 % au-dessus');
           best.vacancies--;
         }
       }
@@ -1042,6 +1061,10 @@ class Sim {
         state.paid += total;
         state.paidToday += total;
         _flow('E', 'M', '\$prestations', idle.length.toDouble(), total);
+        if (trace != null) {
+          _t('compta', 'prestations', '', null, 'prestation forfaitaire aux sans-emploi', '${idle.length} sans-emploi',
+              total, state.benefitCut < 1 ? 'trésor insuffisant : ${fmtPct(state.benefitCut)} versés' : '');
+        }
       }
     }
   }
@@ -1080,6 +1103,10 @@ class Sim {
         if (c.insuredDays >= p.eiQualifyingDays && c.lastWage > 0) {
           c.eiDaysLeft = eiDuration(unemp);
           c.eiBenefit = p.eiReplacement * math.min(c.lastWage, cap);
+          if (trace != null) {
+            _t('institutions', 'demande_ae', c.name, c.id, 'I3 : assurance-emploi', '${c.insuredDays} j assurables',
+                c.eiBenefit, '${c.eiDaysLeft} j de prestations, chômage ${fmtPct(unemp)}');
+          }
           c.insuredDays = 0;
         } else {
           c.eiDaysLeft = 0;
@@ -1111,6 +1138,12 @@ class Sim {
     st.paidToday += ei + assist;
     if (ei > 0) _flow('E', 'M', '\$assurance-emploi', st.eiClaimants.toDouble(), ei);
     if (assist > 0) _flow('E', 'M', '\$aide sociale', st.assistRecipients.toDouble(), assist);
+    if (trace != null) {
+      _t('institutions', 'prestations', '', null, 'I3 : assurance-emploi et aide sociale',
+          '${st.eiClaimants} prestataires, ${st.assistRecipients} à l’aide sociale', ei + assist,
+          'assurance-emploi ${fmtMoney0(ei)}, aide sociale ${fmtMoney0(assist)}'
+              '${k < 1 ? ' ; trésor insuffisant : ${fmtPct(k)} versés' : ''}');
+    }
   }
 
   void _produce() {
@@ -1194,10 +1227,15 @@ class Sim {
         _flow(f.id.toString(), 'M', '\$salaires', n.toDouble(), net);
         if (tax > 0) _flow('M', 'E', '\$impôts', 1, tax);
       }
+      if (trace != null) {
+        _t('compta', 'salaires', f.name, f.id, 'paie', '$n employé(s)', net + tax + premiums,
+            'net ${fmtMoney0(net)}, impôt ${fmtMoney0(tax)}, cotisations ${fmtMoney0(premiums)}'
+                '${each < f.wage - eps ? ' ; salaires versés en partie' : ''}');
+      }
       if (each < f.wage - eps) {
         // ne peut pas payer : mise à pied du dernier embauché
         final c = _cmap[f.workers.last];
-        _fire(f, c);
+        _fire(f, c, 'salaires impayables : mise à pied du dernier embauché');
         f.vacancies = 0;
         if (day - f.lastDistressLog > 10) {
           _log('warn', '${f.name} ne peut plus payer ses salaires — mise à pied.');
@@ -1253,6 +1291,10 @@ class Sim {
         final back = transfer(f, state, f.money - target);
         st.envelopeTotal -= back;
         _flow(f.id.toString(), 'E', '\$budget non dépensé', 1, back);
+        if (trace != null) {
+          _t('institutions', 'budget_non_depense', f.name, f.id, 'I2 : enveloppe budgétaire',
+              'trésorerie au-delà de 1,5 fois la cible', back, 'cible ${fmtMoney0(target)}');
+        }
       }
       final w = math.max(0.0, target - f.money);
       want.add(w);
@@ -1280,6 +1322,11 @@ class Sim {
         state.educationPaid += amt;
       }
       _flow('E', f.id.toString(), '\$enveloppe', 1, amt);
+      if (trace != null) {
+        _t('institutions', 'enveloppe', f.name, f.id, 'I2 : enveloppe budgétaire',
+            k < 1 ? 'trésor insuffisant : ${fmtPct(k)} de l’enveloppe' : 'trésorerie ramenée à la cible', amt,
+            'voulu ${fmtMoney0(want[i])}');
+      }
     }
     for (final st in short) {
       st.shortDays++;
@@ -1717,8 +1764,9 @@ class Sim {
   // ================================================================ Filets de sécurité
 
   /// Enregistre un déclenchement : compté, journalisé (jour, agent, montant, raison), résumé dans le journal du jour.
-  void _net(String net, String agent, double amount, String cause, [String detail = '']) {
+  void _net(String net, String agent, double amount, String cause, [String detail = '', int? id]) {
     nets.add(NetEvent(day, net, agent, amount, detail.isEmpty ? cause : '$cause — $detail'), cause);
+    if (trace != null) _t('filets', net, agent, id, 'filet : ${Safeguards.labels[net]}', cause, amount, detail);
   }
 
   /// Pourquoi ce citoyen n'arrive pas à manger.
@@ -1772,7 +1820,7 @@ class Sim {
       _flow('E', 'M', '\$aide alimentaire', 1, spent);
     }
     c.hungerDays = 0;
-    _net('famine', c.name, spent, cause, magic ? '$detail ; ration magique' : detail);
+    _net('famine', c.name, spent, cause, magic ? '$detail ; ration magique' : detail, c.id);
   }
 
   /// Plancher de logement : l'État paie une nuitée ; si le parc est plein, un abri d'urgence (magique).
@@ -1789,7 +1837,7 @@ class Sim {
     c.homelessDays = 0;
     c.sat['logement'] = 1;
     _net('shelter', c.name, r.spent, cause,
-        magic ? 'abri d’urgence magique' : 'argent ${fmtMoney0(c.money)}, revenu du jour ${fmtMoney0(c.income)}');
+        magic ? 'abri d’urgence magique' : 'argent ${fmtMoney0(c.money)}, revenu du jour ${fmtMoney0(c.income)}', c.id);
   }
 
   /// Résumé quotidien des filets déclenchés, dans le journal principal.
@@ -1854,6 +1902,10 @@ class Sim {
           f.costs += paid;
           f.interestToday = paid;
           _flow(key, 'B', '\$intérêts', 1, paid);
+          if (trace != null) {
+            _t('compta', 'interets', f.name, f.id, 'service de la dette', 'intérêts du jour', paid,
+                'dette ${fmtMoney0(f.debt)}');
+          }
           final reserve = 6 * (f.wage * f.workers.length + f.inputSpendEma);
           var pay = math.max(f.debt / p.loanTermDays, 5.0);
           if (f.money > 2 * reserve) pay += 0.05 * (f.money - 2 * reserve); // remboursement anticipé
@@ -1865,6 +1917,10 @@ class Sim {
             bank.repaid += repaid;
             dayFlows.repaid += repaid;
             _flow(key, 'B', '\$remboursements', 1, repaid);
+            if (trace != null) {
+              _t('compta', 'remboursement', f.name, f.id, 'service de la dette', 'remboursement du capital', repaid,
+                  'reste ${fmtMoney0(f.debt)}');
+            }
           }
           f.missedPayments = 0;
         } else {
@@ -1873,9 +1929,13 @@ class Sim {
           bank.equity += interest;
           dayFlows.capitalized += interest;
           f.missedPayments++;
+          if (trace != null) {
+            _t('credit', 'interets_impayes', f.name, f.id, 'service de la dette', 'trésorerie insuffisante', interest,
+                '${f.missedPayments} j de retard');
+          }
           if (f.missedPayments > 60) {
             _log('warn', '${f.name} ne rembourse plus : la Caisse radie ${fmtMoney0(f.debt)} de dette.');
-            _writeOff(f);
+            _writeOff(f, 'plus de 60 jours de retard');
             f.creditBanUntil = day + 180;
           }
         }
@@ -1897,6 +1957,10 @@ class Sim {
       bank.equity -= total;
       dayFlows.rebates += total;
       _flow('B', 'M', '\$ristournes', 1, total);
+      if (trace != null) {
+        _t('compta', 'ristourne', 'Caisse', null, 'ristourne du surplus de la Caisse', 'fonds propres au-dessus de la cible',
+            total, '${citizens.length} membres');
+      }
     }
   }
 
@@ -1911,12 +1975,17 @@ class Sim {
     bank.repaid += repaid;
     dayFlows.repaid += repaid;
     _flow(f.id.toString(), 'B', '\$remboursements', 1, repaid);
+    if (trace != null) {
+      _t('institutions', 'remboursement_faillite', f.name, f.id, 'I5 : faillite ordonnée',
+          'la trésorerie rembourse la Caisse avant tout', repaid, 'reste ${fmtMoney0(f.debt)} à radier');
+    }
     return repaid;
   }
 
   /// La Caisse renonce à la créance : la perte est imputée à ses fonds propres, la monnaie déjà créée reste.
-  void _writeOff(Firm f) {
+  void _writeOff(Firm f, [String why = '']) {
     if (f.debt <= 0) return;
+    if (trace != null) _t('credit', 'radiation', f.name, f.id, 'radiation de créance', why, f.debt);
     bank.writtenOff += f.debt;
     bank.equity -= f.debt;
     dayFlows.writtenOff += f.debt;
@@ -2014,7 +2083,12 @@ class Sim {
   /// prudentielles (I4), le filet n'a plus d'effet propre : c'est la Caisse qui refuse.
   void _refuse(Firm f, double need, String cause, String detail) {
     bank.refusals++;
-    if (safeguards.credit) _net('credit', f.name, need, cause, detail);
+    if (safeguards.credit) _net('credit', f.name, need, cause, detail, f.id);
+    if (trace != null) {
+      _t('credit', 'refus', f.name, f.id,
+          modules.bankRegulation ? 'I4 : règles prudentielles de la Caisse' : 'filet : anti-crédit-fou', cause, need,
+          detail);
+    }
   }
 
   void _lend(Firm f, double amt, {bool working = false}) {
@@ -2030,6 +2104,10 @@ class Sim {
     }
     dayFlows.loans += a;
     _flow('B', f.id.toString(), '\$prêts', 1, a);
+    if (trace != null) {
+      _t('credit', 'pret', f.name, f.id, working ? 'fonds de roulement' : 'achat de machine',
+          working ? 'clients en attente, postes à ouvrir' : 'machine rentable', a, 'dette ${fmtMoney0(f.debt)}');
+    }
   }
 
   // ================================================================ Entrée et sortie d'entreprises
@@ -2132,6 +2210,10 @@ class Sim {
     f.vacancies = team;
     _lastEntry[ty] = day;
     firmsCreated++;
+    if (trace != null) {
+      _t('entrees_sorties', 'creation', f.name, f.id, 'entrée : demande non servie', why, paid,
+          'fondateur ${founder.name} ; ${fmtNum1(want)} ${goods[g]!.unit}/j non servis ; équipe $team');
+    }
     _log('info', '${founder.name} fonde ${f.name} avec ${fmtMoney0(paid)} : $why '
         '(${goods[g]!.label.toLowerCase()}, ${fmtNum1(want)} ${goods[g]!.unit}/j non servis).');
     return true;
@@ -2141,10 +2223,15 @@ class Sim {
   void _close(Firm f) {
     final repaid = modules.bankruptcy ? _repayFromCash(f) : 0.0;
     final lost = f.debt;
-    _writeOff(f);
+    _writeOff(f, 'fermeture');
     final owner = f.ownerId != null ? _cmap[f.ownerId!] : null;
     final left = f.money;
     if (left > 0) transfer(f, owner ?? state, left);
+    if (trace != null) {
+      _t('entrees_sorties', 'fermeture', f.name, f.id, 'sortie : aucun employé depuis ${params.exitIdleDays} jours',
+          'aucun employé', left, 'trésorerie rendue à ${owner?.name ?? 'l’État'} ; dette remboursée '
+              '${fmtMoney0(repaid)}, radiée ${fmtMoney0(lost)}');
+    }
     if (repaid > 0 || lost > 0) {
       _log('info', '${f.name} : ${fmtMoney0(repaid)} de dette remboursés par sa trésorerie, ${fmtMoney0(lost)} radiés.');
     }
@@ -2168,7 +2255,7 @@ class Sim {
     final capped = next > hi ? hi : lo;
     final up = next > hi;
     _net('drift', f.name, (next - capped).abs(), '${up ? 'hausse' : 'baisse'} de $kind',
-        '$what : ${fmtPct(next / old - 1)} ramené à ${fmtPct(capped / old - 1)}');
+        '$what : ${fmtPct(next / old - 1)} ramené à ${fmtPct(capped / old - 1)}', f.id);
     return capped;
   }
 
@@ -2272,7 +2359,7 @@ class Sim {
       final bill = f.wage * nw;
       f.vacancies = 0;
       if (nw > 0 && f.money < bill * 2) {
-        _fire(f, _cmap[f.workers[nw - 1]]);
+        _fire(f, _cmap[f.workers[nw - 1]], 'trésorerie sous 2 jours de salaires');
       } else if (desired > nw) {
         var affordable = affordablePosts(f);
         if (affordable < math.min(desired - nw, maxPostsPerDay)) {
@@ -2283,7 +2370,7 @@ class Sim {
       } else if (desired < nw - 1) {
         final k = math.min(nw - desired - 1, math.max(1, (nw * 0.08).ceil()));
         for (var i = 0; i < k; i++) {
-          _fire(f, _cmap[f.workers.last]);
+          _fire(f, _cmap[f.workers.last], 'effectif au-dessus du plan de production');
         }
       }
 
@@ -2315,7 +2402,14 @@ class Sim {
       f.dividends = 0;
       if (owner != null && f.money > reserve && !publicService(f)) {
         var d = (f.money - reserve) * p.dividendRate;
-        if (modules.dividendTest) d = solventDividend(f, d);
+        if (modules.dividendTest) {
+          final d0 = d;
+          d = solventDividend(f, d);
+          if (trace != null && d < d0) {
+            _t('institutions', 'dividende_retenu', f.name, f.id, 'I1 : test de solvabilité', _dividendCause(f),
+                d0 - d, 'dividende voulu ${fmtMoney0(d0)}, versé ${fmtMoney0(d)}');
+          }
+        }
         if (d > 0) {
           final net = transfer(f, owner, d * (1 - p.taxRate));
           final tax = transfer(f, state, d * p.taxRate);
@@ -2326,6 +2420,10 @@ class Sim {
           f.retained -= f.dividends;
           _flow(f.id.toString(), 'M', '\$dividendes', 1, net);
           if (tax > 0) _flow('M', 'E', '\$impôts', 1, tax);
+          if (trace != null) {
+            _t('compta', 'dividende', f.name, f.id, 'dividende : ${fmtPct(p.dividendRate, 0)} de la trésorerie au-delà '
+                'de la réserve', 'à ${owner.name}', net + tax, 'net ${fmtMoney0(net)}, impôt ${fmtMoney0(tax)}');
+          }
         }
       }
     }
@@ -2356,6 +2454,16 @@ class Sim {
   /// dividende qui laisserait en caisse moins que le seuil d'embauche des postes voulus (8 jours de salaire par employé,
   /// nouveaux compris, pour les postes que la règle d'embauche ouvrirait aujourd'hui) ; jamais plus que le bénéfice
   /// lissé du jour.
+  /// La contrainte du test de solvabilité qui a réduit le dividende (pour le journal complet).
+  String _dividendCause(Firm f) {
+    if (f.profitEma <= 0) return 'pas de bénéfice lissé';
+    final want = math.min(f.desired - f.workers.length, maxPostsPerDay);
+    final hire = want > 0 ? hireCashDays * f.wage * (f.workers.length + want) : 0.0;
+    final cap = params.dividendFromRetained ? f.retained : f.profitEma;
+    if (f.money - hire <= cap) return 'trésorerie nécessaire aux postes voulus';
+    return params.dividendFromRetained ? 'plafond : bénéfices non répartis' : 'plafond : bénéfice lissé du jour';
+  }
+
   double solventDividend(Firm f, double d) {
     if (f.profitEma <= 0) return 0;
     final want = math.min(f.desired - f.workers.length, maxPostsPerDay);
@@ -2385,6 +2493,10 @@ class Sim {
             if (rich == null || c.money > rich.money) rich = c;
           }
           if (rich != null && !identical(rich, owner) && rich.money - buffer > need * 2) {
+            if (trace != null) {
+              _t('entrees_sorties', 'rachat', f.name, f.id, 'filet : renflouement (rachat)',
+                  'le propriétaire n’a pas les moyens', 0, 'nouveau propriétaire ${rich.name}');
+            }
             f.ownerId = rich.id;
             owner = rich;
             surplus = rich.money - buffer;
@@ -2398,7 +2510,7 @@ class Sim {
             final amt = transfer(owner, f, want);
             _flow('M', f.id.toString(), '\$capital', 1, amt);
             _net('bailout', f.name, amt, bought ? 'après rachat' : 'par le propriétaire',
-                '${owner.name} ; caisse ${fmtMoney0(f.money - amt)} pour $nw poste(s)');
+                '${owner.name} ; caisse ${fmtMoney0(f.money - amt)} pour $nw poste(s)', f.id);
             if (day - f.lastRecapLog > 30) {
               _log('info', '${owner.name} renfloue ${f.name} (${fmtMoney0(amt)}).');
               f.lastRecapLog = day;
@@ -2421,6 +2533,10 @@ class Sim {
       e.paid += total;
       e.paidToday += total;
       _flow('E', 'M', '\$redistribution', 1, total);
+      if (trace != null) {
+        _t('compta', 'redistribution', 'État', null, 'redistribution du surplus de l’État', 'trésor au-delà de la réserve',
+            total, '${citizens.length} citoyens');
+      }
     }
   }
 
@@ -2570,6 +2686,7 @@ class Sim {
       }
     }
     _log('god', '${total >= 0 ? 'Injection de ' : 'Retrait de '}${fmtMoney0(total.abs())} → ${_targetLabel(target)}.');
+    if (trace != null) _t('compta', 'divin', _targetLabel(target), target.id, 'god mode', 'injection ou retrait', total);
     return total;
   }
 
@@ -2625,6 +2742,7 @@ class Sim {
     for (var i = 0; i < n; i++) {
       final c = _newCitizen(money: money);
       _godIn(c.money);
+      if (trace != null) _t('entrees_sorties', 'arrivee', c.name, c.id, 'god mode', 'immigration', c.money);
     }
     _log('god', '$n nouveaux citoyens arrivent avec ${fmtMoney0(money)} chacun.');
   }
@@ -2638,7 +2756,8 @@ class Sim {
     for (var i = 0; i < n && i < order.length; i++) {
       final c = order[i];
       if (firms.any((f) => f.ownerId == c.id)) continue;
-      if (c.employer != null) _fire(firm(c.employer!), c);
+      if (c.employer != null) _fire(firm(c.employer!), c, 'départ de la région');
+      if (trace != null) _t('entrees_sorties', 'depart', c.name, c.id, 'god mode', 'émigration', c.money);
       money += c.money;
       _godIn(-c.money);
       c.money = 0;
@@ -2697,7 +2816,7 @@ class Sim {
     }
     if (forgiveDebt && f.debt > 0) {
       notes.add('dette de ${fmtMoney0(f.debt)} effacée');
-      _writeOff(f);
+      _writeOff(f, 'dette effacée (god mode)');
     }
     if (notes.isNotEmpty) _log('god', '${f.name} : ${notes.join(', ')}.');
   }
@@ -2743,6 +2862,7 @@ class Sim {
     }
     f.vacancies = 2;
     _log('god', 'Nouvelle entreprise : ${f.name} (${templates[type]!.label.toLowerCase()}, capital ${fmtMoney0(money)}).');
+    if (trace != null) _t('entrees_sorties', 'creation', f.name, f.id, 'god mode', 'entreprise ajoutée', f.money);
     return f;
   }
 
@@ -2750,11 +2870,12 @@ class Sim {
     final f = firm(id);
     if (f == null) return;
     for (final wid in List<int>.from(f.workers)) {
-      _fire(f, _cmap[wid]);
+      _fire(f, _cmap[wid], 'fermeture de l’entreprise (god mode)');
     }
     if (modules.bankruptcy) _repayFromCash(f);
     final hadDebt = f.debt > 0;
-    _writeOff(f);
+    _writeOff(f, 'fermeture (god mode)');
+    if (trace != null) _t('entrees_sorties', 'retrait', f.name, f.id, 'god mode', 'entreprise retirée', f.money);
     final owner = f.ownerId != null ? _cmap[f.ownerId!] : null;
     if (owner != null) {
       transfer(f, owner, f.money);
@@ -2782,7 +2903,7 @@ class Sim {
       f.inv[g] = 0;
     }
     final debt = f.debt;
-    _writeOff(f);
+    _writeOff(f, 'faillite (god mode)');
     _log('god', 'Faillite de ${f.name} : ${fmtMoney0(lost)} de trésorerie et tous les stocks perdus'
         '${debt > 0 ? ', ${fmtMoney0(debt)} de dette radiés' : ''}.');
   }

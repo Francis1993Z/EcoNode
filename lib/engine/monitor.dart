@@ -80,6 +80,13 @@ const Set<String> criticalAlerts = {
   'chomageHaut', 'faim', 'sansAbri', 'sante', 'inflationJour', 'inflation100', 'invariant',
 };
 
+/// Une ligne de la liste des agents impliqués : le texte, et l'agent qu'il cite (pour ouvrir son inspecteur).
+typedef AgentLine = (String, AgentRef?);
+
+AgentRef _firm(Firm f) => AgentRef('firm', f.id);
+AgentRef _citizen(Citizen c) => AgentRef('citizen', c.id);
+List<AgentLine> _plain(List<String> l) => [for (final t in l) (t, null)];
+
 class Monitor {
   MonitorConfig cfg = MonitorConfig();
   final Map<String, Alert> active = {};
@@ -96,6 +103,35 @@ class Monitor {
     _streak.clear();
   }
 
+  /// État du moniteur pour un instantané (snapshot.dart) : seuils, alertes, compteurs, séries de jours en cours.
+  Map<String, dynamic> toJson() => {
+        'cfg': _cfgJson(cfg),
+        'active': [for (final a in active.values) _alertJson(a)],
+        'closed': [for (final a in closed) _alertJson(a)],
+        'opened': opened,
+        'alertDays': alertDays,
+        'streak': _streak,
+      };
+
+  void loadJson(Map j) {
+    clear();
+    cfg = _cfgFrom(j['cfg'] as Map);
+    for (final a in j['active'] as List) {
+      final x = _alertFrom(a as Map);
+      active[x.key] = x;
+    }
+    closed.addAll([for (final a in j['closed'] as List) _alertFrom(a as Map)]);
+    for (final e in (j['opened'] as Map).entries) {
+      opened[e.key as String] = e.value as int;
+    }
+    for (final e in (j['alertDays'] as Map).entries) {
+      alertDays[e.key as String] = e.value as int;
+    }
+    for (final e in (j['streak'] as Map).entries) {
+      _streak[e.key as String] = e.value as int;
+    }
+  }
+
   int get criticalCount => active.values.where((a) => a.critical).length;
 
   /// Alertes actives, les critiques d'abord, puis les plus anciennes.
@@ -107,7 +143,7 @@ class Monitor {
     final seen = <String>{};
 
     void cond(String key, String type, bool on, int persist, double value, double threshold, String Function() what,
-        List<String> Function() agents) {
+        List<AgentLine> Function() agents, {AgentRef? subject}) {
       if (!on) return;
       seen.add(key);
       final st = (_streak[key] ?? 0) + 1;
@@ -115,7 +151,9 @@ class Monitor {
       if (st < persist) return;
       final a = active[key];
       if (a == null) {
-        final na = Alert(key, type, criticalAlerts.contains(type), s.day - st + 1, what(), value, threshold, agents());
+        final l = agents();
+        final na = Alert(key, type, criticalAlerts.contains(type), s.day - st + 1, what(), value, threshold,
+            [for (final x in l) x.$1], refs: [for (final x in l) x.$2], subject: subject);
         active[key] = na;
         opened[type] = (opened[type] ?? 0) + 1;
         s.logAlert(na, opened: true);
@@ -123,7 +161,11 @@ class Monitor {
         a.what = what();
         a.value = value;
         a.threshold = threshold;
-        if (s.day % 5 == 0) a.agents = agents();
+        if (s.day % 5 == 0) {
+          final l = agents();
+          a.agents = [for (final x in l) x.$1];
+          a.refs = [for (final x in l) x.$2];
+        }
       }
       alertDays[type] = (alertDays[type] ?? 0) + 1;
     }
@@ -182,7 +224,7 @@ class Monitor {
       cond('efficacite', 'efficacite', avg < c.efficiencyLow, c.efficiencyDays, avg, c.efficiencyLow,
           () => 'efficacité moyenne des employés ${_dec(avg, 2)} (seuil ${_dec(c.efficiencyLow, 2)}, '
               '${c.efficiencyDays} j de suite) : un poste demande ${_dec(1 / avg, 1)} employé(s)',
-          () => _factors({'santé': sante / m, 'faim': faim / m, 'logement': logement / m, 'moral': moral / m}));
+          () => _plain(_factors({'santé': sante / m, 'faim': faim / m, 'logement': logement / m, 'moral': moral / m})));
     }
 
     // ---- marché du travail : postes ouverts que personne ne vient pourvoir (pénurie), et postes voulus que les
@@ -213,10 +255,10 @@ class Monitor {
     cond('prestations', 'prestations', cut < 1 - 1e-9, 1, cut, 1,
         () => 'le trésor ne verse que ${fmtPct(cut)} des prestations dues aux sans-emploi '
             '(trésor ${fmtMoney0(s.state.money)})',
-        () => [
+        () => _plain([
               if (s.modules.insurance) '${s.state.eiClaimants} prestataires de l’assurance-emploi',
               if (s.modules.insurance) '${s.state.assistRecipients} bénéficiaires de l’aide sociale',
-            ]);
+            ]));
 
     // ---- services publics : attente
     for (final g in const ['soins', 'cours']) {
@@ -251,14 +293,14 @@ class Monitor {
       final d1 = prev.cpi > 0 ? h.cpi / prev.cpi - 1 : 0.0;
       cond('inflationJour', 'inflationJour', d1.abs() > c.inflationDaily, 1, d1, c.inflationDaily,
           () => 'indice des prix ${_signed(d1)} en un jour (seuil ±${fmtPct(c.inflationDaily, 0)})',
-          () => _movers(s, prev, h));
+          () => _plain(_movers(s, prev, h)));
     }
     if (hist.length > 100) {
       final old = hist[hist.length - 101];
       final d100 = old.cpi > 0 ? h.cpi / old.cpi - 1 : 0.0;
       cond('inflation100', 'inflation100', d100.abs() > c.inflation100, 1, d100, c.inflation100,
           () => 'indice des prix ${_signed(d100)} en 100 jours (seuil ±${fmtPct(c.inflation100, 0)})',
-          () => _movers(s, old, h));
+          () => _plain(_movers(s, old, h)));
     }
 
     // ---- entreprises
@@ -268,20 +310,22 @@ class Monitor {
         final stock = f.inv[g] ?? 0;
         cond('stockVide:${f.id}', 'stockVide', stock < 1, c.stockEmptyDays + 1, stock, 1,
             () => '${f.name} : stock de ${goods[g]!.label.toLowerCase()} vide depuis plus de ${c.stockEmptyDays} j',
-            () => [f.name]);
+            () => [(f.name, _firm(f))], subject: _firm(f));
         final days = stock / math.max(f.demandEma[g] ?? 0, 0.05);
         cond('stockPlein:${f.id}', 'stockPlein', days > c.stockFullDays, c.stockFullPersist, days, c.stockFullDays,
             () => '${f.name} : ${_dec(days, 0)} jours de ventes en stock (seuil ${_dec(c.stockFullDays, 0)})',
-            () => [f.name]);
+            () => [(f.name, _firm(f))], subject: _firm(f));
       }
       cond('sansEmploye:${f.id}', 'sansEmploye', f.workers.isEmpty, c.noStaffDays + 1, 0, 0,
-          () => '${f.name} n’a plus d’employé depuis plus de ${c.noStaffDays} j', () => [f.name]);
+          () => '${f.name} n’a plus d’employé depuis plus de ${c.noStaffDays} j', () => [(f.name, _firm(f))],
+          subject: _firm(f));
       var sold = 0.0;
       for (final v in f.sold.values) {
         sold += v;
       }
       cond('sansClient:${f.id}', 'sansClient', sold <= eps, c.noClientDays + 1, 0, 0,
-          () => '${f.name} n’a rien vendu depuis plus de ${c.noClientDays} j', () => [f.name]);
+          () => '${f.name} n’a rien vendu depuis plus de ${c.noClientDays} j', () => [(f.name, _firm(f))],
+          subject: _firm(f));
       // prix aberrant : bien au-dessus du prix d'équilibre du départ, corrigé de la hausse des salaires
       if (f.workers.isNotEmpty) {
         final ref = s.referencePrice(g);
@@ -294,7 +338,7 @@ class Monitor {
               'référence (${_money(ref)}, corrigée des salaires) depuis ${c.priceAberrantDays} j ; coût de revient '
               '${_money(f.unitCostCache[g] ?? 0)}, équipe utilisée à ${fmtPct(math.min(util, 9.99), 0)}'
               '${f.inputLimited ? ', limitée par ses intrants' : ''}';
-        }, () => [f.name]);
+        }, () => [(f.name, _firm(f))], subject: _firm(f));
       }
     }
 
@@ -303,7 +347,7 @@ class Monitor {
         () => 'fonds propres de ${fmtMoney0(s.bank.equity)} pour ${fmtMoney0(s.totalDebt())} de prêts',
         () => [
               for (final f in s.firms.where((f) => f.missedPayments > 0).take(4))
-                '${f.name} (${f.missedPayments} j de retard)'
+                ('${f.name} (${f.missedPayments} j de retard)', _firm(f))
             ]);
 
     // ---- invariant comptable
@@ -311,12 +355,12 @@ class Monitor {
     final w = inv.worst;
     cond('invariant', 'invariant', w > c.invariantTol, 1, w, c.invariantTol,
         () => 'écart de ${w.toStringAsExponential(2)} \$ (seuil ${c.invariantTol.toStringAsExponential(0)} \$)',
-        () => [
+        () => _plain([
               'masse ${inv.money.toStringAsExponential(2)}',
               'prêts ${inv.loans.toStringAsExponential(2)}',
               'bilan ${inv.bank.toStringAsExponential(2)}',
               'ΔM ${inv.flows.toStringAsExponential(2)}',
-            ]);
+            ]));
 
     // fermer les alertes dont la condition ne tient plus
     for (final k in active.keys.toList()) {
@@ -338,7 +382,7 @@ class Monitor {
   static int _vacancies(Sim s) => s.firms.fold(0, (a, f) => a + f.vacancies);
 
   /// Entreprises qui ont le plus réduit leurs effectifs en 30 jours.
-  static List<String> _shrinking(Sim s) {
+  static List<AgentLine> _shrinking(Sim s) {
     final drops = <Firm, int>{};
     for (final f in s.firms) {
       if (f.hist.length < 31) continue;
@@ -346,32 +390,35 @@ class Monitor {
       if (d > 0) drops[f] = d;
     }
     final l = drops.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    return [for (final e in l.take(4)) '${e.key.name} (−${e.value} empl. en 30 j)'];
+    return [for (final e in l.take(4)) ('${e.key.name} (−${e.value} empl. en 30 j)', _firm(e.key))];
   }
 
   static String _money(double v) => v < 100 ? '${_dec(v, 1)} \$' : fmtMoney0(v);
 
   /// Hôpitaux : effectifs, visites produites et demandées, intrants qui manquent ; file d'attente si public.
-  static List<String> _hospitals(Sim s) {
+  static List<AgentLine> _hospitals(Sim s) {
     final hs = s.firms.where((f) => f.outputs.containsKey('soins')).toList();
-    if (hs.isEmpty) return const ['aucun hôpital'];
+    if (hs.isEmpty) return const [('aucun hôpital', null)];
     final st = s.services['soins']!;
     return [
       ..._providers(s, 'soins'),
-      if (s.publicGood('soins')) 'file : ${st.queue} personne(s), attente moyenne ${_dec(st.wait, 1)} j',
+      if (s.publicGood('soins')) ('file : ${st.queue} personne(s), attente moyenne ${_dec(st.wait, 1)} j', null),
     ];
   }
 
   /// Établissements qui produisent un service : effectifs, production et demande, intrants qui manquent.
-  static List<String> _providers(Sim s, String g) {
+  static List<AgentLine> _providers(Sim s, String g) {
     final l = s.firms.where((f) => f.outputs.containsKey(g)).toList();
-    if (l.isEmpty) return [g == 'soins' ? 'aucun hôpital' : 'aucune école'];
+    if (l.isEmpty) return [(g == 'soins' ? 'aucun hôpital' : 'aucune école', null)];
     final unit = g == 'soins' ? 'visite(s)' : 'cours';
     return [
       for (final f in l.take(3))
-        '${f.name} : ${f.workers.length} employé(s) pour ${f.desired} voulus, '
-            '${_dec(f.produced[g] ?? 0, 1)} $unit/j pour ${_dec(f.demandEma[g] ?? 0, 0)} demandés'
-            '${f.inputLimited ? ' ; limité par ses intrants${_short(s, f)}' : ''}',
+        (
+          '${f.name} : ${f.workers.length} employé(s) pour ${f.desired} voulus, '
+              '${_dec(f.produced[g] ?? 0, 1)} $unit/j pour ${_dec(f.demandEma[g] ?? 0, 0)} demandés'
+              '${f.inputLimited ? ' ; limité par ses intrants${_short(s, f)}' : ''}',
+          _firm(f)
+        ),
     ];
   }
 
@@ -392,18 +439,21 @@ class Monitor {
   }
 
   /// Entreprises dont des postes ouverts restent non pourvus, les plus anciens d'abord.
-  static List<String> _unfilled(Sim s) {
+  static List<AgentLine> _unfilled(Sim s) {
     final l = s.firms.where((f) => f.vacancies > 0 && f.unfilledDays >= 1).toList()
       ..sort((a, b) => b.unfilledDays.compareTo(a.unfilledDays));
     return [
       for (final f in l.take(4))
-        '${f.name} : ${f.vacancies} poste(s) de ${classLabels[f.template.skill].toLowerCase()} ouvert(s) depuis '
-            '${f.unfilledDays} j',
+        (
+          '${f.name} : ${f.vacancies} poste(s) de ${classLabels[f.template.skill].toLowerCase()} ouvert(s) depuis '
+              '${f.unfilledDays} j',
+          _firm(f)
+        ),
     ];
   }
 
   /// Entreprises qui voudraient embaucher sans en avoir les moyens.
-  static List<String> _blocked(Sim s) {
+  static List<AgentLine> _blocked(Sim s) {
     final l = s.firms.where((f) {
       final gap = f.desired - f.workers.length;
       return gap > f.vacancies && s.affordablePosts(f) < math.min(gap, 3);
@@ -411,20 +461,23 @@ class Monitor {
       ..sort((a, b) => (b.desired - b.workers.length).compareTo(a.desired - a.workers.length));
     return [
       for (final f in l.take(4))
-        '${f.name} : ${f.workers.length} employé(s), ${f.desired} voulus, caisse de '
-            '${_dec(f.money / math.max(1.0, f.wage * math.max(1, f.workers.length)), 1)} j de salaires '
-            '(il en faut ${Sim.hireCashDays} par employé, nouveaux compris)',
+        (
+          '${f.name} : ${f.workers.length} employé(s), ${f.desired} voulus, caisse de '
+              '${_dec(f.money / math.max(1.0, f.wage * math.max(1, f.workers.length)), 1)} j de salaires '
+              '(il en faut ${Sim.hireCashDays} par employé, nouveaux compris)',
+          _firm(f)
+        ),
     ];
   }
 
   /// Entreprises qui cherchent à embaucher.
-  static List<String> _hiring(Sim s) {
+  static List<AgentLine> _hiring(Sim s) {
     final l = s.firms.where((f) => f.vacancies > 0).toList()..sort((a, b) => b.vacancies.compareTo(a.vacancies));
-    return [for (final f in l.take(4)) '${f.name} (${f.vacancies} poste(s), ${f.unfilledDays} j)'];
+    return [for (final f in l.take(4)) ('${f.name} (${f.vacancies} poste(s), ${f.unfilledDays} j)', _firm(f))];
   }
 
   /// Citoyens en détresse : résumé des causes, puis les cas les plus anciens.
-  static List<String> _people(List<Citizen> list, int Function(Citizen) days, String Function(Citizen) cause) {
+  static List<AgentLine> _people(List<Citizen> list, int Function(Citizen) days, String Function(Citizen) cause) {
     final causes = <String, int>{};
     for (final c in list) {
       final k = cause(c);
@@ -433,19 +486,21 @@ class Monitor {
     final cs = causes.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     final sorted = List<Citizen>.from(list)..sort((a, b) => days(b).compareTo(days(a)));
     return [
-      'causes : ${cs.map((e) => '${e.key} ×${e.value}').join(', ')}',
-      for (final c in sorted.take(5)) '${c.name} (${days(c)} j, ${cause(c)})',
+      ('causes : ${cs.map((e) => '${e.key} ×${e.value}').join(', ')}', null),
+      for (final c in sorted.take(5)) ('${c.name} (${days(c)} j, ${cause(c)})', _citizen(c)),
     ];
   }
 
   /// Citoyens les plus riches et leur part de la richesse.
-  static List<String> _richest(Sim s) {
+  static List<AgentLine> _richest(Sim s) {
     var total = 0.0;
     for (final c in s.citizens) {
       total += math.max(0.0, c.money);
     }
     final l = List<Citizen>.from(s.citizens)..sort((a, b) => b.money.compareTo(a.money));
-    return [for (final c in l.take(3)) '${c.name} (${fmtPct(total > 0 ? c.money / total : 0.0)} de la richesse)'];
+    return [
+      for (final c in l.take(3)) ('${c.name} (${fmtPct(total > 0 ? c.money / total : 0.0)} de la richesse)', _citizen(c))
+    ];
   }
 
   /// Biens du panier dont le prix a le plus varié entre deux relevés.
@@ -459,3 +514,109 @@ class Monitor {
     return [for (final e in l.take(4)) '${goods[e.key]!.label} ${_signed(e.value)}'];
   }
 }
+
+// ------------------------------------------------------------------ instantanés
+
+Object? _jd(double v) => v.isFinite ? v : (v.isNaN ? 'NaN' : (v > 0 ? 'Infinity' : '-Infinity'));
+
+double _jr(Object? v) {
+  if (v is num) return v.toDouble();
+  switch (v) {
+    case 'NaN':
+      return double.nan;
+    case 'Infinity':
+      return double.infinity;
+    case '-Infinity':
+      return double.negativeInfinity;
+  }
+  throw FormatException('Instantané : nombre attendu, lu $v');
+}
+
+Object? _refJson(AgentRef? r) => r == null ? null : [r.kind, r.id];
+AgentRef? _refFrom(Object? v) => v == null ? null : AgentRef((v as List)[0] as String, v[1] as int);
+
+Map<String, Object?> _alertJson(Alert a) => {
+      'key': a.key,
+      'type': a.type,
+      'critical': a.critical,
+      'since': a.since,
+      'until': a.until,
+      'what': a.what,
+      'value': _jd(a.value),
+      'threshold': _jd(a.threshold),
+      'agents': a.agents,
+      'refs': [for (final r in a.refs) _refJson(r)],
+      'subject': _refJson(a.subject),
+    };
+
+Alert _alertFrom(Map j) => Alert(j['key'] as String, j['type'] as String, j['critical'] as bool, j['since'] as int,
+    j['what'] as String, _jr(j['value']), _jr(j['threshold']), (j['agents'] as List).cast<String>(),
+    refs: [for (final r in j['refs'] as List) _refFrom(r)], subject: _refFrom(j['subject']))
+  ..until = j['until'] as int?;
+
+Map<String, Object?> _cfgJson(MonitorConfig c) => {
+      'unempHigh': _jd(c.unempHigh),
+      'unempDays': c.unempDays,
+      'fullEmploymentDays': c.fullEmploymentDays,
+      'distressShare': _jd(c.distressShare),
+      'distressDays': c.distressDays,
+      'giniHigh': _jd(c.giniHigh),
+      'giniLow': _jd(c.giniLow),
+      'giniDays': c.giniDays,
+      'medianLowDays': _jd(c.medianLowDays),
+      'medianHighDays': _jd(c.medianHighDays),
+      'medianDays': c.medianDays,
+      'inflationDaily': _jd(c.inflationDaily),
+      'inflation100': _jd(c.inflation100),
+      'stockEmptyDays': c.stockEmptyDays,
+      'stockFullDays': _jd(c.stockFullDays),
+      'stockFullPersist': c.stockFullPersist,
+      'noStaffDays': c.noStaffDays,
+      'noClientDays': c.noClientDays,
+      'invariantTol': _jd(c.invariantTol),
+      'healthLow': _jd(c.healthLow),
+      'healthDays': c.healthDays,
+      'efficiencyLow': _jd(c.efficiencyLow),
+      'efficiencyDays': c.efficiencyDays,
+      'laborShortage': _jd(c.laborShortage),
+      'laborShortageDays': c.laborShortageDays,
+      'blockedHiring': _jd(c.blockedHiring),
+      'blockedHiringDays': c.blockedHiringDays,
+      'waitLong': _jd(c.waitLong),
+      'waitDays': c.waitDays,
+      'priceAberrant': _jd(c.priceAberrant),
+      'priceAberrantDays': c.priceAberrantDays,
+    };
+
+MonitorConfig _cfgFrom(Map j) => MonitorConfig()
+  ..unempHigh = _jr(j['unempHigh'])
+  ..unempDays = j['unempDays'] as int
+  ..fullEmploymentDays = j['fullEmploymentDays'] as int
+  ..distressShare = _jr(j['distressShare'])
+  ..distressDays = j['distressDays'] as int
+  ..giniHigh = _jr(j['giniHigh'])
+  ..giniLow = _jr(j['giniLow'])
+  ..giniDays = j['giniDays'] as int
+  ..medianLowDays = _jr(j['medianLowDays'])
+  ..medianHighDays = _jr(j['medianHighDays'])
+  ..medianDays = j['medianDays'] as int
+  ..inflationDaily = _jr(j['inflationDaily'])
+  ..inflation100 = _jr(j['inflation100'])
+  ..stockEmptyDays = j['stockEmptyDays'] as int
+  ..stockFullDays = _jr(j['stockFullDays'])
+  ..stockFullPersist = j['stockFullPersist'] as int
+  ..noStaffDays = j['noStaffDays'] as int
+  ..noClientDays = j['noClientDays'] as int
+  ..invariantTol = _jr(j['invariantTol'])
+  ..healthLow = _jr(j['healthLow'])
+  ..healthDays = j['healthDays'] as int
+  ..efficiencyLow = _jr(j['efficiencyLow'])
+  ..efficiencyDays = j['efficiencyDays'] as int
+  ..laborShortage = _jr(j['laborShortage'])
+  ..laborShortageDays = j['laborShortageDays'] as int
+  ..blockedHiring = _jr(j['blockedHiring'])
+  ..blockedHiringDays = j['blockedHiringDays'] as int
+  ..waitLong = _jr(j['waitLong'])
+  ..waitDays = j['waitDays'] as int
+  ..priceAberrant = _jr(j['priceAberrant'])
+  ..priceAberrantDays = j['priceAberrantDays'] as int;

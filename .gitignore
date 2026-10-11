@@ -7,3 +7,6 @@ build/
 .idea/
 android/.gradle/
 android/local.properties
+# journaux et instantanés de tool/partie.dart
+traces/
+instantanes/

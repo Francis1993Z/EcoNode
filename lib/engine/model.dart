@@ -231,6 +231,7 @@ final Map<String, String> producerOf = {
     for (final g in e.value.outputs.keys) g: e.key,
 };
 
+/// Paramètres de la partie. Tout paramètre ajouté doit l'être aussi dans les instantanés (snapshot.dart).
 class Params {
   int population = 240;
   double startWallet = 3000;
@@ -633,6 +634,13 @@ class NetStats {
   }
 }
 
+/// Un agent cité par une alerte : entreprise ou citoyen (l'interface ouvre son inspecteur).
+class AgentRef {
+  final String kind; // firm | citizen
+  final int id;
+  const AgentRef(this.kind, this.id);
+}
+
 /// Une anomalie détectée : quoi, depuis quand, valeur, seuil, agents impliqués.
 class Alert {
   final String key; // type, ou type:id de l'entreprise
@@ -644,8 +652,39 @@ class Alert {
   double value;
   double threshold;
   List<String> agents;
-  Alert(this.key, this.type, this.critical, this.since, this.what, this.value, this.threshold, this.agents);
+  List<AgentRef?> refs; // l'agent de chaque ligne de [agents], s'il y en a un
+  final AgentRef? subject; // l'entreprise que l'alerte concerne (alertes par entreprise)
+  Alert(this.key, this.type, this.critical, this.since, this.what, this.value, this.threshold, this.agents,
+      {List<AgentRef?>? refs, this.subject})
+      : refs = refs ?? List<AgentRef?>.filled(agents.length, null);
   bool get active => until == null;
+}
+
+/// Un événement du journal complet (outil en ligne de commande, voir trace.dart).
+class TraceEvent {
+  final int day;
+  final String category; // compta | travail | credit | filets | institutions | entrees_sorties | alertes
+  final String type;
+  final String agent; // citoyen ou entreprise ('' : l'économie entière)
+  final int? id; // identifiant de l'agent
+  final String rule; // règle déclenchée
+  final String cause;
+  final double amount; // $ (0 si sans objet)
+  final String detail;
+  const TraceEvent(this.day, this.category, this.type, this.agent, this.id, this.rule, this.cause, this.amount,
+      [this.detail = '']);
+
+  Map<String, Object?> toJson() => {
+        'jour': day,
+        'categorie': category,
+        'type': type,
+        'agent': agent,
+        'id': id,
+        'regle': rule,
+        'cause': cause,
+        'montant': amount.isFinite ? amount : null,
+        if (detail.isNotEmpty) 'detail': detail,
+      };
 }
 
 /// Flux monétaires du jour qui changent la masse détenue par le public (dépôts).
