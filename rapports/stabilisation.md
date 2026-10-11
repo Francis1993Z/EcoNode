@@ -975,3 +975,111 @@ noyau. L'anti-crédit-fou ne sert plus (I4).
    insolvable (graine 5).
 5. **Mesure.** Sur 5 graines, la sensibilité de l'économie aux petites perturbations pèse autant que l'effet des petites
    institutions (I5) : plus de graines départageraient.
+
+## 5. Outils de mesure
+
+### Tâche 1 — Flux de hasard indépendants (11 octobre 2026)
+
+Aucune règle économique ne change. Référence : Klein et al. 2024, « Noise-free comparison of stochastic agent-based
+simulations using common random numbers » (arXiv 2409.02086).
+
+**Pourquoi.** Avec un seul générateur tiré dans l'ordre des appels, toute différence dans le nombre de tirages (une
+entreprise qui ferme, une épidémie sans effet) décalait tous les tirages suivants. Comparer deux règles sur une même
+graine revenait donc à comparer deux parties différentes.
+
+**Ce qui a changé.**
+
+- **Tirages.** `draw(flux, id, sous-tirage)` ne dépend que de (graine, flux, jour, agent, sous-tirage), jamais de l'ordre
+  des appels : Mulberry32 initialisé par `hash32(hash32(hash32(hash32(graine, code du flux), jour), id), sous-tirage)`.
+  `hash32` est une étape de MurmurHash3 suivie de son brassage final, avec la même arithmétique 32 bits que Mulberry32
+  (masques, multiplication en deux moitiés de 16 bits).
+- **16 flux** (`enum Flux`) : traits, classes, recrutement, propriétaire, embauche, départ, maladie, ordinateur, études,
+  loisirs, consommation, achats, capital, offres, prix, divin. Chacun a un code fixe : en ajouter un ne change pas les
+  tirages des autres. La création d'entreprise n'a pas de flux, car elle ne tire rien (le fondateur est le citoyen le
+  plus riche).
+- **Sous-tirages**, quand une même décision tire plusieurs fois pour un même agent le même jour :
+  - traits : qualification, argent, ambition, ordinateur, nom ;
+  - gravité de la maladie ;
+  - loisirs : désir × 64 + rang de l'achat ;
+  - prix : rang du bien ;
+  - offres : (acheteur, bien, n-ième achat de ce bien dans la journée, vendeur) ;
+  - god mode : numéro de l'action.
+
+  Quand l'État achète pour un citoyen (aide alimentaire, abri, soins, cours), les tirages sont ceux de ce citoyen.
+- **Ordres du jour.** Les 5 mélanges de Fisher-Yates (premier recrutement, chômeurs, achats des entreprises, passage des
+  ménages, phase du capital) et la répartition des qualifications au départ sont remplacés par un tri selon une clé
+  hachée (graine, flux, jour, id). Retirer un agent ne change pas l'ordre relatif des autres.
+- **Identifiants stables, jamais réutilisés.** Les citoyens sont numérotés à partir de 1. Une entreprise reçoit
+  100 000 + 10 000 × (rang de son type) + (rang de création dans ce type). Avant, citoyens et entreprises partageaient
+  un compteur : une entreprise créée en plus décalait les identifiants, donc les tirages, de tous les agents créés
+  ensuite.
+- **`math.pow` retiré du gain technologique.** Il est remplacé par des multiplications successives. Mesuré :
+  `math.pow(1,15, 3)` diffère d'un bit entre la VM et JavaScript (…dd2d contre …dd2e). Une entreprise au niveau
+  technologique 4 aurait fait diverger le web et Android.
+
+**Tests** (23, tous verts sur la VM ; les 16 tests existants passent sans modification) :
+
+- valeurs de référence de `hash32` et des tirages, et empreinte d'une partie de 150 jours (`test/hasard_test.dart`) ;
+- 10⁵ tirages par flux : moyenne à moins de 0,005 de 0,5, variance à moins de 0,002 de 1/12 ; corrélation entre deux
+  flux et entre agents voisins sous 0,015 (écart type attendu : 0,003) ;
+- ordre du jour : retirer un agent ne change pas l'ordre des 299 autres ;
+- les tirages d'un agent ne dépendent pas de la taille de la population ;
+- une institution qui ne mord jamais (I4 sans crédit, I2 sans santé ni éducation) : partie identique au tirage près sur
+  600 jours ;
+- une épidémie qui ne frappe personne : partie identique sur 300 jours. Avec l'ancien générateur, ses 240 tirages
+  décalaient toute la suite.
+
+**Parité VM / web.** `tool/parite.dart` affiche des hachages, 16 tirages, et l'empreinte jour par jour de deux parties
+de 400 jours, les nombres écrits bit à bit. Les sorties sont identiques sur la VM et en JavaScript (dart2js, en `-O2` et
+en `-O4` comme `flutter build web`, exécuté par Node 25). `flutter test --platform chrome` n'a pas pu tourner : ce poste
+n'a pas Chrome, et le lanceur de tests ne se connecte pas à Edge. Android (Dart compilé à l'avance) n'a pas été lancé
+sur un appareil ; il a la même arithmétique que la VM.
+
+**Ce que les flux indépendants changent aux comparaisons, mesuré.** 10 graines, sans filets, 1 500 jours : chaque partie
+avec, puis sans une institution.
+
+| | Ancien générateur | Flux indépendants |
+|---|---|---|
+| I5 : jour de la première divergence | 77 à 1 018 (une graine identique) | 78 à 166 (une graine identique) |
+| I5 : écart moyen du chômage entre les deux parties | 4,5 points | 4,9 points |
+| I5 : écart type de l'effet estimé entre graines | 1,4 point | 3,0 points (1,2 sans la graine 5, qui s'effondre d'un côté) |
+| I1 : jour de la première divergence | 2 ou 3 | 2 ou 3 |
+| I1 : écart moyen du chômage entre les deux parties | 28,4 points | 30,2 points |
+| I1 : écart type de l'effet estimé entre graines | 27,3 points | 22,1 points |
+
+Les flux indépendants suppriment le décalage artificiel des tirages : les tests le prouvent. Ils ne suppriment pas la
+divergence des parties. Celle-ci commence le jour où l'institution mord pour la première fois, puis grandit par
+l'économie elle-même : quelques milliers de dollars en plus ou en moins changent des achats, puis des prix, puis des
+embauches. En 100 à 300 jours, les deux parties sont aussi différentes que deux graines distinctes. Le bruit des
+comparaisons est donc surtout endogène : il faudra plus de graines et des comparaisons appariées (tâche 2).
+
+**Nouvelle référence. Les anciennes références ne sont plus comparables** (`stabilite-avant.json`, `tache*`,
+`institutions-*`, `i1-*` à `i5-*`) : mêmes règles, autres tirages. Nouvelle référence :
+[`crn-reference-complet.md`](crn-reference-complet.md) et [`crn-reference-noyau.md`](crn-reference-noyau.md).
+Comparée au dernier rapport (I5), qui avait exactement le même modèle, elle mesure le bruit d'un protocole à 5 graines :
+
+| Indicateur (5 graines) | Anciens tirages | Nouveaux tirages |
+|---|---|---|
+| Sans filets : chômage moyen | 8,0 % | 10,2 % |
+| Sans filets : faim moyenne | 5,5 % | 8,6 % |
+| Sans filets : sans-abri moyen | 2,0 % | 2,8 % |
+| Sans filets : jours de Caisse insolvable | 1 277 | 0 |
+| Sans filets : jours de prestations réduites | 0 | 219 |
+| Avec filets : chômage moyen | 8,0 % | 9,0 % |
+| Avec filets : anti-famine / 50 j | 0,14 | 2,2 |
+| Noyau : renflouements / 50 j | 8,9 | 13,4 |
+| Noyau, avec filets : Gini moyen | 0,20 | 0,14 |
+
+Rien n'a changé dans l'économie : ces écarts sont du bruit. Ils sont du même ordre que plusieurs effets attribués aux
+institutions I1 à I5 (par exemple I5 : chômage sans filets 9,2 → 8,0 %). Ces effets sont à revoir avec le protocole
+statistique de la tâche 2.
+
+**Coût.** Le protocole complet passe de ~155 s à 164 s, le noyau de ~166 s à 184 s.
+
+**Limites.**
+
+- Les tests statistiques sont simples (moyenne, variance, corrélations), pas une batterie complète comme TestU01 ou
+  PractRand.
+- Au plus 9 999 entreprises d'un même type par partie, pour garder des identifiants stables.
+- Un agent qui n'existe que dans une des deux parties a forcément un identifiant à lui ; la comparaison reste appariée
+  pour tous les autres.

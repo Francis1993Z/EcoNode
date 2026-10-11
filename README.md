@@ -90,12 +90,15 @@ flutter build web
   `sim.dart` (simulation, filets, invariants), `monitor.dart` (détecteurs d'anomalies).
 - `lib/ui/` : contrôleur, disposition et dessin du graphe, inspecteurs, onglets Diagnostic, God mode, Économie, Modèle.
 - `tool/stabilite.dart` : protocole de stabilité en ligne de commande.
+- `tool/parite.dart` : empreinte d'une partie, à comparer entre la VM et la version JavaScript.
 - `rapports/` : rapports du protocole et plan de stabilisation.
-- `test/engine_test.dart` : déterminisme, invariants exacts à chaque jour, filets et détecteurs provoqués.
+- `test/engine_test.dart` : déterminisme, invariants exacts à chaque jour, filets, détecteurs et institutions provoqués.
+- `test/hasard_test.dart` : flux de hasard (valeurs de référence VM / web, indépendance, ordre du jour stable).
 
 ## État
 
-`flutter analyze` ne signale rien et `flutter test` passe (16 tests). Tâches 1, 2, 3, 4, 5, 7 et 8 du plan de
+`flutter analyze` ne signale rien et `flutter test` passe (23 tests). Le hasard est en flux indépendants (nombres
+aléatoires communs) : une même graine donne la même partie sur la VM et en JavaScript (`tool/parite.dart`). Tâches 1, 2, 3, 4, 5, 7 et 8 du plan de
 stabilisation faites (coût de revient réel, intrants secondaires non bloquants, prix et salaires limités à 1,5 %/j,
 consommation stock-flux, entrée et sortie d'entreprises, fonds de roulement, Caisse capitalisée et prudente). Avec
 filets, la partie est jouable (chômage 8 %, faim ≈ 0 %). Les institutions I1 à I5 sont en place : sans filets, le

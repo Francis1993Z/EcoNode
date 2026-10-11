@@ -29,6 +29,51 @@ class Mulberry32 {
   }
 }
 
+/// Mélange deux entiers de 32 bits : une étape de MurmurHash3 (x86, 32 bits) suivie de son brassage final.
+/// Même arithmétique que Mulberry32 (masques, multiplication 32 bits en deux moitiés de 16 bits) : le résultat est
+/// identique sur la VM (Android, ordinateur) et sur le web, où les entiers Dart sont des nombres JavaScript.
+int hash32(int a, int b) {
+  var k = Mulberry32._imul(b & 0xFFFFFFFF, 0xCC9E2D51);
+  k = ((k << 15) | (k >>> 17)) & 0xFFFFFFFF;
+  k = Mulberry32._imul(k, 0x1B873593);
+  var h = (a & 0xFFFFFFFF) ^ k;
+  h = ((h << 13) | (h >>> 19)) & 0xFFFFFFFF;
+  h = (Mulberry32._imul(h, 5) + 0xE6546B64) & 0xFFFFFFFF;
+  h ^= h >>> 16;
+  h = Mulberry32._imul(h, 0x85EBCA6B);
+  h ^= h >>> 13;
+  h = Mulberry32._imul(h, 0xC2B2AE35);
+  h ^= h >>> 16;
+  return h & 0xFFFFFFFF;
+}
+
+/// Flux de hasard : un par décision. Un tirage ne dépend que de (graine, flux, jour, agent, sous-tirage), jamais de
+/// l'ordre des appels : deux parties qui ne diffèrent que par une règle gardent les mêmes tirages partout ailleurs
+/// (nombres aléatoires communs ; Klein et al. 2024, arXiv 2409.02086). Chaque flux a un code fixe : en ajouter un ne
+/// change pas les tirages des autres. La création d'entreprise n'a pas de flux : elle ne tire rien (le fondateur est
+/// le citoyen le plus riche).
+enum Flux {
+  traits(1), // traits à la naissance : qualification, argent, ambition, ordinateur, nom
+  classes(2), // répartition des qualifications au départ
+  recrutement(3), // ordre du premier recrutement
+  proprietaire(4), // propriétaire d'une entreprise
+  embauche(5), // ordre des chômeurs sur le marché du travail
+  depart(6), // un employé part pour un meilleur salaire
+  maladie(7), // maladie et sa gravité
+  ordinateur(8), // envie d'acheter un ordinateur
+  etudes(9), // envie de suivre un cours
+  loisirs(10), // s'offrir un loisir plus cher que le budget du jour
+  consommation(11), // ordre de passage des ménages
+  achats(12), // ordre des entreprises pour leurs achats d'intrants et de services
+  capital(13), // ordre des entreprises pour l'usure, la dette et l'investissement
+  offres(14), // départage des offres à prix voisins
+  prix(15), // pas d'ajustement de la marge
+  divin(16); // actions du god mode (épidémie)
+
+  const Flux(this.code);
+  final int code;
+}
+
 /// Tri stable (List.sort de Dart ne l'est pas).
 void stableSort<T>(List<T> list, int Function(T a, T b) cmp) {
   final idx = List<int>.generate(list.length, (i) => i);
@@ -104,13 +149,20 @@ const Map<String, double> _extraDemand = {
 
 class Sim {
   late int seed;
-  late Mulberry32 _rng;
   late Params params;
   late Modules modules;
   late Safeguards safeguards;
   bool devChecks; // mode développement : un invariant rompu lève une exception
   int day = 0;
-  int _nextId = 1;
+  // identifiants stables, jamais réutilisés : les citoyens sont numérotés à partir de 1 ; une entreprise reçoit
+  // 100 000 + 10 000 × (rang de son type) + son rang de création dans ce type (voir _newFirmId)
+  int _nextCitizenId = 1;
+  final Map<String, int> _firmSeq = {};
+  // hasard (voir draw) : clés du jour par flux, achats du jour par (acheteur, bien), actions divines
+  int _keysDay = -1;
+  final List<int> _dayKeys = List<int>.filled(Flux.values.length, 0);
+  final Map<int, int> _buySeq = {};
+  int _godSeq = 0;
   List<Citizen> citizens = [];
   final Map<int, Citizen> _cmap = {};
   List<Firm> firms = [];
@@ -173,18 +225,56 @@ class Sim {
     reset(seed: seed, params: params, scenario: scenario, modules: modules, safeguards: safeguards);
   }
 
-  double rng() => _rng.next();
+  /// Clé du jour d'un flux : hachage de (graine, flux, jour).
+  int _dayKey(Flux f) {
+    if (_keysDay != day) {
+      for (final x in Flux.values) {
+        _dayKeys[x.index] = hash32(hash32(seed & 0xFFFFFFFF, x.code), day);
+      }
+      _keysDay = day;
+    }
+    return _dayKeys[f.index];
+  }
+
+  /// Tirage uniforme dans [0, 1) qui ne dépend que de (graine, flux, jour, agent, sous-tirage), jamais de l'ordre des
+  /// appels. Le sous-tirage distingue plusieurs tirages d'une même décision, pour un même agent, le même jour.
+  double draw(Flux flux, int id, [int sub = 0]) {
+    var h = hash32(_dayKey(flux), id);
+    if (sub != 0) h = hash32(h, sub);
+    return Mulberry32(h).next();
+  }
+
+  /// Clé d'ordre du jour d'un agent dans un flux.
+  int orderKey(Flux flux, int id) => hash32(_dayKey(flux), id);
+
+  /// Les agents rangés selon leur clé d'ordre du jour (égalités départagées par l'identifiant). Retirer un agent ne
+  /// change pas l'ordre relatif des autres ; le mélange de Fisher-Yates qu'il remplace consommait un nombre de tirages
+  /// variable, ce qui décalait tous les tirages suivants de la partie.
+  List<T> _ordered<T>(Iterable<T> items, Flux flux, int Function(T) id) {
+    final keyed = [for (final x in items) (orderKey(flux, id(x)), id(x), x)];
+    keyed.sort((a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2.compareTo(b.$2));
+    return [for (final k in keyed) k.$3];
+  }
+
+  static final Map<String, int> _goodIndex = {for (final (i, g) in goods.keys.indexed) g: i};
+  static final Map<String, int> _typeIndex = {for (final (i, t) in templates.keys.indexed) t: i};
+
+  /// Identifiant d'un compte acheteur pour les tirages : citoyen, entreprise, ou 0 pour l'État.
+  int _accountId(Account a) => a is Citizen ? a.id : (a is Firm ? a.id : 0);
 
   // ================================================================== Setup
   void reset(
       {int seed = 42, Params? params, List<ScenarioFirm>? scenario, Modules? modules, Safeguards? safeguards}) {
     this.seed = seed;
-    _rng = Mulberry32(seed);
     this.params = params ?? Params();
     this.modules = modules ?? Modules();
     this.safeguards = safeguards ?? Safeguards();
     day = 0;
-    _nextId = 1;
+    _nextCitizenId = 1;
+    _firmSeq.clear();
+    _keysDay = -1;
+    _buySeq.clear();
+    _godSeq = 0;
     citizens = [];
     _cmap.clear();
     firms = [];
@@ -262,11 +352,14 @@ class Sim {
     final pros = math.min(pop, (needByClass[2] * 1.15).ceil() + 1);
     final techs = math.min(pop - pros, (needByClass[1] * 1.1).ceil() + 1);
     final levels = <int>[for (var i = 0; i < pop; i++) i < pros ? 2 : (i < pros + techs ? 1 : 0)];
-    _shuffle(levels);
+    // répartition des qualifications : les rangs sont rangés selon le hachage de l'identifiant à venir (i + 1)
+    final ranks = _ordered(List<int>.generate(pop, (i) => i), Flux.classes, (i) => i + 1);
+    final levelOf = List<int>.filled(pop, 0);
+    for (var j = 0; j < pop; j++) {
+      levelOf[ranks[j]] = levels[j];
+    }
     for (var i = 0; i < pop; i++) {
-      final lvl = levels[i];
-      final money = p.startWallet * (0.6 + 0.8 * rng()) * const [1.0, 1.3, 1.8][lvl];
-      _newCitizen(money, lvl + 0.9 * rng());
+      _newCitizen(level: levelOf[i]);
     }
 
     final created = <Firm>[];
@@ -277,7 +370,7 @@ class Sim {
       created.add(f);
     }
     // les postes les plus qualifiés d'abord, chacun pris par le candidat le moins surqualifié
-    final pool = _shuffle(List<Citizen>.from(citizens));
+    final pool = _ordered(citizens, Flux.recrutement, (c) => c.id);
     final order = List<int>.generate(scen.length, (i) => i);
     stableSort<int>(order, (a, b) => created[b].template.skill - created[a].template.skill);
     for (final i in order) {
@@ -310,7 +403,7 @@ class Sim {
       f.revenueEma = revenue;
       f.outputEma = batches;
       f.money = quantize(math.max(6000.0, 12 * (f.wage * f.workers.length + inputCost)));
-      f.ownerId = citizens[(rng() * citizens.length).floor()].id;
+      f.ownerId = citizens[(draw(Flux.proprietaire, f.id) * citizens.length).floor()].id;
       if (publicService(f)) f.ownerId = null; // établissement public : l'État en est le propriétaire
     }
     for (final c in citizens) {
@@ -482,16 +575,22 @@ class Sim {
   /// Part de la productivité nominale d'une entreprise trop petite pour occuper un employé à plein temps.
   static double _minScale(double workers, int firms) => (workers / firms).clamp(0.001, 1.0).toDouble();
 
-  Citizen _newCitizen(double money, [double? skill]) {
+  /// Un citoyen. Ses traits ne dépendent que de (graine, jour, identifiant), par le flux « traits ». Au départ, sa
+  /// qualification prévue (`level`) fixe son argent ; un immigrant (`money` donné) a une qualification de 0 à 1,6.
+  Citizen _newCitizen({int? level, double? money}) {
+    final id = _nextCitizenId++;
+    double t(int k) => draw(Flux.traits, id, k);
+    final skill = level != null ? level + 0.9 * t(1) : t(1) * 1.6;
+    final cash = money ?? params.startWallet * (0.6 + 0.8 * t(2)) * const [1.0, 1.3, 1.8][level ?? 0];
     var name = '';
     for (var k = 0; k < 30; k++) {
-      final a = firstNames[(rng() * firstNames.length).floor()];
-      final b = lastNames[(rng() * lastNames.length).floor()];
+      final a = firstNames[(t(10 + 2 * k) * firstNames.length).floor()];
+      final b = lastNames[(t(11 + 2 * k) * lastNames.length).floor()];
       name = '$a $b';
       if (!citizens.any((x) => x.name == name)) break;
     }
-    final c = Citizen(_nextId++, name, quantize(money), skill ?? rng() * 1.6, rng());
-    if (rng() < const [0.2, 0.6, 0.7][c.level]) c.computerDays = (rng() * params.computerLife).floor();
+    final c = Citizen(id, name, quantize(cash), skill, t(3));
+    if (t(4) < const [0.2, 0.6, 0.7][c.level]) c.computerDays = (t(5) * params.computerLife).floor();
     citizens.add(c);
     _cmap[c.id] = c;
     return c;
@@ -500,7 +599,7 @@ class Sim {
   Firm _newFirm(String type, String? name, double money, int? ownerId, double x, double y,
       [Map<String, double>? priceTable]) {
     final t = templates[type]!;
-    final f = Firm(_nextId++, type, name ?? t.label, Map<String, double>.from(t.inputs),
+    final f = Firm(_newFirmId(type), type, name ?? t.label, Map<String, double>.from(t.inputs),
         Map<String, double>.from(t.outputs), t.rate, t.capacity, quantize(money), ownerId,
         params.startWage * classWage[t.skill], x, y);
     final pt = priceTable ?? worldPrice;
@@ -527,16 +626,15 @@ class Sim {
     }
   }
 
-  // ============================================================= Utilitaires
-  List<T> _shuffle<T>(List<T> a) {
-    for (var i = a.length - 1; i > 0; i--) {
-      final j = (rng() * (i + 1)).floor();
-      final t = a[i];
-      a[i] = a[j];
-      a[j] = t;
-    }
-    return a;
+  /// Identifiant stable d'une entreprise : 100 000 + 10 000 × (rang du type) + rang de création dans ce type. Créer
+  /// une entreprise d'un type ne décale pas les identifiants (donc les tirages) des entreprises des autres types.
+  int _newFirmId(String type) {
+    final k = _firmSeq[type] = (_firmSeq[type] ?? 0) + 1;
+    if (k >= 10000) throw StateError('Trop d’entreprises de type $type pour des identifiants stables');
+    return 100000 + 10000 * _typeIndex[type]! + k;
   }
+
+  // ============================================================= Utilitaires
 
   Citizen? citizen(int id) => _cmap[id];
   Firm? firm(int id) => _fmap[id];
@@ -643,7 +741,15 @@ class Sim {
     return 1 + a * k / (k + 1);
   }
 
-  double techMult(Firm f) => math.pow(1.15, f.techLevel - 1).toDouble();
+  /// ×1,15 par niveau. Des multiplications successives plutôt que math.pow, dont le dernier chiffre peut différer entre
+  /// la VM et le web : une même graine doit donner la même partie partout.
+  double techMult(Firm f) {
+    var m = 1.0;
+    for (var i = 1; i < f.techLevel; i++) {
+      m *= 1.15;
+    }
+    return m;
+  }
 
   /// Sans ingénierie, l'industrie lourde tourne au ralenti (jusqu'à moitié).
   double uptime(Firm f) => f.template.heavy && modules.capital ? 0.5 + 0.5 * f.maintCover : 1.0;
@@ -725,18 +831,27 @@ class Sim {
   }
 
   /// Achat sur le marché : le moins cher d'abord (les ménages préfèrent un peu les marques connues).
-  BuyResult buy(Account buyer, String buyerKey, String good, double qty, double budget, bool integer) {
+  /// `forCitizen` : le citoyen pour qui l'État achète (aides, soins) ; ses tirages restent les siens.
+  BuyResult buy(Account buyer, String buyerKey, String good, double qty, double budget, bool integer,
+      {Citizen? forCitizen}) {
     budget = math.min(budget, buyer.money);
     if (qty <= eps || budget <= eps) return const BuyResult(0, 0);
     final household = buyerKey == 'M';
+    // départage des offres : un tirage par (acheteur, bien, n-ième achat de ce bien aujourd'hui, vendeur)
+    final who = forCitizen?.id ?? _accountId(buyer);
+    final gi = _goodIndex[good]!;
+    final n = _buySeq[who * 64 + gi] = (_buySeq[who * 64 + gi] ?? -1) + 1;
+    final base = hash32(hash32(_dayKey(Flux.offres), who), hash32(gi, n));
     final offers = <_Offer>[];
     for (final f in sellersOf(good)) {
       if (identical(f, buyer)) continue;
-      if ((f.inv[good] ?? 0) > eps) offers.add(_Offer(f, f.price[good]!, rng(), household ? 1 / (1 + brandPull(f)) : 1));
+      if ((f.inv[good] ?? 0) > eps) {
+        offers.add(_Offer(f, f.price[good]!, Mulberry32(hash32(base, f.id)).next(), household ? 1 / (1 + brandPull(f)) : 1));
+      }
     }
     final p = params;
     if (p.trade && !goods[good]!.perish) {
-      offers.add(_Offer(null, worldPrice[good]! * p.importMarkup, rng(), 1));
+      offers.add(_Offer(null, worldPrice[good]! * p.importMarkup, Mulberry32(hash32(base, 0)).next(), 1));
     }
     stableSort<_Offer>(offers, (a, b) {
       final d = a.p * (1 + 0.03 * a.r) * a.pull - b.p * (1 + 0.03 * b.r) * b.pull;
@@ -812,6 +927,7 @@ class Sim {
   void step() {
     final p = params;
     day++;
+    _buySeq.clear();
     flows = {};
     unmet = {};
     householdSpend = 0;
@@ -875,7 +991,7 @@ class Sim {
   }
 
   void _laborMarket() {
-    final unemployed = _shuffle(citizens.where((c) => c.employer == null).toList());
+    final unemployed = _ordered(citizens.where((c) => c.employer == null), Flux.embauche, (c) => c.id);
     final hiring = firms.where((f) => f.vacancies > 0).toList();
     stableSort<Firm>(hiring, (a, b) => b.wage.compareTo(a.wage));
     for (final f in hiring) {
@@ -892,7 +1008,7 @@ class Sim {
     final open = firms.where((f) => f.vacancies > 0).toList();
     if (open.isNotEmpty) {
       for (final c in List<Citizen>.from(citizens)) {
-        if (c.employer == null || rng() > params.jobSwitch) continue;
+        if (c.employer == null || draw(Flux.depart, c.id) > params.jobSwitch) continue;
         final cur = firm(c.employer!);
         Firm? best;
         for (final b in open) {
@@ -1289,7 +1405,7 @@ class Sim {
   }
 
   void _buyInputs() {
-    for (final f in _shuffle(List<Firm>.from(firms))) {
+    for (final f in _ordered(firms, Flux.achats, (f) => f.id)) {
       if (f.inputs.isNotEmpty) {
         // on n'achète pas plus de matière que l'équipe peut transformer
         final crew = (f.workers.length + f.vacancies) * perWorker(f) * 1.2;
@@ -1396,7 +1512,7 @@ class Sim {
     adsBoost = 1 + p.adsEffect * totalBrand / (totalBrand + 0.3 * math.max(1, citizens.length));
     final floor = _stateFloor();
 
-    for (final c in _shuffle(List<Citizen>.from(citizens))) {
+    for (final c in _ordered(citizens, Flux.consommation, (c) => c.id)) {
       final before = c.money;
       for (final d in desires) {
         if (d != 'sante') c.sat[d] = math.max(0.0, c.sat[d]! - desireDecay[d]!);
@@ -1473,7 +1589,7 @@ class Sim {
       return;
     }
     var h = c.health - desireDecay['sante']!;
-    if (rng() < p.illness) h -= 0.2 + 0.3 * rng();
+    if (draw(Flux.maladie, c.id) < p.illness) h -= 0.2 + 0.3 * draw(Flux.maladie, c.id, 1);
     h = h.clamp(0.05, 1.0).toDouble();
     if (publicGood('soins')) {
       // soins publics gratuits : on s'inscrit dans la file de l'hôpital, servie par ordre d'arrivée (I2)
@@ -1487,7 +1603,7 @@ class Sim {
     if (h < 0.75) {
       for (var n = 0; n < 3 && h < 0.95; n++) {
         final pub = modules.publicHealth && state.money > floor;
-        final r = buy(pub ? state : c, 'M', 'soins', 1, pub ? state.money - floor : c.money, true);
+        final r = buy(pub ? state : c, 'M', 'soins', 1, pub ? state.money - floor : c.money, true, forCitizen: c);
         if (r.qty < 1) break;
         h = math.min(1.0, h + 0.3);
         if (pub) {
@@ -1508,7 +1624,7 @@ class Sim {
       c.sat['divertissement'] = math.min(1.0, c.sat['divertissement']! + 0.08);
       return;
     }
-    if (rng() >= computerWish[c.level] * adsBoost) return;
+    if (draw(Flux.ordinateur, c.id) >= computerWish[c.level] * adsBoost) return;
     final pr = quote('ordinateur');
     if (!pr.isFinite) {
       unmet['ordinateur'] = (unmet['ordinateur'] ?? 0) + 1;
@@ -1522,7 +1638,7 @@ class Sim {
   /// Les ambitieux suivent des cours ; la qualification monte d'un cran tous les 50 cours.
   void _study(Citizen c, double floor) {
     final p = params;
-    if (c.skill >= 3 || rng() >= c.ambition * p.eduRate) return;
+    if (c.skill >= 3 || draw(Flux.etudes, c.id) >= c.ambition * p.eduRate) return;
     if (publicGood('cours')) {
       // cours publics gratuits : on s'inscrit dans la file de l'école (I2)
       if (c.schoolSince == null) {
@@ -1536,7 +1652,7 @@ class Sim {
       final pr = quote('cours');
       if (pr.isFinite && c.money - p.bufferDays * needCost < 10 * pr) return;
     }
-    final r = buy(pub ? state : c, 'M', 'cours', 1, pub ? state.money - floor : c.money, true);
+    final r = buy(pub ? state : c, 'M', 'cours', 1, pub ? state.money - floor : c.money, true, forCitizen: c);
     if (r.qty < 1) return;
     c.skill = math.min(3.0, c.skill + p.learnRate);
     if (pub) {
@@ -1567,14 +1683,15 @@ class Sim {
     final wDiv = desireWeight['divertissement']![lvl] * (0.25 + math.max(0.0, 1 - c.sat['divertissement']!));
     final wLux = desireWeight['luxe']![lvl] * (0.25 + math.max(0.0, 1 - c.sat['luxe']!));
     final counts = <String, int>{};
-    for (final d in const ['divertissement', 'luxe']) {
+    for (var di = 0; di < 2; di++) {
+      final d = const ['divertissement', 'luxe'][di];
       var share = budget * (d == 'luxe' ? wLux : wDiv) / (wDiv + wLux);
       for (var k = 0; k < 60 && share > eps; k++) {
         var g = _choose(c, desireGoods[d]!, d, share, counts, signal: k == 0);
         if (g == null) {
           // rien d'abordable avec ce budget : on s'offre le favori de temps en temps (en moyenne, le budget)
           g = _choose(c, desireGoods[d]!, d, double.infinity, counts);
-          if (g == null || rng() >= share / quote(g)) break;
+          if (g == null || draw(Flux.loisirs, c.id, di * 64 + k) >= share / quote(g)) break;
         }
         final r = buy(c, 'M', g, 1, c.money, true);
         if (r.qty < 1) break;
@@ -1642,7 +1759,7 @@ class Sim {
     for (var n = 0; n < 4 && c.sat['faim']! < 1 - eps; n++) {
       final g = _choose(c, foods, 'faim', state.money, null);
       if (g == null) break;
-      final r = buy(state, 'M', g, 1, state.money, true);
+      final r = buy(state, 'M', g, 1, state.money, true, forCitizen: c);
       if (r.qty < 1) break;
       _enjoy(c, g);
       spent += r.spent;
@@ -1661,7 +1778,7 @@ class Sim {
   /// Plancher de logement : l'État paie une nuitée ; si le parc est plein, un abri d'urgence (magique).
   void _shelterAid(Citizen c) {
     final cause = shelterCause(c);
-    final r = buy(state, 'M', 'logement', 1, state.money, true);
+    final r = buy(state, 'M', 'logement', 1, state.money, true, forCitizen: c);
     final magic = r.qty < 1;
     if (r.spent > 0) {
       state.paid += r.spent;
@@ -1716,7 +1833,7 @@ class Sim {
   void _capital() {
     final p = params;
     final pm = bestPrice('machines');
-    for (final f in _shuffle(List<Firm>.from(firms))) {
+    for (final f in _ordered(firms, Flux.capital, (f) => f.id)) {
       final key = f.id.toString();
       // usure : deux fois et demie plus rapide sans entretien
       if (modules.capital && f.machines > eps) {
@@ -2115,7 +2232,7 @@ class Sim {
           }
         }
         final pressure = 1 + 2 * math.min(1.0, um / math.max(f.sold[g] ?? 0, 1.0));
-        final stepSize = p.priceStep * (0.5 + rng());
+        final stepSize = p.priceStep * (0.5 + draw(Flux.prix, f.id, _goodIndex[g]!));
         final mkOld = f.markup[g]!;
         var mk = mkOld;
         if (dir > 0) {
@@ -2485,8 +2602,9 @@ class Sim {
   /// Épidémie : une part de la population perd la moitié de sa santé.
   int godEpidemic(double share) {
     var sick = 0;
+    final seq = ++_godSeq;
     for (final c in citizens) {
-      if (rng() < share) {
+      if (draw(Flux.divin, c.id, seq) < share) {
         c.sat['sante'] = math.max(0.05, c.health - 0.5);
         sick++;
       }
@@ -2505,7 +2623,7 @@ class Sim {
 
   void godAddCitizens(int n, double money) {
     for (var i = 0; i < n; i++) {
-      final c = _newCitizen(money);
+      final c = _newCitizen(money: money);
       _godIn(c.money);
     }
     _log('god', '$n nouveaux citoyens arrivent avec ${fmtMoney0(money)} chacun.');
@@ -2597,7 +2715,7 @@ class Sim {
   Firm addFirm(String type, String? name, double money, int? ownerId, double x, double y) {
     final f = _newFirm(type, name, money, ownerId, x, y);
     if (f.ownerId == null && citizens.isNotEmpty) {
-      f.ownerId = citizens[(rng() * citizens.length).floor()].id;
+      f.ownerId = citizens[(draw(Flux.proprietaire, f.id) * citizens.length).floor()].id;
     }
     _godIn(f.money);
     // salaire du marché pour cette qualification

@@ -36,6 +36,46 @@ void main() {
     expect(b.nets.total(), a.nets.total());
   });
 
+  // nombres aléatoires communs : comparer deux parties de même graine ne compare que la règle qui les distingue
+  void sameGame(List<HistPoint> a, List<HistPoint> b) {
+    expect(b.length, a.length);
+    for (var i = 0; i < a.length; i++) {
+      final x = a[i], y = b[i];
+      expect([y.total, y.mH, y.mF, y.mE, y.mB, y.unemp, y.cpi, y.gini, y.wage, y.gdp, y.hungry, y.homeless],
+          [x.total, x.mH, x.mF, x.mE, x.mB, x.unemp, x.cpi, x.gini, x.wage, x.gdp, x.hungry, x.homeless],
+          reason: 'jour ${x.day}');
+    }
+  }
+
+  test('une institution qui ne mord jamais ne change pas la partie, au tirage près', () {
+    // sans crédit, les règles prudentielles (I4) ne s'appliquent jamais ; sans santé ni éducation, l'enveloppe (I2)
+    // non plus
+    List<HistPoint> game(bool on) {
+      final m = Modules()
+        ..credit = false
+        ..health = false
+        ..education = false
+        ..bankRegulation = on
+        ..publicBudget = on;
+      final s = Sim(seed: 4, modules: m);
+      run(s, 600);
+      return s.history;
+    }
+
+    sameGame(game(true), game(false));
+  });
+
+  test('une action sans effet ne décale pas les tirages du reste de la partie', () {
+    // une épidémie qui ne frappe personne : avec un générateur unique, ses 240 tirages décalaient toute la suite
+    final a = Sim(seed: 6), b = Sim(seed: 6);
+    run(a, 100);
+    run(b, 100);
+    expect(b.godEpidemic(0), 0);
+    run(a, 200);
+    run(b, 200);
+    sameGame(a.history, b.history);
+  });
+
   test('invariants comptables exacts à chaque jour, avec et sans filets', () {
     for (final seed in [1, 2]) {
       final s = Sim(seed: seed, devChecks: true); // lève une exception au premier écart
