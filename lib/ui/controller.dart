@@ -5,6 +5,9 @@ import '../engine/model.dart';
 import '../engine/sim.dart';
 import 'layout.dart';
 
+/// Calque « argent » : tous les flux monétaires, même si leur affichage est coupé.
+const String kMoneyLayer = r'$';
+
 /// Ce qui est sélectionné dans le graphe.
 class Selection {
   final String kind; // M | E | B | X | firm | citizen
@@ -39,10 +42,23 @@ class SimController extends ChangeNotifier {
   bool panelOpen = true;
   int panelTab = Tabs.inspector;
 
+  /// Calque du graphe : un bien (ou [kMoneyLayer]) mis en avant, les autres flux estompés ; null = tous.
+  String? layer;
+
+  /// Augmente à chaque notification : le graphe garde son dessin tant qu'elle ne change pas.
+  int rev = 0;
+
+  /// Vitesse réellement tenue (jours par seconde) : plus basse que [speed] si l'appareil ne suit pas.
+  double realSpeed = 0;
+
   late final Ticker _ticker;
   Duration _last = Duration.zero;
   double _acc = 0;
   double _sinceNotify = 0;
+  int _daysSinceNotify = 0;
+
+  /// Temps de calcul accordé à la simulation par image, pour que l'interface reste fluide.
+  static const int _budgetUs = 10000;
 
   SimController({int seed = 42}) : sim = Sim(seed: seed) {
     autoLayout(sim);
@@ -57,20 +73,34 @@ class SimController extends ChangeNotifier {
     _last = elapsed;
     if (playing) {
       _acc += (dt > 0.25 ? 0.25 : dt) * speed;
+      final sw = Stopwatch()..start();
       var n = 0;
-      while (_acc >= 1 && n < 120) {
+      while (_acc >= 1 && n < 120 && sw.elapsedMicroseconds < _budgetUs) {
         sim.step();
         _acc -= 1;
         n++;
       }
-      if (n > 0) {
-        _sinceNotify += dt;
-        if (_sinceNotify >= 0.12) {
-          _sinceNotify = 0;
-          notifyListeners();
-        }
+      // au plus un quart de seconde de retard : au-delà, la vitesse demandée n'est pas tenue
+      final cap = speed * 0.25 < 1 ? 1.0 : speed * 0.25;
+      if (_acc > cap) _acc = cap;
+      _daysSinceNotify += n;
+      _sinceNotify += dt;
+      // l'interface suit toutes les 0,12 s de temps réel, pas à chaque jour calculé
+      if (_sinceNotify >= 0.12) {
+        final r = _daysSinceNotify / _sinceNotify;
+        realSpeed = realSpeed == 0 ? r : realSpeed * 0.7 + r * 0.3;
+        final changed = _daysSinceNotify > 0;
+        _sinceNotify = 0;
+        _daysSinceNotify = 0;
+        if (changed) notifyListeners();
       }
     }
+  }
+
+  @override
+  void notifyListeners() {
+    rev++;
+    super.notifyListeners();
   }
 
   /// À appeler après toute action de l'utilisateur qui change l'état de la simulation.
@@ -78,6 +108,7 @@ class SimController extends ChangeNotifier {
 
   void togglePlay() {
     playing = !playing;
+    realSpeed = 0;
     notifyListeners();
   }
 
@@ -89,6 +120,7 @@ class SimController extends ChangeNotifier {
 
   void setSpeed(double s) {
     speed = s;
+    realSpeed = 0;
     playing = true;
     notifyListeners();
   }
@@ -121,8 +153,15 @@ class SimController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Met en avant un bien (ou l'argent) dans le graphe ; le même choix une seconde fois revient à tous les flux.
+  void setLayer(String? l) {
+    layer = layer == l ? null : l;
+    notifyListeners();
+  }
+
   /// Nouvelle partie : les modules et les filets en cours sont conservés.
   void newGame(int seed, {Params? params}) {
+    realSpeed = 0;
     sim = Sim(seed: seed, params: params, modules: sim.modules.copy(), safeguards: sim.safeguards.copy());
     autoLayout(sim);
     selection = const Selection('M');

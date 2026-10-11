@@ -109,6 +109,15 @@ class TopBar extends StatelessWidget {
               ),
             const SizedBox(width: 8),
             Text('Jour ${sim.day}', style: mono(pal.ink, 14, weight: FontWeight.w800)),
+            // l'appareil ne tient pas la vitesse demandée : on affiche celle qu'il tient
+            if (ctrl.playing && ctrl.speed >= 16 && ctrl.realSpeed > 0 && ctrl.realSpeed < ctrl.speed * 0.85)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Tooltip(
+                  message: 'Vitesse réellement tenue par cet appareil',
+                  child: Text('réel ×${ctrl.realSpeed.round()}', style: mono(pal.warn, 11, weight: FontWeight.w700)),
+                ),
+              ),
             const SizedBox(width: 14),
             Expanded(
               child: SingleChildScrollView(

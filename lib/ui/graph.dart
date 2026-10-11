@@ -1,5 +1,8 @@
 // Graphe de la chaîne d'approvisionnement : nodes dessinés au canevas, déplaçables,
 // avec panoramique (1 doigt sur le vide) et zoom (pincement ou molette).
+//
+// Le dessin des nodes et des flux est enregistré une fois par notification de la simulation (WorldCache) : le
+// panoramique et le zoom ne font que le transformer. Dézoomé, chaque node se réduit à son code et à son nom.
 
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -16,6 +19,27 @@ import 'palette.dart';
 
 /// Port d'entrée des services aux entreprises et des machines (ligne « Capital »).
 const String kSvcPort = '@svc';
+
+/// En dessous de cette échelle, le texte des lignes est illisible : les nodes passent en vue simplifiée.
+const double kMacroScale = 0.55;
+
+/// Dessin du monde (nodes et flux, sans la grille) gardé tant que rien de ce qu'il montre n'a changé.
+class WorldCache {
+  ui.Picture? picture;
+  Object? key;
+
+  void set(ui.Picture p, Object k) {
+    picture?.dispose();
+    picture = p;
+    key = k;
+  }
+
+  void dispose() {
+    picture?.dispose();
+    picture = null;
+    key = null;
+  }
+}
 
 /// Boîte d'un node dans le repère du monde.
 class NodeBox {
@@ -100,10 +124,17 @@ class _GraphViewState extends State<GraphView> {
 
   // état du geste en cours
   NodeBox? _dragBox;
+  final WorldCache _cache = WorldCache();
   Offset _startFocal = Offset.zero;
   Offset _startOffset = Offset.zero;
   double _startScale = 1;
   bool _moved = false;
+
+  @override
+  void dispose() {
+    _cache.dispose();
+    super.dispose();
+  }
 
   Offset toWorld(Offset p) => (p - offset) / scale;
 
@@ -231,7 +262,9 @@ class _GraphViewState extends State<GraphView> {
                       pal: pal,
                       scale: scale,
                       offset: offset,
-                      stamp: widget.ctrl.sim.day,
+                      stamp: widget.ctrl.rev,
+                      layer: widget.ctrl.layer,
+                      cache: _cache,
                     ),
                   ),
                 ),
@@ -257,11 +290,87 @@ class _GraphViewState extends State<GraphView> {
                 active: widget.ctrl.showServices,
                 onTap: widget.ctrl.toggleServices,
               ),
+              const SizedBox(width: 6),
+              _LayerBtn(ctrl: widget.ctrl),
+              if (widget.ctrl.layer != null) ...[
+                const SizedBox(width: 6),
+                _LayerChip(ctrl: widget.ctrl),
+              ],
             ]),
           ),
         ),
       ]);
     });
+  }
+}
+
+String layerLabel(String l) => l == kMoneyLayer ? 'Argent' : goods[l]?.label ?? l;
+
+/// Choix du calque : un bien ou l'argent ; les autres flux s'estompent.
+class _LayerBtn extends StatelessWidget {
+  final SimController ctrl;
+  const _LayerBtn({required this.ctrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final pal = Pal.of(context);
+    // les biens qui circulent en ce moment, dans l'ordre du catalogue
+    final live = {for (final e in ctrl.sim.flowsEma.values) if (!e.isMoney && e.value >= 0.5) e.good};
+    final items = [for (final g in goods.keys) if (live.contains(g)) g];
+    Widget item(String value, Color c, String label) => Row(children: [
+          Container(width: 10, height: 10, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          Text(label,
+              style: TextStyle(fontSize: 13, fontWeight: ctrl.layer == value ? FontWeight.w700 : FontWeight.w400)),
+        ]);
+    return PopupMenuButton<String>(
+      tooltip: 'Calque : isoler un bien',
+      position: PopupMenuPosition.over,
+      onSelected: ctrl.setLayer,
+      itemBuilder: (context) => [
+        PopupMenuItem(value: kMoneyLayer, height: 36, child: item(kMoneyLayer, pal.money, 'Argent')),
+        const PopupMenuDivider(),
+        for (final g in items)
+          PopupMenuItem(value: g, height: 34, child: item(g, pal.sector(goods[g]!.sector), goods[g]!.label)),
+      ],
+      child: IgnorePointer(
+        child: _MiniBtn(icon: Icons.layers_outlined, active: ctrl.layer != null, onTap: () {}),
+      ),
+    );
+  }
+}
+
+/// Calque en cours ; un appui revient à tous les flux.
+class _LayerChip extends StatelessWidget {
+  final SimController ctrl;
+  const _LayerChip({required this.ctrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final pal = Pal.of(context);
+    final l = ctrl.layer!;
+    final c = l == kMoneyLayer ? pal.money : pal.sector(goods[l]?.sector ?? 'tertiaire');
+    return Material(
+      color: pal.sheet,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: c)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => ctrl.setLayer(null),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
+          child: SizedBox(
+            height: 38,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 10, height: 10, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+              const SizedBox(width: 8),
+              Text(layerLabel(l), style: TextStyle(color: pal.ink, fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 4),
+              Icon(Icons.close, size: 16, color: pal.ink3),
+            ]),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -299,7 +408,9 @@ class GraphPainter extends CustomPainter {
   final Pal pal;
   final double scale;
   final Offset offset;
-  final int stamp;
+  final int stamp; // révision du contrôleur : change à chaque notification
+  final String? layer;
+  final WorldCache? cache;
 
   GraphPainter({
     required this.sim,
@@ -310,10 +421,17 @@ class GraphPainter extends CustomPainter {
     required this.scale,
     required this.offset,
     required this.stamp,
+    this.layer,
+    this.cache,
   });
 
   @override
-  bool shouldRepaint(covariant GraphPainter old) => true; // l'état de sim est mutable
+  bool shouldRepaint(covariant GraphPainter old) => true; // l'état de sim est mutable ; le dessin du monde est en cache
+
+  bool get _macro => scale < kMacroScale;
+
+  /// Échelle arrondie de la vue simplifiée : la taille du texte en dépend, le cache aussi.
+  double get _macroStep => (scale * 20).round().clamp(1, 20) / 20;
 
   TextPainter _tp(String text, TextStyle style, {double? maxWidth, TextAlign align = TextAlign.left}) {
     final tp = TextPainter(
@@ -334,14 +452,56 @@ class GraphPainter extends CustomPainter {
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
     canvas.scale(scale);
+    final c = cache;
+    if (c == null) {
+      _world(canvas);
+    } else {
+      final key = (stamp, pal, _macro ? _macroStep : 0.0, showMoney, showServices, selection, layer);
+      if (c.picture == null || c.key != key) {
+        final rec = ui.PictureRecorder();
+        _world(Canvas(rec));
+        c.set(rec.endRecording(), key);
+      }
+      canvas.drawPicture(c.picture!);
+    }
+    canvas.restore();
+  }
 
+  void _world(Canvas canvas) {
     final boxes = allBoxes(sim);
     final byKey = <String, NodeBox>{for (final b in boxes) keyOf(b.sel): b};
     _edges(canvas, byKey);
+    final focus = _involved();
     for (final b in boxes) {
       _node(canvas, b);
+      if (focus != null && !focus.contains(keyOf(b.sel))) {
+        // hors du calque : le node s'estompe (20 % d'opacité)
+        canvas.drawRRect(RRect.fromRectAndRadius(b.rect.inflate(1), const Radius.circular(10)),
+            Paint()..color = pal.paper.withValues(alpha: 0.8));
+      }
     }
-    canvas.restore();
+  }
+
+  bool _inLayer(FlowEdge e) => layer == kMoneyLayer ? e.isMoney : !e.isMoney && e.good == layer;
+
+  /// Nodes concernés par le calque : extrémités de ses flux, et entreprises qui produisent ou utilisent le bien.
+  Set<String>? _involved() {
+    final l = layer;
+    if (l == null) return null;
+    final out = <String>{};
+    for (final e in sim.flowsEma.values) {
+      if (e.value >= 0.5 && _inLayer(e)) {
+        out
+          ..add(e.from)
+          ..add(e.to);
+      }
+    }
+    if (l != kMoneyLayer) {
+      for (final f in sim.firms) {
+        if (f.outputs.containsKey(l) || f.inputs.containsKey(l)) out.add(f.id.toString());
+      }
+    }
+    return out;
   }
 
   void _grid(Canvas canvas, Size size) {
@@ -385,16 +545,19 @@ class GraphPainter extends CustomPainter {
     final list = <FlowEdge>[];
     var maxGood = 1.0, maxMoney = 1.0;
     for (final e in sim.flowsEma.values) {
-      if (e.value < 0.5) continue;
+      if (e.value < 0.5) continue; // flux insignifiant : pas dessiné
+      final inLayer = layer != null && _inLayer(e);
       if (e.isMoney) {
-        if (!showMoney) continue;
+        if (!showMoney && !inLayer) continue;
         maxMoney = math.max(maxMoney, e.value);
       } else {
-        if (!showServices && _isService(e) && !_hot(e)) continue;
+        if (!showServices && _isService(e) && !_hot(e) && !inLayer) continue;
         maxGood = math.max(maxGood, e.value);
       }
       list.add(e);
     }
+    // le calque par-dessus les flux estompés
+    if (layer != null) list.sort((a, b) => (_inLayer(a) ? 1 : 0) - (_inLayer(b) ? 1 : 0));
     for (final e in list) {
       final a = byKey[e.from];
       final b = byKey[e.to];
@@ -412,15 +575,18 @@ class GraphPainter extends CustomPainter {
         p1 = e.to == 'X' ? b.headLeft : b.inPort(e.good);
         col = pal.sector(goods[e.good]?.sector ?? 'tertiaire');
       }
-      final hot = _hot(e);
+      final inLayer = layer != null && _inLayer(e);
+      final faded = layer != null && !inLayer;
+      final hot = _hot(e) || inLayer;
       final service = _isService(e);
       final ref = e.isMoney ? maxMoney : maxGood;
-      final w = (1.2 + 4.0 * math.sqrt(e.value / ref)).clamp(1.2, 5.2).toDouble();
+      // épaisseur proportionnelle à la valeur du flux ($/j lissés), comme un diagramme de Sankey
+      final w = (1.0 + 11.0 * e.value / ref).clamp(1.0, 12.0).toDouble();
       final dx = math.max(40.0, (p1.dx - p0.dx).abs() * 0.5);
       final path = Path()
         ..moveTo(p0.dx, p0.dy)
         ..cubicTo(p0.dx + dx, p0.dy, p1.dx - dx, p1.dy, p1.dx, p1.dy);
-      final alpha = hot ? 0.95 : (service ? 0.3 : 0.55);
+      final alpha = (hot ? 0.95 : (service ? 0.3 : 0.55)) * (faded ? 0.2 : 1.0);
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = service && !hot ? math.min(w, 2.0) : w
@@ -433,15 +599,16 @@ class GraphPainter extends CustomPainter {
       } else {
         canvas.drawPath(path, paint);
       }
-      _arrow(canvas, p1, col.withValues(alpha: hot ? 0.95 : 0.7));
+      _arrow(canvas, p1, col.withValues(alpha: (hot ? 0.95 : 0.7) * (faded ? 0.2 : 1.0)), paint.strokeWidth);
     }
   }
 
-  void _arrow(Canvas canvas, Offset tip, Color c) {
+  void _arrow(Canvas canvas, Offset tip, Color c, double w) {
+    final half = math.max(4.0, w * 0.75), len = math.max(8.0, w * 1.3);
     final p = Path()
       ..moveTo(tip.dx, tip.dy)
-      ..lineTo(tip.dx - 8, tip.dy - 4)
-      ..lineTo(tip.dx - 8, tip.dy + 4)
+      ..lineTo(tip.dx - len, tip.dy - half)
+      ..lineTo(tip.dx - len, tip.dy + half)
       ..close();
     canvas.drawPath(p, Paint()..color = c);
   }
@@ -471,6 +638,10 @@ class GraphPainter extends CustomPainter {
           ..strokeWidth = selected ? 2.5 : 1
           ..color = selected ? pal.accent : pal.rule);
 
+    if (_macro) {
+      _macroNode(canvas, b);
+      return;
+    }
     switch (b.sel.kind) {
       case 'firm':
         _firmNode(canvas, b);
@@ -486,6 +657,70 @@ class GraphPainter extends CustomPainter {
         break;
       default:
         _worldNode(canvas, b);
+    }
+  }
+
+  /// Vue dézoomée : le code et le nom en gros, la pastille d'état et l'alerte ; pas de lignes.
+  void _macroNode(Canvas canvas, NodeBox b) {
+    final r = b.rect;
+    final k = 1 / _macroStep; // ramène le texte à une taille lisible à l'écran
+    final kk = k.clamp(1.0, 3.0).toDouble();
+    Color accent;
+    String code, title;
+    Color? st;
+    var alert = false;
+    switch (b.sel.kind) {
+      case 'firm':
+        final f = sim.firm(b.sel.id!);
+        if (f == null) return;
+        accent = pal.sector(f.template.sector);
+        code = f.template.code;
+        title = f.name;
+        if (f.workers.isEmpty) {
+          st = pal.bad;
+        } else if (f.inputLimited || f.vacancies > 0 && f.unfilledDays > 10) {
+          st = pal.warn;
+        }
+        final suffix = ':${f.id}';
+        alert = sim.monitor.active.keys.any((x) => x.endsWith(suffix));
+        break;
+      case 'M':
+        (accent, code, title) = (pal.ink2, 'M', 'Ménages');
+        break;
+      case 'E':
+        (accent, code, title) = (pal.accent, 'É', 'État');
+        break;
+      case 'B':
+        (accent, code, title) = (pal.money, 'C', 'Caisse');
+        break;
+      default:
+        (accent, code, title) = (pal.ink3, 'X', 'Extérieur');
+    }
+    canvas.drawRRect(RRect.fromRectAndRadius(r.deflate(1), const Radius.circular(10)),
+        Paint()..color = accent.withValues(alpha: 0.08));
+    canvas.drawRRect(
+        RRect.fromRectAndCorners(Rect.fromLTWH(r.left, r.top, 6 * kk, r.height),
+            topLeft: const Radius.circular(10), bottomLeft: const Radius.circular(10)),
+        Paint()..color = accent);
+    final x = r.left + 6 * kk + 8 * kk;
+    final c = _tp(code, mono(accent, 13 * k, weight: FontWeight.w800), maxWidth: r.right - x - 4);
+    final t = _tp(title, TextStyle(color: pal.ink, fontSize: 10 * k, fontWeight: FontWeight.w700),
+        maxWidth: r.right - x - 4);
+    final both = r.height > c.height + t.height + 8;
+    var y = r.top + (r.height - c.height - (both ? t.height : 0)) / 2;
+    c.paint(canvas, Offset(x, y));
+    y += c.height;
+    if (both) t.paint(canvas, Offset(x, y));
+    final dot = 5 * kk;
+    if (st != null) canvas.drawCircle(Offset(r.right - dot - 6, r.top + dot + 6), dot, Paint()..color = st);
+    if (alert) {
+      final ax = r.right - (st != null ? 3 * dot + 12 : dot * 1.4 + 6), top = r.top + 6;
+      final tri = Path()
+        ..moveTo(ax, top)
+        ..lineTo(ax + dot * 1.4, top + dot * 2.4)
+        ..lineTo(ax - dot * 1.4, top + dot * 2.4)
+        ..close();
+      canvas.drawPath(tri, Paint()..color = pal.warn);
     }
   }
 
