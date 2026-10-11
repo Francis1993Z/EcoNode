@@ -39,6 +39,8 @@ class SimController extends ChangeNotifier {
   Selection selection = const Selection('M');
   bool showMoneyFlows = false;
   bool showServices = false; // flux de services aux entreprises (comptabilité, entretien, publicité, machines)
+  bool showParticles = true; // particules animées sur les flux
+  bool bundleEdges = true; // flux regroupés en troncs entre colonnes éloignées
   bool panelOpen = true;
   int panelTab = Tabs.inspector;
 
@@ -150,6 +152,16 @@ class SimController extends ChangeNotifier {
 
   void toggleServices() {
     showServices = !showServices;
+    notifyListeners();
+  }
+
+  void toggleParticles() {
+    showParticles = !showParticles;
+    notifyListeners();
+  }
+
+  void toggleBundle() {
+    bundleEdges = !bundleEdges;
     notifyListeners();
   }
 

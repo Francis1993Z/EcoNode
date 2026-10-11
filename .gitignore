@@ -10,3 +10,8 @@ android/local.properties
 # journaux et instantanés de tool/partie.dart
 traces/
 instantanes/
+
+# synthèses de stabilite.dart : seules les deux références sont suivies
+rapports/stat/*.json
+!rapports/stat/complet-i1-i5.json
+!rapports/stat/noyau-i1-i5.json

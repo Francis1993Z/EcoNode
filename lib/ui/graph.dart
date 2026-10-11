@@ -2,13 +2,17 @@
 // avec panoramique (1 doigt sur le vide) et zoom (pincement ou molette).
 //
 // Le dessin des nodes et des flux est enregistré une fois par notification de la simulation (WorldCache) : le
-// panoramique et le zoom ne font que le transformer. Dézoomé, chaque node se réduit à son code et à son nom.
+// panoramique et le zoom ne font que le transformer. Trois niveaux de zoom : détail, nodes réduits à leur code et à
+// leur nom, puis entreprises regroupées par colonne (secteur ou profondeur dans la chaîne). Des particules circulent
+// sur les flux, entre le dessin des flux et celui des nodes.
 
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../engine/model.dart';
 import '../engine/sim.dart';
@@ -23,20 +27,59 @@ const String kSvcPort = '@svc';
 /// En dessous de cette échelle, le texte des lignes est illisible : les nodes passent en vue simplifiée.
 const double kMacroScale = 0.55;
 
-/// Dessin du monde (nodes et flux, sans la grille) gardé tant que rien de ce qu'il montre n'a changé.
+/// En dessous de cette échelle, les entreprises se regroupent par colonne de la disposition.
+const double kClusterScale = 0.3;
+
+/// Largeur d'une tuile de groupe (zoom stratégique) ; sa hauteur suit la taille du texte.
+const double kTileW = kNodeW + 56;
+const double kTileH = 108;
+
+/// Pas de l'échelle des vues réduites : la taille du texte (et le cache) ne change qu'à chaque pas.
+double macroStepOf(double scale) => (scale * 20).round().clamp(1, 20) / 20;
+
+/// Un flux dessiné : son tracé sert aussi aux particules.
+class Track {
+  final Path path;
+  final Color color;
+  final double width;
+  final double rel; // valeur rapportée au plus gros flux de son type (biens ou argent)
+  final bool faded;
+  Track(this.path, this.color, this.width, this.rel, this.faded);
+
+  ui.PathMetric? _metric;
+  Rect? _bounds;
+  ui.PathMetric? get metric {
+    if (_metric == null) {
+      final it = path.computeMetrics().iterator;
+      if (it.moveNext()) _metric = it.current;
+    }
+    return _metric;
+  }
+
+  Rect get bounds => _bounds ??= path.getBounds().inflate(width);
+}
+
+/// Dessin du monde gardé tant que rien de ce qu'il montre n'a changé : le fond (flux), le premier plan (nodes) et
+/// les tracés des particules.
 class WorldCache {
-  ui.Picture? picture;
+  ui.Picture? back, front;
+  List<Track> tracks = const [];
   Object? key;
 
-  void set(ui.Picture p, Object k) {
-    picture?.dispose();
-    picture = p;
+  void set(ui.Picture b, ui.Picture f, List<Track> t, Object k) {
+    dispose();
+    back = b;
+    front = f;
+    tracks = t;
     key = k;
   }
 
   void dispose() {
-    picture?.dispose();
-    picture = null;
+    back?.dispose();
+    front?.dispose();
+    back = null;
+    front = null;
+    tracks = const [];
     key = null;
   }
 }
@@ -107,6 +150,54 @@ bool showsExterior(Sim sim) {
   return false;
 }
 
+// ---------------------------------------------------------------- zoom stratégique
+
+const List<String> kClusterLabels = [
+  'Extraction',
+  'Industrie de base',
+  'Industrie avancée',
+  'Haute technologie',
+  'Services aux entreprises',
+  'Services aux ménages',
+];
+
+/// Entreprises d'une même colonne de la disposition, réunies en une tuile au zoom stratégique. Les tuiles sont
+/// alignées à mi-hauteur de l'ensemble, chacune au-dessus de sa colonne ; ouvrir une tuile zoome sur ses membres.
+class ClusterBox {
+  final int col;
+  final Rect members; // boîte englobant les entreprises du groupe
+  final Rect tile;
+  final List<Firm> firms;
+  ClusterBox(this.col, this.members, this.tile, this.firms);
+  String get key => 'c$col';
+  String get sector => col == 0 ? 'primaire' : (col <= 3 ? 'secondaire' : 'tertiaire');
+}
+
+List<ClusterBox> allClusters(Sim sim, double scale) {
+  final by = <int, List<Firm>>{};
+  for (final f in sim.firms) {
+    (by[columnOf(f.type)] ??= []).add(f);
+  }
+  if (by.isEmpty) return [];
+  final cols = by.keys.toList()..sort();
+  final members = {for (final c in cols) c: by[c]!.map((f) => firmBox(f).rect).reduce((a, b) => a.expandToInclude(b))};
+  final all = members.values.reduce((a, b) => a.expandToInclude(b));
+  final h = kTileH / macroStepOf(scale);
+  return [
+    for (final c in cols)
+      ClusterBox(c, members[c]!,
+          Rect.fromCenter(center: Offset(members[c]!.center.dx, all.center.dy), width: kTileW, height: h), by[c]!),
+  ];
+}
+
+/// Colonne d'un node : celle de son type pour une entreprise, 6 pour les nodes spéciaux (État, ménages…).
+int colOfKey(Sim sim, String key) {
+  final id = int.tryParse(key);
+  if (id == null) return 6;
+  final f = sim.firm(id);
+  return f == null ? 6 : columnOf(f.type);
+}
+
 class GraphView extends StatefulWidget {
   final SimController ctrl;
   const GraphView({super.key, required this.ctrl});
@@ -115,7 +206,7 @@ class GraphView extends StatefulWidget {
   State<GraphView> createState() => _GraphViewState();
 }
 
-class _GraphViewState extends State<GraphView> {
+class _GraphViewState extends State<GraphView> with SingleTickerProviderStateMixin {
   double scale = 0.5;
   Offset offset = const Offset(20, 20);
   bool _fitted = false;
@@ -125,13 +216,33 @@ class _GraphViewState extends State<GraphView> {
   // état du geste en cours
   NodeBox? _dragBox;
   final WorldCache _cache = WorldCache();
+  final ValueNotifier<double> _clock = ValueNotifier(0); // temps des particules (s)
+  late final Ticker _ticker;
+  Duration _lastTick = Duration.zero;
   Offset _startFocal = Offset.zero;
   Offset _startOffset = Offset.zero;
   double _startScale = 1;
   bool _moved = false;
 
   @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker(_onTick)..start();
+  }
+
+  /// Les particules avancent avec la partie : arrêtées en pause, plus vives quand elle accélère.
+  void _onTick(Duration elapsed) {
+    final dt = _lastTick == Duration.zero ? 0.0 : (elapsed - _lastTick).inMicroseconds / 1e6;
+    _lastTick = elapsed;
+    final c = widget.ctrl;
+    if (!c.playing || !c.showParticles) return;
+    _clock.value += math.min(dt, 0.1) * math.sqrt(c.speed / 4).clamp(0.5, 2.5);
+  }
+
+  @override
   void dispose() {
+    _ticker.dispose();
+    _clock.dispose();
     _cache.dispose();
     super.dispose();
   }
@@ -140,7 +251,14 @@ class _GraphViewState extends State<GraphView> {
 
   NodeBox? hit(Offset screen) {
     final w = toWorld(screen);
-    final boxes = allBoxes(widget.ctrl.sim);
+    final sim = widget.ctrl.sim;
+    final boxes = allBoxes(sim);
+    if (scale < kClusterScale) {
+      for (final c in allClusters(sim, scale)) {
+        if (c.tile.contains(w)) return NodeBox(Selection('cluster', c.col), c.members, const {}, const {});
+      }
+      boxes.removeWhere((b) => b.sel.kind == 'firm');
+    }
     for (var i = boxes.length - 1; i >= 0; i--) {
       if (boxes[i].rect.inflate(4).contains(w)) return boxes[i];
     }
@@ -159,6 +277,15 @@ class _GraphViewState extends State<GraphView> {
     setState(() {
       scale = s;
       offset = Offset((_size.width - r.width * s) / 2 - r.left * s, (_size.height - r.height * s) / 2 - r.top * s);
+    });
+  }
+
+  /// Ouvre un groupe : zoom jusqu'à la vue des nodes, centré sur lui.
+  void explode(Rect r) {
+    final s = math.max(kMacroScale + 0.05, math.min(_size.width / r.width, _size.height / r.height) * 0.9);
+    setState(() {
+      scale = s.clamp(0.15, 2.5).toDouble();
+      offset = Offset(_size.width / 2, _size.height / 2) - r.center * scale;
     });
   }
 
@@ -196,7 +323,14 @@ class _GraphViewState extends State<GraphView> {
     if (b != null) {
       final delta = d.focalPointDelta / scale;
       final sim = widget.ctrl.sim;
-      if (b.sel.kind == 'firm') {
+      if (b.sel.kind == 'cluster') {
+        for (final f in sim.firms) {
+          if (columnOf(f.type) == b.sel.id) {
+            f.x += delta.dx;
+            f.y += delta.dy;
+          }
+        }
+      } else if (b.sel.kind == 'firm') {
         final f = sim.firm(b.sel.id!);
         if (f != null) {
           f.x += delta.dx;
@@ -218,7 +352,11 @@ class _GraphViewState extends State<GraphView> {
   void _onScaleEnd(ScaleEndDetails d) {
     if (!_moved) {
       final b = hit(_startFocal);
-      if (b != null) widget.ctrl.select(b.sel);
+      if (b != null && b.sel.kind == 'cluster') {
+        explode(b.rect);
+      } else if (b != null) {
+        widget.ctrl.select(b.sel);
+      }
     }
     _dragBox = null;
   }
@@ -252,21 +390,36 @@ class _GraphViewState extends State<GraphView> {
               child: ClipRect(
                 child: AnimatedBuilder(
                   animation: widget.ctrl,
-                  builder: (context, _) => CustomPaint(
-                    size: Size.infinite,
-                    painter: GraphPainter(
-                      sim: widget.ctrl.sim,
-                      selection: widget.ctrl.selection,
-                      showMoney: widget.ctrl.showMoneyFlows,
-                      showServices: widget.ctrl.showServices,
-                      pal: pal,
-                      scale: scale,
-                      offset: offset,
-                      stamp: widget.ctrl.rev,
-                      layer: widget.ctrl.layer,
-                      cache: _cache,
-                    ),
-                  ),
+                  builder: (context, _) {
+                    final ctrl = widget.ctrl;
+                    GraphPainter painter(GraphPart part) => GraphPainter(
+                          sim: ctrl.sim,
+                          selection: ctrl.selection,
+                          showMoney: ctrl.showMoneyFlows,
+                          showServices: ctrl.showServices,
+                          pal: pal,
+                          scale: scale,
+                          offset: offset,
+                          stamp: ctrl.rev,
+                          layer: ctrl.layer,
+                          cache: _cache,
+                          part: part,
+                          bundle: ctrl.bundleEdges,
+                          particles: ctrl.showParticles,
+                        );
+                    // fond (flux), particules dans leur propre calque (seul redessiné à chaque image), puis nodes
+                    return CustomPaint(
+                      painter: painter(GraphPart.back),
+                      foregroundPainter: painter(GraphPart.front),
+                      child: RepaintBoundary(
+                        child: CustomPaint(
+                          size: Size.infinite,
+                          painter: ParticlePainter(
+                              cache: _cache, scale: scale, offset: offset, clock: _clock, on: ctrl.showParticles),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -289,6 +442,20 @@ class _GraphViewState extends State<GraphView> {
                 tooltip: 'Flux de services aux entreprises',
                 active: widget.ctrl.showServices,
                 onTap: widget.ctrl.toggleServices,
+              ),
+              const SizedBox(width: 6),
+              _MiniBtn(
+                icon: Icons.animation,
+                tooltip: 'Particules sur les flux',
+                active: widget.ctrl.showParticles,
+                onTap: widget.ctrl.toggleParticles,
+              ),
+              const SizedBox(width: 6),
+              _MiniBtn(
+                icon: Icons.call_merge,
+                tooltip: 'Regrouper les flux en troncs',
+                active: widget.ctrl.bundleEdges,
+                onTap: widget.ctrl.toggleBundle,
               ),
               const SizedBox(width: 6),
               _LayerBtn(ctrl: widget.ctrl),
@@ -400,6 +567,19 @@ class _MiniBtn extends StatelessWidget {
 
 // ---------------------------------------------------------------- dessin
 
+enum GraphPart { back, front }
+
+/// Géométrie d'un flux, avant dessin (le regroupement des arêtes peut remplacer son tracé).
+class _Geo {
+  final FlowEdge e;
+  final Offset p0, p1;
+  final Color color;
+  final double w, rel;
+  final bool hot, faded, service;
+  Path? path;
+  _Geo(this.e, this.p0, this.p1, this.color, this.w, this.rel, this.hot, this.faded, this.service);
+}
+
 class GraphPainter extends CustomPainter {
   final Sim sim;
   final Selection selection;
@@ -411,6 +591,9 @@ class GraphPainter extends CustomPainter {
   final int stamp; // révision du contrôleur : change à chaque notification
   final String? layer;
   final WorldCache? cache;
+  final GraphPart part; // fond (grille et flux) ou premier plan (nodes) ; les particules passent entre les deux
+  final bool bundle;
+  final bool particles;
 
   GraphPainter({
     required this.sim,
@@ -423,21 +606,25 @@ class GraphPainter extends CustomPainter {
     required this.stamp,
     this.layer,
     this.cache,
+    this.part = GraphPart.back,
+    this.bundle = false,
+    this.particles = false,
   });
 
   @override
   bool shouldRepaint(covariant GraphPainter old) => true; // l'état de sim est mutable ; le dessin du monde est en cache
 
   bool get _macro => scale < kMacroScale;
+  bool get _cluster => scale < kClusterScale;
 
   /// Échelle arrondie de la vue simplifiée : la taille du texte en dépend, le cache aussi.
-  double get _macroStep => (scale * 20).round().clamp(1, 20) / 20;
+  double get _macroStep => macroStepOf(scale);
 
-  TextPainter _tp(String text, TextStyle style, {double? maxWidth, TextAlign align = TextAlign.left}) {
+  TextPainter _tp(String text, TextStyle style, {double? maxWidth, TextAlign align = TextAlign.left, int maxLines = 1}) {
     final tp = TextPainter(
       text: TextSpan(text: text, style: style),
       textDirection: ui.TextDirection.ltr,
-      maxLines: 1,
+      maxLines: maxLines,
       ellipsis: '…',
       textAlign: align,
     );
@@ -447,38 +634,57 @@ class GraphPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = pal.paper);
-    _grid(canvas, size);
+    if (part == GraphPart.back) {
+      canvas.drawRect(Offset.zero & size, Paint()..color = pal.paper);
+      _grid(canvas, size);
+    }
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
     canvas.scale(scale);
     final c = cache;
     if (c == null) {
-      _world(canvas);
-    } else {
-      final key = (stamp, pal, _macro ? _macroStep : 0.0, showMoney, showServices, selection, layer);
-      if (c.picture == null || c.key != key) {
-        final rec = ui.PictureRecorder();
-        _world(Canvas(rec));
-        c.set(rec.endRecording(), key);
+      // dessin direct, sans cache (mesures)
+      if (part == GraphPart.back) {
+        _cluster ? _clusterEdges(canvas, []) : _edges(canvas, []);
+      } else {
+        _cluster ? _clusterNodes(canvas) : _nodes(canvas);
       }
-      canvas.drawPicture(c.picture!);
+    } else {
+      _ensure(c);
+      canvas.drawPicture(part == GraphPart.back ? c.back! : c.front!);
     }
     canvas.restore();
   }
 
-  void _world(Canvas canvas) {
-    final boxes = allBoxes(sim);
-    final byKey = <String, NodeBox>{for (final b in boxes) keyOf(b.sel): b};
-    _edges(canvas, byKey);
+  /// Enregistre les deux dessins du monde et les tracés des particules, si ce qu'ils montrent a changé.
+  void _ensure(WorldCache c) {
+    final lod = _cluster ? -_macroStep : (_macro ? _macroStep : 0.0);
+    final key = (stamp, pal, lod, showMoney, showServices, selection, layer, bundle, particles);
+    if (c.back != null && c.key == key) return;
+    final rb = ui.PictureRecorder(), rf = ui.PictureRecorder();
+    final tracks = <Track>[];
+    final cb = Canvas(rb), cf = Canvas(rf);
+    if (_cluster) {
+      _clusterEdges(cb, tracks);
+      _clusterNodes(cf);
+    } else {
+      _edges(cb, tracks);
+      _nodes(cf);
+    }
+    c.set(rb.endRecording(), rf.endRecording(), tracks, key);
+  }
+
+  void _fade(Canvas canvas, Rect r) {
+    // hors du calque : le node s'estompe (20 % d'opacité)
+    canvas.drawRRect(RRect.fromRectAndRadius(r.inflate(1), const Radius.circular(10)),
+        Paint()..color = pal.paper.withValues(alpha: 0.8));
+  }
+
+  void _nodes(Canvas canvas) {
     final focus = _involved();
-    for (final b in boxes) {
+    for (final b in allBoxes(sim)) {
       _node(canvas, b);
-      if (focus != null && !focus.contains(keyOf(b.sel))) {
-        // hors du calque : le node s'estompe (20 % d'opacité)
-        canvas.drawRRect(RRect.fromRectAndRadius(b.rect.inflate(1), const Radius.circular(10)),
-            Paint()..color = pal.paper.withValues(alpha: 0.8));
-      }
+      if (focus != null && !focus.contains(keyOf(b.sel))) _fade(canvas, b.rect);
     }
   }
 
@@ -541,7 +747,12 @@ class GraphPainter extends CustomPainter {
     return e.from == k || e.to == k;
   }
 
-  void _edges(Canvas canvas, Map<String, NodeBox> byKey) {
+  /// Épaisseur proportionnelle à la valeur du flux ($/j lissés), comme un diagramme de Sankey.
+  static double sankey(double value, double ref) => (1.0 + 11.0 * value / ref).clamp(1.0, 12.0).toDouble();
+
+  void _edges(Canvas canvas, List<Track> tracks) {
+    final boxes = allBoxes(sim);
+    final byKey = <String, NodeBox>{for (final b in boxes) keyOf(b.sel): b};
     final list = <FlowEdge>[];
     var maxGood = 1.0, maxMoney = 1.0;
     for (final e in sim.flowsEma.values) {
@@ -558,6 +769,7 @@ class GraphPainter extends CustomPainter {
     }
     // le calque par-dessus les flux estompés
     if (layer != null) list.sort((a, b) => (_inLayer(a) ? 1 : 0) - (_inLayer(b) ? 1 : 0));
+    final geo = <_Geo>[];
     for (final e in list) {
       final a = byKey[e.from];
       final b = byKey[e.to];
@@ -576,30 +788,89 @@ class GraphPainter extends CustomPainter {
         col = pal.sector(goods[e.good]?.sector ?? 'tertiaire');
       }
       final inLayer = layer != null && _inLayer(e);
-      final faded = layer != null && !inLayer;
-      final hot = _hot(e) || inLayer;
       final service = _isService(e);
+      final hot = _hot(e) || inLayer;
       final ref = e.isMoney ? maxMoney : maxGood;
-      // épaisseur proportionnelle à la valeur du flux ($/j lissés), comme un diagramme de Sankey
-      final w = (1.0 + 11.0 * e.value / ref).clamp(1.0, 12.0).toDouble();
-      final dx = math.max(40.0, (p1.dx - p0.dx).abs() * 0.5);
-      final path = Path()
-        ..moveTo(p0.dx, p0.dy)
-        ..cubicTo(p0.dx + dx, p0.dy, p1.dx - dx, p1.dy, p1.dx, p1.dy);
-      final alpha = (hot ? 0.95 : (service ? 0.3 : 0.55)) * (faded ? 0.2 : 1.0);
+      var w = sankey(e.value, ref);
+      if (service && !hot) w = math.min(w, 2.0);
+      if (_macro) w *= math.max(1.0, 0.5 / _macroStep); // reste lisible quand on dézoome
+      geo.add(_Geo(e, p0, p1, col, w, e.value / ref, hot, layer != null && !inLayer, service));
+    }
+    if (bundle) _bundle(geo, boxes);
+    for (final g in geo) {
+      final dx = math.max(40.0, (g.p1.dx - g.p0.dx).abs() * 0.5);
+      final path = g.path ??
+          (Path()
+            ..moveTo(g.p0.dx, g.p0.dy)
+            ..cubicTo(g.p0.dx + dx, g.p0.dy, g.p1.dx - dx, g.p1.dy, g.p1.dx, g.p1.dy));
+      final alpha = (g.hot ? 0.95 : (g.service ? 0.3 : 0.55)) * (g.faded ? 0.2 : 1.0);
       final paint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = service && !hot ? math.min(w, 2.0) : w
-        ..strokeCap = StrokeCap.round
-        ..color = col.withValues(alpha: alpha);
-      if (e.isMoney) {
+        ..strokeWidth = g.w
+        ..strokeCap = g.path != null ? StrokeCap.butt : StrokeCap.round
+        ..color = g.color.withValues(alpha: alpha);
+      if (g.e.isMoney) {
         _dashed(canvas, path, paint, 7, 5);
-      } else if (service) {
+      } else if (g.service) {
         _dashed(canvas, path, paint, 3, 4);
       } else {
         canvas.drawPath(path, paint);
       }
-      _arrow(canvas, p1, col.withValues(alpha: (hot ? 0.95 : 0.7) * (faded ? 0.2 : 1.0)), paint.strokeWidth);
+      // les particules disent le sens du flux ; sans elles, une flèche
+      if (!particles) _arrow(canvas, g.p1, g.color.withValues(alpha: (g.hot ? 0.95 : 0.7) * (g.faded ? 0.2 : 1.0)), g.w);
+      tracks.add(Track(path, g.color, g.w, g.rel, g.faded));
+    }
+  }
+
+  /// Regroupement des arêtes : les flux de biens qui vont d'une colonne à une autre plus à droite, à au moins une
+  /// colonne d'écart, partagent un tronc. Ils y sont empilés côte à côte (la largeur du tronc est la somme de leurs
+  /// largeurs) et ne s'en séparent qu'à l'approche de leurs nodes, dans l'allée qui précède la colonne d'arrivée.
+  void _bundle(List<_Geo> geo, List<NodeBox> boxes) {
+    final colRect = <int, Rect>{};
+    for (final b in boxes) {
+      final c = colOfKey(sim, keyOf(b.sel));
+      colRect[c] = colRect[c]?.expandToInclude(b.rect) ?? b.rect;
+    }
+    final groups = <(int, int), List<_Geo>>{};
+    for (final g in geo) {
+      if (g.e.isMoney || g.e.from == 'X' || g.e.to == 'X') continue;
+      final a = colOfKey(sim, g.e.from), b = colOfKey(sim, g.e.to);
+      if (b - a < 2) continue;
+      (groups[(a, b)] ??= []).add(g);
+    }
+    // un tronc par paire de colonnes ; les troncs sont écartés verticalement pour ne pas se recouvrir
+    final trunks = <(double, double, List<_Geo>, double, double)>[]; // centre, largeur, flux, début, fin
+    for (final en in groups.entries) {
+      final list = en.value;
+      if (list.length < 2) continue;
+      final sx = colRect[en.key.$1]!.right + (kColW - kNodeW) / 2;
+      final tx = colRect[en.key.$2]!.left - (kColW - kNodeW) / 2;
+      if (tx - sx < 60) continue;
+      var total = 0.0, cy = 0.0;
+      for (final g in list) {
+        total += g.w;
+        cy += (g.p0.dy + g.p1.dy) / 2 * g.w;
+      }
+      trunks.add((cy / total, total, list, sx, tx));
+    }
+    trunks.sort((a, b) => a.$1.compareTo(b.$1));
+    var floor = -double.infinity;
+    for (var i = 0; i < trunks.length; i++) {
+      final t = trunks[i];
+      final top = math.max(t.$1 - t.$2 / 2, floor);
+      floor = top + t.$2 + 8;
+      final list = t.$3..sort((p, q) => (p.p0.dy + p.p1.dy).compareTo(q.p0.dy + q.p1.dy));
+      var y = top;
+      for (final g in list) {
+        final yi = y + g.w / 2;
+        y += g.w;
+        final d0 = math.max(20.0, (t.$4 - g.p0.dx) * 0.6), d1 = math.max(20.0, (g.p1.dx - t.$5) * 0.6);
+        g.path = Path()
+          ..moveTo(g.p0.dx, g.p0.dy)
+          ..cubicTo(g.p0.dx + d0, g.p0.dy, t.$4 - d0, yi, t.$4, yi)
+          ..lineTo(t.$5, yi)
+          ..cubicTo(t.$5 + d1, yi, g.p1.dx - d1, g.p1.dy, g.p1.dx, g.p1.dy);
+      }
     }
   }
 
@@ -621,6 +892,176 @@ class GraphPainter extends CustomPainter {
         d += on + off;
       }
     }
+  }
+
+  // ---- zoom stratégique : groupes d'entreprises
+
+  /// Groupe d'un node : la colonne d'une entreprise, ou le node spécial lui-même.
+  String _group(String key) {
+    final id = int.tryParse(key);
+    if (id == null) return key;
+    final f = sim.firm(id);
+    return f == null ? key : 'c${columnOf(f.type)}';
+  }
+
+  /// Flux additionnés entre groupes (et nodes spéciaux), dessinés en arcs : vers la droite sous les tuiles, vers la
+  /// gauche au-dessus ; les nodes spéciaux (colonne de droite) sont reliés par leur côté gauche. À chaque extrémité,
+  /// les flux sont empilés comme dans un diagramme de Sankey, l'épaisseur restant constante à l'écran.
+  void _clusterEdges(Canvas canvas, List<Track> tracks) {
+    final k = 1 / _macroStep;
+    final rectOf = <String, Rect>{};
+    final colOf = <String, int>{};
+    for (final c in allClusters(sim, scale)) {
+      rectOf[c.key] = c.tile;
+      colOf[c.key] = c.col;
+    }
+    for (final b in allBoxes(sim)) {
+      if (b.sel.kind != 'firm') {
+        rectOf[keyOf(b.sel)] = b.rect;
+        colOf[keyOf(b.sel)] = 6;
+      }
+    }
+    final agg = <(String, String, bool), Map<String, double>>{}; // de, vers, argent → valeur par bien
+    final inL = <(String, String, bool), double>{};
+    for (final e in sim.flowsEma.values) {
+      if (e.value < 0.5) continue;
+      final inLayer = layer != null && _inLayer(e);
+      if (e.isMoney && !showMoney && !inLayer) continue;
+      if (!e.isMoney && !showServices && _isService(e) && !inLayer) continue;
+      final a = _group(e.from), b = _group(e.to);
+      if (a == b || !rectOf.containsKey(a) || !rectOf.containsKey(b)) continue;
+      final key = (a, b, e.isMoney);
+      final m = agg[key] ??= {};
+      m[e.good] = (m[e.good] ?? 0) + e.value;
+      if (inLayer) inL[key] = (inL[key] ?? 0) + e.value;
+    }
+    var maxGood = 1.0, maxMoney = 1.0;
+    final total = <(String, String, bool), double>{};
+    for (final en in agg.entries) {
+      final v = en.value.values.fold(0.0, (s, x) => s + x);
+      total[en.key] = v;
+      if (en.key.$3) {
+        maxMoney = math.max(maxMoney, v);
+      } else {
+        maxGood = math.max(maxGood, v);
+      }
+    }
+    double width((String, String, bool) key) => sankey(total[key]!, key.$3 ? maxMoney : maxGood) * k;
+    // côté d'accroche : 'b' dessous, 't' dessus, 'l' gauche (nodes spéciaux)
+    String side(String node, String other) {
+      if (colOf[node] == 6) return 'l';
+      return rectOf[node]!.center.dx < rectOf[other]!.center.dx ? 'b' : 't';
+    }
+
+    final keys = agg.keys.toList();
+    if (layer != null) keys.sort((p, q) => (inL.containsKey(p) ? 1 : 0) - (inL.containsKey(q) ? 1 : 0));
+    final sides = <(String, String), List<(String, String, bool)>>{};
+    for (final key in keys) {
+      (sides[(key.$1, side(key.$1, key.$2))] ??= []).add(key);
+      (sides[(key.$2, side(key.$2, key.$1))] ??= []).add(key);
+    }
+    final ends = <((String, String, bool), String), (Offset, Offset)>{}; // point, normale sortante
+    for (final en in sides.entries) {
+      final node = en.key.$1, sd = en.key.$2;
+      final r = rectOf[node]!;
+      Offset otherOf((String, String, bool) key) => rectOf[key.$1 == node ? key.$2 : key.$1]!.center;
+      final list = en.value
+        ..sort((p, q) => sd == 'l' ? otherOf(p).dy.compareTo(otherOf(q).dy) : otherOf(p).dx.compareTo(otherOf(q).dx));
+      final sum = list.fold(0.0, (acc, key) => acc + width(key));
+      var at = (sd == 'l' ? r.center.dy : r.center.dx) - sum / 2;
+      for (final key in list) {
+        final w = width(key);
+        final c = at + w / 2;
+        at += w;
+        ends[(key, node)] = switch (sd) {
+          'l' => (Offset(r.left, c), const Offset(-1, 0)),
+          'b' => (Offset(c, r.bottom), const Offset(0, 1)),
+          _ => (Offset(c, r.top), const Offset(0, -1)),
+        };
+      }
+    }
+    for (final key in keys) {
+      final (p0, n0) = ends[(key, key.$1)]!;
+      final (p1, n1) = ends[(key, key.$2)]!;
+      final byGood = agg[key]!;
+      final main = byGood.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+      final col = key.$3 ? pal.money : pal.sector(goods[main]?.sector ?? 'tertiaire');
+      final faded = layer != null && !inL.containsKey(key);
+      final w = width(key);
+      final span = ((colOf[key.$1]! - colOf[key.$2]!).abs()).clamp(1, 6);
+      final h = (16 + 14 * span) * k;
+      final c0 = p0 + n0 * h, c1 = p1 + n1 * h;
+      final path = Path()
+        ..moveTo(p0.dx, p0.dy)
+        ..cubicTo(c0.dx, c0.dy, c1.dx, c1.dy, p1.dx, p1.dy);
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = w
+        ..color = col.withValues(alpha: (faded ? 0.2 : 1.0) * (layer != null && !faded ? 0.95 : 0.6));
+      if (key.$3) {
+        _dashed(canvas, path, paint, 7 * k, 5 * k);
+      } else {
+        canvas.drawPath(path, paint);
+      }
+      tracks.add(Track(path, col, w, total[key]! / (key.$3 ? maxMoney : maxGood), faded));
+    }
+  }
+
+  void _clusterNodes(Canvas canvas) {
+    final focus = _involved();
+    for (final c in allClusters(sim, scale)) {
+      _clusterNode(canvas, c);
+      if (focus != null && !c.firms.any((f) => focus.contains(f.id.toString()))) _fade(canvas, c.tile);
+    }
+    for (final b in allBoxes(sim)) {
+      if (b.sel.kind == 'firm') continue;
+      _node(canvas, b);
+      if (focus != null && !focus.contains(keyOf(b.sel))) _fade(canvas, b.rect);
+    }
+  }
+
+  /// Un groupe : son nom, le nombre d'entreprises et d'emplois, le profit total, les entreprises à l'arrêt et les
+  /// alertes de ses membres.
+  void _clusterNode(Canvas canvas, ClusterBox c) {
+    final r = c.tile;
+    final k = 1 / _macroStep;
+    final kk = k.clamp(1.0, 4.0).toDouble();
+    final accent = pal.sector(c.sector);
+    final rr = RRect.fromRectAndRadius(r, Radius.circular(8 * kk));
+    final selected = selection.kind == 'firm' && c.firms.any((f) => f.id == selection.id);
+    canvas.drawRRect(rr, Paint()..color = pal.node);
+    canvas.drawRRect(rr, Paint()..color = accent.withValues(alpha: 0.10));
+    canvas.drawRRect(
+        rr,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = (selected ? 2.5 : 1.2) * kk
+          ..color = selected ? pal.accent : accent.withValues(alpha: 0.6));
+    var workers = 0, idle = 0, alerts = 0;
+    var profit = 0.0;
+    for (final f in c.firms) {
+      workers += f.workers.length;
+      if (f.workers.isEmpty) idle++;
+      profit += f.profitEma;
+      final suffix = ':${f.id}';
+      if (sim.monitor.active.keys.any((x) => x.endsWith(suffix))) alerts++;
+    }
+    final x = r.left + 8 * kk, maxW = r.width - 16 * kk;
+    var y = r.top + 8 * kk;
+    void line(String t, TextStyle s, {int lines = 1}) {
+      final tp = _tp(t, s, maxWidth: maxW, maxLines: lines);
+      if (y + tp.height > r.bottom - 4 * kk) return;
+      tp.paint(canvas, Offset(x, y));
+      y += tp.height + 2 * kk;
+    }
+
+    line(kClusterLabels[c.col], TextStyle(color: accent, fontSize: 9 * k, fontWeight: FontWeight.w800, height: 1.1),
+        lines: 2);
+    line('${c.firms.length} entr.', mono(pal.ink, 9 * k, weight: FontWeight.w700));
+    line('$workers empl.', mono(pal.ink2, 9 * k));
+    line('${profit >= 0 ? '+' : ''}${fmtNum(profit, 0)} \$/j', mono(profit >= 0 ? pal.ok : pal.bad, 9 * k));
+    if (idle > 0) line('$idle à l\'arrêt', mono(pal.bad, 9 * k, weight: FontWeight.w700));
+    if (alerts > 0) line('▲ $alerts', mono(pal.warn, 9 * k, weight: FontWeight.w800));
   }
 
   // ---- nodes
@@ -863,5 +1304,48 @@ class GraphPainter extends CustomPainter {
     final r = b.rect;
     _header(canvas, r, pal.ink3, 'X', 'Extérieur', sim.params.trade ? 'frontières ouvertes' : 'frontières fermées');
     _footer(canvas, r, 'import ${kmoney(sim.ledgerImports)}', 'export ${kmoney(sim.ledgerExports)}');
+  }
+}
+
+/// Particules sur les flux : leur vitesse suit la valeur du flux, leur pas et leur taille restent lisibles à toute
+/// échelle. Seuls les flux visibles à l'écran sont parcourus.
+class ParticlePainter extends CustomPainter {
+  final WorldCache cache;
+  final double scale;
+  final Offset offset;
+  final ValueListenable<double> clock;
+  final bool on;
+  ParticlePainter({required this.cache, required this.scale, required this.offset, required this.clock, required this.on})
+      : super(repaint: clock);
+
+  @override
+  bool shouldRepaint(covariant ParticlePainter old) => true;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!on || cache.tracks.isEmpty) return;
+    final view = Rect.fromLTWH(-offset.dx / scale, -offset.dy / scale, size.width / scale, size.height / scale);
+    canvas.save();
+    canvas.translate(offset.dx, offset.dy);
+    canvas.scale(scale);
+    final t = clock.value;
+    final spacing = math.max(40.0, 26 / scale);
+    final paint = Paint()..strokeCap = StrokeCap.round;
+    for (final tr in cache.tracks) {
+      if (tr.faded || !tr.bounds.overlaps(view)) continue;
+      final m = tr.metric;
+      if (m == null || m.length < 1) continue;
+      final speed = (18 + 90 * tr.rel) * math.max(1.0, 0.5 / scale);
+      final pts = <Offset>[];
+      for (var d = (t * speed) % spacing; d < m.length; d += spacing) {
+        final p = m.getTangentForOffset(d);
+        if (p != null) pts.add(p.position);
+      }
+      paint
+        ..strokeWidth = math.max(tr.width + 2.5, 4 / scale)
+        ..color = tr.color.withValues(alpha: 0.9);
+      canvas.drawPoints(ui.PointMode.points, pts, paint);
+    }
+    canvas.restore();
   }
 }
