@@ -123,6 +123,9 @@ flutter build web
   `sim.dart` (simulation, filets, invariants), `monitor.dart` (détecteurs d'anomalies).
 - `lib/ui/` : contrôleur, disposition et dessin du graphe, inspecteurs, onglets Diagnostic, God mode, Économie, Modèle.
 - `tool/stabilite.dart` : protocole de stabilité en ligne de commande.
+- `tool/stabilite.dart --niveau 0|1|2` : protocole en trois niveaux (fumée, décision, échelle) ; `tool/perf.dart` :
+  temps par jour et mémoire d'une partie ; `tool/echelle.dart` : ratios du jour 1 selon la population ;
+  `bash tool/compiler.sh` : exécutables natifs des outils dans `build/outils/`.
 - `tool/partie.dart` : une partie en ligne de commande, avec ses journaux complets, ses instantanés et `--diff` ;
   `--sans-hasard` joue une partie où tous les tirages valent 0,5, lisible à la main.
 - `tool/detresse.dart` : ce qui distingue les citoyens en détresse des autres (à partir d'`agents_fin.csv`).

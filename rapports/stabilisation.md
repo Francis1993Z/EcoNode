@@ -1689,3 +1689,143 @@ la population).
 - Ce qui reste vient de la création d'entreprise, plafonnée en nombre absolu.
 - La cause de refus dominante est la concurrence (plafond de 3 producteurs), suivie du délai par type.
 - La tâche 2 se justifie : la création est trop rare à grande taille, et bloquée par des conditions fixes.
+
+## 7. Performance du protocole à grande population (12 octobre 2026)
+
+Aucune règle économique ne change. Chaque optimisation laisse identiques, au bit près :
+
+- l'empreinte de `tool/parite.dart` sur la VM ;
+- les résultats du protocole (valeurs comparées ci-dessous) ;
+- les parties vérifiées pas à pas.
+
+Machine : AMD Ryzen 7 5800X (8 cœurs, 16 fils), 32 Go.
+
+### Tâche 1 — Mesurer
+
+- **`tool/perf.dart`** : temps par jour (médiane des jours 100 à 300, graine 1, avec filets), mémoire maximale du
+  processus, empreinte de la partie. L'option `--population` existait déjà dans `stabilite.dart` et `partie.dart`.
+- **Profil à 3 000 habitants** (échantillonneur du service VM, 60 s). La consommation des ménages prend 97 % du temps,
+  dont 82 % pour les loisirs (`_leisure`). Fonctions les plus coûteuses, en part du temps total (inclusif) :
+
+| Fonction | Part |
+|---|---|
+| `Sim.quote` | 50,1 % |
+| `Sim.buy` | 33,0 % |
+| `Sim.bestPrice` | 31,0 % |
+| tri stable des offres (`stableSort`) | 9,3 % |
+| recherches dans les tables par nom de bien (`Map.[]`) | 37,2 % |
+
+- **Cause.** Pour chaque bien envisagé, et chaque achat d'un ménage, `quote` et `bestPrice` parcourent tous les vendeurs
+  du bien, et `buy` tire puis trie toutes leurs offres. Le nombre de vendeurs croît avec la population (scénario répété,
+  § 6) : le coût d'une journée croît à peu près comme N².
+
+### Tâche 2 — Corriger les goulots (fonctions modifiées : `Sim.quote`, `Sim.bestPrice`, `Sim._consume`, `Sim.buy`)
+
+| Étape | 3 000 habitants (ms par jour) |
+|---|---|
+| Départ | 211 |
+| 1. Meilleurs prix en cache pendant la consommation (`_BestOffers`) | 111 |
+| 2. Ordre des offres sans tri complet (`_AllOffers`) | 102 |
+| Essai rejeté : vendeurs élagués par une borne de la clé | 128 |
+| 3. Prix et attraits lus une fois par bien et par jour | 94 |
+
+1. **Meilleurs prix en cache.** Pendant la consommation, aucun prix ne change et les stocks ne font que baisser. Une
+   liste des vendeurs triée par prix, avec un pointeur qui saute ceux passés sous une unité, donne donc les mêmes
+   minima. Gain : 211 → 111 ms par jour.
+2. **Ordre des offres.** Un achat s'arrête presque toujours après une ou deux offres. Les quatre premières sont prises
+   par sélection de la plus petite clé (la première à égalité, comme le tri stable) ; le reste n'est trié que s'il en
+   faut plus. Gain : 111 → 102 ms.
+3. **Essai rejeté : élagage par une borne.** La clé d'une offre n'est jamais sous prix × attrait. Mais les entreprises
+   répétées ont des prix voisins, presque tous dans la bande de 3 %, et le surcoût des tables d'appoint l'emporte :
+   102 → 128 ms. Retiré.
+4. **Prix et attraits lus une fois.** Pendant la consommation, prix et attrait des vendeurs sont lus une fois par bien
+   et par jour ; seuls les stocks sont relus à chaque achat. Gain : 102 → 94 ms, moins de 10 %. Arrêt, selon la règle de
+   la mission.
+
+**Preuve d'identité.**
+
+- **Parité.** L'empreinte de `tool/parite.dart` est identique (VM, puis exécutable natif). Une seule ligne diffère de
+  l'ancienne référence : le tirage du 17ᵉ flux de hasard (`logement`), ajouté par la branche bâtiments, et non par ces
+  optimisations.
+- **Vérification pas à pas.** Le drapeau de test `Sim.verifyFastPaths` recalcule chaque meilleur prix par le chemin
+  complet et lève une erreur à la moindre différence. Pendant l'essai d'élagage, il comparait aussi l'ordre des offres.
+  Résultat : 0 différence sur 3 600 jours (1 000 habitants, graines 1 à 3, 400 jours ; 3 000 habitants, graines 1 à 3,
+  200 jours ; sans et avec filets ; invariants exacts).
+- **Protocole.** Les résultats sont identiques avant et après (voir la tâche 5). Au niveau 1, ils reproduisent
+  `rapports/stat/complet-i1-i5.json`, la référence de la tâche 2 : 2 640 valeurs et 300 chocs, 0 différence.
+
+**Temps par jour et mémoire** (graine 1, avec filets ; JIT par `dart run`) :
+
+| Population | Avant | Après | Mémoire maximale (JIT ; natif) |
+|---|---|---|---|
+| 240 | 4,55 ms | 4,10 ms | 250 Mo ; 24 Mo |
+| 1 000 | 32,6 ms | 21,2 ms | 254 Mo ; 51 Mo |
+| 3 000 | 211 ms | 93,9 ms | 268 Mo ; 79 Mo |
+| 13 240 | 3 937 ms | 1 372 ms | 287 Mo ; — |
+| Exposant b (temps ≈ a·N^b, moindres carrés sur les 4 tailles) | 1,69 | 1,44 | |
+
+La mesure « après » à 13 240 habitants a tourné en même temps qu'une autre exécution : le temps est peut-être un peu
+surestimé.
+
+**Ce qui reste superlinéaire, et pourquoi on s'arrête.** Chaque achat d'un ménage tire et compare les offres de tous
+les vendeurs du bien : c'est la règle du marché, pas un détail d'implémentation. Rapprocher b de 1 demanderait de
+changer cette règle, par exemple en tirant au hasard un échantillon de vendeurs par achat. C'est hors mission. Le GPU,
+un port natif ou le SIMD ne sont pas justifiés tant que ce choix de modèle n'est pas tranché.
+
+### Tâche 3 — Compilation native des outils
+
+- **`tool/compiler.sh`** compile `stabilite`, `partie`, `perf`, `parite` et `echelle` dans `build/outils/` (16 s). Le
+  moteur est figé dans chaque exécutable : modifier `lib/` pendant qu'un protocole tourne ne change plus la partie en
+  cours.
+- **Identité.** L'empreinte de parité de l'exécutable est identique à celle de la VM. Au niveau 1, l'exécutable et
+  `dart run` donnent les mêmes 3 360 valeurs et 300 chocs ; au niveau 0, 16 isolats et 1 isolat les mêmes 560 valeurs.
+- **Gain.**
+  - **Durée :** aucun. Au niveau 1 : 2 min 45 s pour l'exécutable, 2 min 49 s pour `dart run`. À 3 000 habitants,
+    105 ms par jour en natif contre 94 ms en JIT, machine chargée pendant la mesure native.
+  - **Mémoire :** divisée par 3 à 10.
+  - **Démarrage :** plus rapide (pas de compilation au lancement).
+
+### Tâche 4 — Chocs depuis un instantané
+
+- **Ce qui change.** Une tâche de chocs couvre désormais une graine et un réglage des filets. Les jours 1 à 300 sont
+  joués une fois et l'instantané du jour du choc est enregistré. Les cinq chocs repartent de cet instantané
+  (`runShockGroup`). Les résultats sont remis dans l'ordre d'avant (filets, choc, graine). `runShock`, la partie d'une
+  traite, est gardé comme référence.
+- **Vérification.** Graines 1 à 4, sans et avec filets, les cinq chocs : les 40 résultats branchés sont identiques,
+  octet pour octet en JSON, aux parties jouées d'une traite.
+- **Temps économisé.** 122 s d'une traite contre 85 s branchés sur cet échantillon, soit −30 %. C'est attendu : 300 +
+  5 × 500 jours au lieu de 5 × 800.
+
+### Tâche 5 — Niveaux du protocole (`--niveau 0|1|2`)
+
+- **Les trois niveaux :**
+  - **0, fumée :** 240 habitants, 5 graines × 500 jours, sans chocs ;
+  - **1, décision :** 240 habitants, 30 graines × 1 500 jours, chocs compris ;
+  - **2, échelle :** 240 / 1 000 / 3 000 / 13 240 habitants, 10 / 10 / 5 / 3 graines × 600 jours, sans chocs. Il donne
+    les indicateurs par habitant (médiane [min–max]) et leur écart à 240 habitants.
+- **Chaque rapport dit son niveau** et ce qu'il peut conclure. Le niveau 2 rappelle qu'il ne remplace pas le niveau 1.
+  240 habitants y est ajouté comme référence, pour calculer les écarts.
+
+**Durées du protocole** (exécutables natifs, 16 isolats) :
+
+| Niveau | Avant (moteur sans les optimisations de la tâche 2) | Après | Résultats identiques |
+|---|---|---|---|
+| 0, fumée (10 parties) | 5 s | 4 s | 560 valeurs, 0 différence |
+| 1, décision (120 parties, chocs branchés) | 3 min 17 s | 2 min 45 s | 3 360 valeurs et 300 chocs, 0 différence |
+| 2, échelle (56 parties) | 48 min 33 s | 20 min 46 s | 3 136 valeurs, 0 différence |
+
+La colonne « avant » utilise déjà les chocs branchés (tâche 4) et la compilation native (tâche 3). Elle ne mesure que
+l'effet de la tâche 2. Le gain des chocs branchés est celui de l'échantillon de la tâche 4.
+
+**Premier rapport de niveau 2** (`rapports/stat/niveau2.md`). Sans filets, le chômage passe de 9,9 % (240 habitants) à
+48,0 % (13 240), et les naissances d'entreprises de 78,6 à 0,2 par an pour 1 000 habitants. C'est le défaut de passage
+à l'échelle de la création d'entreprise (§ 6, tâche 1), mesuré ici sur 600 jours.
+
+**Limites.**
+
+- **Exposant b.** Il est estimé sur une graine et une durée de 200 jours ; il dépend de l'état de l'économie (nombre de
+  vendeurs actifs).
+- **Durée « avant ».** Elle est mesurée avec une copie du moteur où seul le cache des meilleurs prix est coupé ; la
+  sélection des premières offres y reste. L'écart réel avec le moteur d'origine est donc un peu plus grand.
+- **Vérification pas à pas.** `verifyFastPaths` couvre les meilleurs prix. L'ordre des offres et les attraits lus une
+  fois ne sont vérifiés que par les empreintes, la parité et les protocoles identiques.

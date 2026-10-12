@@ -18,6 +18,12 @@
 //   --noyau                  coupe tous les modules ajoutés au modèle de base (les institutions restent actives)
 //   --param nom=valeur       change un paramètre (variantes mesurées ; voir applyParam)
 //   --population 1000        taille de la population (comme --param population=1000)
+//   --niveau 0|1|2           niveau du protocole (remplace graines, durée, étapes et population) :
+//                              0 fumée     240 habitants, 5 graines × 500 jours, sans chocs (modifications courantes)
+//                              1 décision  240 habitants, 30 graines × 1 500 jours, chocs compris (le seul niveau qui
+//                                          sert à conclure sur une règle)
+//                              2 échelle   240 / 1 000 / 3 000 / 13 240 habitants, 10 / 10 / 5 / 3 graines × 600 jours,
+//                                          sans chocs ; indicateurs par habitant et écart à 240 habitants
 //   --key raffinerie         type de la « firme clé » mise en faillite
 //   --out rapport.md         écrit le rapport Markdown (sinon : sortie standard)
 //   --save synthese.json     enregistre les résultats de chaque graine (relus par --compare et --relire)
@@ -117,6 +123,7 @@ class Options {
   String? save;
   String? reread;
   List<String>? compare;
+  int? level; // niveau du protocole (--niveau)
 
   Options(List<String> args) {
     for (var i = 0; i < args.length; i++) {
@@ -131,6 +138,9 @@ class Options {
           final n = int.parse(next());
           if (n < 1) throw ArgumentError('--graines : au moins 1');
           seeds = [for (var k = 1; k <= n; k++) k];
+        case '--niveau':
+          level = int.parse(next());
+          if (level! < 0 || level! > 2) throw ArgumentError('--niveau : 0, 1 ou 2');
         case '--population':
           final v = next();
           applyParam(Params(), 'population', v);
@@ -193,6 +203,21 @@ class Options {
         default:
           throw ArgumentError('Option inconnue : $a');
       }
+    }
+    switch (level) {
+      case 0:
+        seeds = [1, 2, 3, 4, 5];
+        days = 500;
+        phases = {'base', 'nets'};
+        config.params['population'] = '240';
+      case 1:
+        seeds = [for (var k = 1; k <= 30; k++) k];
+        days = 1500;
+        phases = {'base', 'nets', 'chocs'};
+        config.params['population'] = '240';
+      case 2:
+        days = 600;
+        phases = {'base', 'nets'};
     }
     if (compare != null && !phasesGiven) phases = {'base', 'nets'};
   }
@@ -565,71 +590,121 @@ bool _inBand(List<_Day> w) {
       infl.abs() < 0.005;
 }
 
-Map<String, dynamic> runShock(String kind, int seed, Config c, int shockDay, int horizon, String keyFirm, bool nets) {
-  final s = Sim(seed: seed, params: c.newParams(), modules: c.modules.copy(), safeguards: nets ? Safeguards() : Safeguards.none());
-  final r = ShockStats(kind, seed, nets);
-  const window = 30;
-  try {
-    final pre = <_Day>[];
-    for (var d = 1; d <= shockDay; d++) {
-      s.step();
-      if (d > shockDay - 100) pre.add(_snap(s));
-    }
-    r.preInBand = _inBand(pre.sublist(pre.length - window));
-    final uMean = pre.fold(0.0, (a, d) => a + d.unemp) / pre.length;
-    r.collapsedBefore = uMean > 0.5;
-    final uSd = math.sqrt(pre.fold(0.0, (a, d) => a + (d.unemp - uMean) * (d.unemp - uMean)) / pre.length);
-    final hPre = pre.fold(0.0, (a, d) => a + d.hunger) / pre.length;
-    final sPre = pre.fold(0.0, (a, d) => a + d.homeless) / pre.length;
-    final before = Map<String, int>.from(s.monitor.opened);
-    switch (kind) {
-      case 'helico':
-        s.godMoney(const Target('allCitizens'), 5000);
-      case 'immigrants':
-        s.godAddCitizens(25, s.params.startWallet);
-      case 'salaireMin':
-        s.params.minWage = 220;
-      case 'ferme':
-        final f = s.firms.where((f) => f.type == 'ferme').toList();
-        if (f.isNotEmpty) s.removeFirm(f.first.id);
-      case 'faillite':
-        final f = s.firms.where((f) => f.type == keyFirm).toList();
-        if (f.isNotEmpty) {
-          r.detail = f.first.name;
-          s.godBankrupt(f.first.id);
-        }
-    }
-    final post = <_Day>[];
-    for (var d = 1; d <= horizon; d++) {
-      s.step();
-      final x = _snap(s);
-      post.add(x);
-      r.peakUnemp = math.max(r.peakUnemp, x.unemp);
-      r.peakHunger = math.max(r.peakHunger, x.hunger);
-      r.peakHomeless = math.max(r.peakHomeless, x.homeless);
-    }
-    for (final e in s.monitor.opened.entries) {
-      final dlt = e.value - (before[e.key] ?? 0);
-      if (dlt > 0) r.alerts[e.key] = dlt;
-    }
-    final tolU = math.max(0.02, 2 * uSd);
-    bool rel(List<_Day> w) {
-      final infl = w.fold(0.0, (a, d) => a + d.infl) / w.length;
-      return w.every((d) =>
-              (d.unemp - uMean).abs() <= tolU && d.hunger <= hPre + 0.02 && d.homeless <= sPre + 0.02) &&
-          infl.abs() < 0.005;
-    }
+/// Les jours 1 à [shockDay] d'une partie de choc, et ce qu'on en retient pour juger du retour à l'équilibre.
+class _Prefix {
+  final Sim s;
+  final bool preInBand, collapsedBefore;
+  final double uMean, uSd, hPre, sPre;
+  _Prefix(this.s, this.preInBand, this.collapsedBefore, this.uMean, this.uSd, this.hPre, this.sPre);
+}
 
-    for (var t = 0; t + window <= post.length; t++) {
-      final w = post.sublist(t, t + window);
-      if (r.recoverAbs == null && _inBand(w)) r.recoverAbs = t + 1;
-      if (r.recoverRel == null && rel(w)) r.recoverRel = t + 1;
-      if (r.recoverAbs != null && r.recoverRel != null) break;
-    }
+_Prefix _playPrefix(int seed, Config c, int shockDay, bool nets) {
+  final s = Sim(seed: seed, params: c.newParams(), modules: c.modules.copy(), safeguards: nets ? Safeguards() : Safeguards.none());
+  const window = 30;
+  final pre = <_Day>[];
+  for (var d = 1; d <= shockDay; d++) {
+    s.step();
+    if (d > shockDay - 100) pre.add(_snap(s));
+  }
+  final uMean = pre.fold(0.0, (a, d) => a + d.unemp) / pre.length;
+  final uSd = math.sqrt(pre.fold(0.0, (a, d) => a + (d.unemp - uMean) * (d.unemp - uMean)) / pre.length);
+  return _Prefix(s, _inBand(pre.sublist(pre.length - window)), uMean > 0.5, uMean, uSd,
+      pre.fold(0.0, (a, d) => a + d.hunger) / pre.length, pre.fold(0.0, (a, d) => a + d.homeless) / pre.length);
+}
+
+/// Applique le choc [kind] à la partie [s] (au jour du choc) et suit les [horizon] jours suivants.
+void _branch(String kind, Sim s, _Prefix pre, int horizon, String keyFirm, ShockStats r) {
+  const window = 30;
+  r.preInBand = pre.preInBand;
+  r.collapsedBefore = pre.collapsedBefore;
+  final before = Map<String, int>.from(s.monitor.opened);
+  switch (kind) {
+    case 'helico':
+      s.godMoney(const Target('allCitizens'), 5000);
+    case 'immigrants':
+      s.godAddCitizens(25, s.params.startWallet);
+    case 'salaireMin':
+      s.params.minWage = 220;
+    case 'ferme':
+      final f = s.firms.where((f) => f.type == 'ferme').toList();
+      if (f.isNotEmpty) s.removeFirm(f.first.id);
+    case 'faillite':
+      final f = s.firms.where((f) => f.type == keyFirm).toList();
+      if (f.isNotEmpty) {
+        r.detail = f.first.name;
+        s.godBankrupt(f.first.id);
+      }
+  }
+  final post = <_Day>[];
+  for (var d = 1; d <= horizon; d++) {
+    s.step();
+    final x = _snap(s);
+    post.add(x);
+    r.peakUnemp = math.max(r.peakUnemp, x.unemp);
+    r.peakHunger = math.max(r.peakHunger, x.hunger);
+    r.peakHomeless = math.max(r.peakHomeless, x.homeless);
+  }
+  for (final e in s.monitor.opened.entries) {
+    final dlt = e.value - (before[e.key] ?? 0);
+    if (dlt > 0) r.alerts[e.key] = dlt;
+  }
+  final tolU = math.max(0.02, 2 * pre.uSd);
+  bool rel(List<_Day> w) {
+    final infl = w.fold(0.0, (a, d) => a + d.infl) / w.length;
+    return w.every((d) =>
+            (d.unemp - pre.uMean).abs() <= tolU && d.hunger <= pre.hPre + 0.02 && d.homeless <= pre.sPre + 0.02) &&
+        infl.abs() < 0.005;
+  }
+
+  for (var t = 0; t + window <= post.length; t++) {
+    final w = post.sublist(t, t + window);
+    if (r.recoverAbs == null && _inBand(w)) r.recoverAbs = t + 1;
+    if (r.recoverRel == null && rel(w)) r.recoverRel = t + 1;
+    if (r.recoverAbs != null && r.recoverRel != null) break;
+  }
+}
+
+/// Une partie de choc jouée d'une traite : les jours 1 à [shockDay], puis le choc. Sert de référence à runShockGroup.
+Map<String, dynamic> runShock(String kind, int seed, Config c, int shockDay, int horizon, String keyFirm, bool nets) {
+  final r = ShockStats(kind, seed, nets);
+  Sim? s;
+  try {
+    final pre = _playPrefix(seed, c, shockDay, nets);
+    s = pre.s;
+    _branch(kind, pre.s, pre, horizon, keyFirm, r);
   } catch (e) {
-    r.crash = 'j${s.day} : $e';
+    r.crash = 'j${s?.day ?? 0} : $e';
   }
   return r.toJson();
+}
+
+/// Les chocs d'une graine : les jours 1 à [shockDay] sont joués une fois, l'instantané du jour du choc est enregistré,
+/// puis chaque choc repart de cet instantané. La reprise d'un instantané est exacte (test/instantane_test.dart) : chaque
+/// partie branchée est celle de runShock, au bit près (vérifié sur un échantillon, voir le journal).
+Map<String, dynamic> runShockGroup(List<String> kinds, int seed, Config c, int shockDay, int horizon, String keyFirm, bool nets) {
+  final out = <Map<String, dynamic>>[];
+  _Prefix pre;
+  String snap;
+  try {
+    pre = _playPrefix(seed, c, shockDay, nets);
+    snap = jsonEncode(pre.s.toSnapshot());
+  } catch (e) {
+    return {
+      'group': [for (final k in kinds) (ShockStats(k, seed, nets)..crash = 'avant le choc : $e').toJson()]
+    };
+  }
+  for (final kind in kinds) {
+    final r = ShockStats(kind, seed, nets);
+    Sim? s;
+    try {
+      s = simFromSnapshot(jsonDecode(snap) as Map<String, dynamic>);
+      _branch(kind, s, pre, horizon, keyFirm, r);
+    } catch (e) {
+      r.crash = 'j${s?.day ?? shockDay} : $e';
+    }
+    out.add(r.toJson());
+  }
+  return {'group': out};
 }
 
 // ------------------------------------------------------------------ exécution : une partie par isolat
@@ -643,6 +718,9 @@ Job baseJob(int seed, Config c, int days, int warmup, bool nets, Set<String> exc
 
 Job shockJob(String kind, int seed, Config c, int day, int horizon, String key, bool nets) =>
     () => runShock(kind, seed, c, day, horizon, key, nets);
+
+Job shockGroupJob(List<String> kinds, int seed, Config c, int day, int horizon, String key, bool nets) =>
+    () => runShockGroup(kinds, seed, c, day, horizon, key, nets);
 
 class Task {
   final int config; // rang de la configuration (0, ou 0 et 1 en comparaison)
@@ -669,11 +747,10 @@ List<Task> tasksFor(int ci, Config c, Options o, {required bool shocks, String t
   if (shocks) {
     for (final nets in [false, true]) {
       if (!o.shockNets.contains(nets ? 'on' : 'off')) continue;
-      for (final kind in shockLabels.keys) {
-        for (final seed in o.shocksOn) {
-          t.add(Task(ci, 'chocs', '${tag}choc $kind, graine $seed, ${nets ? 'avec' : 'sans'} filets',
-              shockJob(kind, seed, c, o.shockDay, o.shockHorizon, o.keyFirm, nets)));
-        }
+      // une tâche par graine : le début de partie est joué une fois, les chocs repartent de son instantané
+      for (final seed in o.shocksOn) {
+        t.add(Task(ci, 'chocs', '${tag}chocs, graine $seed, ${nets ? 'avec' : 'sans'} filets',
+            shockGroupJob(shockLabels.keys.toList(), seed, c, o.shockDay, o.shockHorizon, o.keyFirm, nets)));
       }
     }
   }
@@ -706,13 +783,20 @@ Json summaryOf(Config c, Options o, List<Task> tasks, List<Json> results, int ci
   for (var i = 0; i < tasks.length; i++) {
     if (tasks[i].config != ci) continue;
     if (tasks[i].phase == 'chocs') {
-      shocks.add(results[i]);
+      shocks.addAll([for (final r in results[i]['group'] as List) r as Json]);
     } else {
       (phases[tasks[i].phase] ??= []).add(results[i]);
     }
   }
+  // même ordre qu'avant les tâches groupées : filets, puis type de choc, puis graine
+  final kinds = shockLabels.keys.toList();
+  int rank(Json r) =>
+      ((r['nets'] == true ? 1 : 0) * kinds.length + kinds.indexOf(r['kind'] as String)) * 100000 +
+      o.shocksOn.indexOf(r['seed'] as int);
+  stableSort<Json>(shocks, (a, b) => rank(a) - rank(b));
   return {
     'version': 2,
+    if (o.level != null) 'level': o.level,
     'date': DateTime.now().toIso8601String(),
     'label': c.label,
     'seeds': o.seeds,
@@ -1161,6 +1245,8 @@ String report(Json sum) {
   final shocks = [for (final s in sum['shocks'] as List) (s as Map).cast<String, dynamic>()];
   b.writeln('# Protocole de stabilité ÉcoNodes');
   b.writeln();
+  final level = sum['level'];
+  if (level != null) b.writeln('- ${levelNote(level as int)}');
   b.writeln('- Date : ${DateTime.now().toIso8601String().substring(0, 16).replaceAll('T', ' ')}');
   final days = sum['days'] as int;
   b.writeln('- Graines : ${seedList((sum['seeds'] as List).cast<int>())} · $days jours');
@@ -1427,6 +1513,91 @@ String compareReport(Options o, Json a, Json c, double seconds, int runs, Json s
 
 // ------------------------------------------------------------------ point d'entrée
 
+/// Ce qu'un niveau du protocole peut conclure, en une ligne (en tête de chaque rapport).
+String levelNote(int level) => switch (level) {
+      0 => 'Niveau 0, fumée (240 habitants, 5 graines × 500 jours) : vérifie que rien ne casse ; ne permet pas de '
+          'conclure sur une règle.',
+      1 => 'Niveau 1, décision (240 habitants, 30 graines × 1 500 jours, chocs compris) : le seul niveau qui sert à '
+          'conclure sur une règle.',
+      _ => 'Niveau 2, échelle (240 / 1 000 / 3 000 / 13 240 habitants, 10 / 10 / 5 / 3 graines × 600 jours) : compare '
+          'les indicateurs par habitant à ceux de 240 habitants. Ne remplace pas le niveau 1 : avec si peu de graines, '
+          'un effondrement de type seuil peut rester bimodal et passer inaperçu.',
+    };
+
+/// Tailles et graines du niveau 2 ; 240 habitants sert de référence.
+const List<(int, int)> levelTwoSizes = [(240, 10), (1000, 10), (3000, 5), (13240, 3)];
+
+/// Indicateurs par habitant du niveau 2 : clé, libellé, format, valeur d'une partie.
+final List<(String, String, String, double? Function(Json))> levelTwoIndicators = [
+  ('unempMean', 'Chômage moyen', 'pc', (r) => (r['unempMean'] as num?)?.toDouble()),
+  ('hungerMean', 'Faim moyenne', 'pc', (r) => (r['hungerMean'] as num?)?.toDouble()),
+  ('homelessMean', 'Sans-abri moyen', 'pc', (r) => (r['homelessMean'] as num?)?.toDouble()),
+  ('giniMean', 'Gini moyen', 'dec', (r) => (r['giniMean'] as num?)?.toDouble()),
+  ('inflMean', 'Inflation moyenne / j', 'pc3', (r) => (r['inflMean'] as num?)?.toDouble()),
+  ('healthMean', 'Santé moyenne', 'dec', (r) => (r['healthMean'] as num?)?.toDouble()),
+  ('happyMean', 'Bonheur moyen', 'dec', (r) => (r['happyMean'] as num?)?.toDouble()),
+  (
+    'births',
+    'Naissances d’entreprises / an pour 1 000 habitants',
+    'dec1',
+    (r) => (r['population'] as num?) != null && (r['population'] as num) > 0
+        ? (r['birthsPerYear'] as num).toDouble() * 1000 / (r['population'] as num)
+        : null
+  ),
+  (
+    'deaths',
+    'Morts d’entreprises / an pour 1 000 habitants',
+    'dec1',
+    (r) => (r['population'] as num?) != null && (r['population'] as num) > 0
+        ? (r['deathsPerYear'] as num).toDouble() * 1000 / (r['population'] as num)
+        : null
+  ),
+];
+
+/// Rapport du niveau 2 : par étape, chaque indicateur par habitant en médiane [min–max] à chaque taille, et l'écart de
+/// la médiane à celle de 240 habitants.
+String levelTwoReport(Map<int, Json> sums, double seconds) {
+  final b = StringBuffer();
+  b.writeln('# Protocole ÉcoNodes — passage à l’échelle');
+  b.writeln();
+  b.writeln('- ${levelNote(2)}');
+  b.writeln('- Date : ${DateTime.now().toIso8601String().substring(0, 16).replaceAll('T', ' ')}');
+  b.writeln('- Temps total : ${duration(seconds)}');
+  b.writeln('- Chaque case : médiane sur les graines [min–max] ; « écart » : médiane − médiane à 240 habitants.');
+  final sizes = sums.keys.toList();
+  for (final phase in ['base', 'nets']) {
+    b.writeln();
+    b.writeln('## ${phaseLabel(phase)}');
+    b.writeln();
+    b.writeln('| Indicateur | ${[for (final n in sizes) '$n hab. (${(sums[n]!['seeds'] as List).length} gr.)'].join(' | ')} |');
+    b.writeln('|---|${[for (final _ in sizes) '---'].join('|')}|');
+    for (final ind in levelTwoIndicators) {
+      final cells = <String>[];
+      double? ref;
+      for (final n in sizes) {
+        final runs = [for (final r in (sums[n]!['phases'] as Map)[phase] as List) (r as Map).cast<String, dynamic>()];
+        final v = [for (final r in runs) if (ind.$4(r) case final x?) x]..sort();
+        if (v.isEmpty) {
+          cells.add('—');
+          continue;
+        }
+        final med = quantile(v, 0.5);
+        ref ??= n == sizes.first ? med : null;
+        final gap = n == sizes.first || ref == null ? '' : ' ; écart ${_signedFmt(med - ref, ind.$3)}';
+        cells.add('${fmtV(ind.$3, med)} [${fmtV(ind.$3, v.first)}–${fmtV(ind.$3, v.last)}]$gap');
+      }
+      b.writeln('| ${ind.$2} | ${cells.join(' | ')} |');
+    }
+  }
+  return b.toString();
+}
+
+/// Écart signé ; en points pour une part (« +2,5 pt » et non « +2,5 % »).
+String _signedFmt(double v, String kind) {
+  final t = fmtV(kind, v.abs());
+  return '${v >= 0 ? '+' : '−'}${kind.startsWith('pc') ? t.replaceAll(' %', ' pt') : t}';
+}
+
 Future<void> main(List<String> args) async {
   final o = Options(args);
   final sw = Stopwatch()..start();
@@ -1445,6 +1616,29 @@ Future<void> main(List<String> args) async {
     } else {
       stdout.write(md);
     }
+    return;
+  }
+
+  if (o.level == 2) {
+    final sums = <int, Json>{};
+    var runs = 0;
+    for (final (n, k) in levelTwoSizes) {
+      o.seeds = [for (var i = 1; i <= k; i++) i];
+      final c = o.config.apply('param:population=$n');
+      final tasks = tasksFor(0, c, o, shocks: false, tag: '$n hab. · ');
+      final results = await runAll(tasks, o.isolates, progress);
+      runs += tasks.length;
+      sums[n] = summaryOf(c, o, tasks, results, 0, sw.elapsedMilliseconds / 1000);
+    }
+    final seconds = sw.elapsedMilliseconds / 1000;
+    final md = levelTwoReport(sums, seconds);
+    if (o.out != null) {
+      write(o.out, md, 'rapport écrit');
+    } else {
+      stdout.write(md);
+    }
+    write(o.save, jsonEncode({'level': 2, 'sizes': {for (final e in sums.entries) '${e.key}': e.value}}), 'synthèse enregistrée');
+    progress('terminé : $runs parties en ${duration(seconds)}');
     return;
   }
 

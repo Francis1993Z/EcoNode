@@ -113,6 +113,105 @@ String fmtNum1(double v) => round1(v).toStringAsFixed(1).replaceAll('.', ',');
 /// Quantifie un montant au 2⁻¹⁰ $ inférieur : la somme de tels montants est exacte.
 double quantize(double v) => (v * 1024).floorToDouble() / 1024;
 
+/// Vendeurs d'un bien triés par prix, pour `Sim.quote` et `Sim.bestPrice` pendant la consommation (voir `_quoteCache`).
+class _BestOffers {
+  final String good;
+  final List<Firm> sellers; // dans l'ordre de Sim.sellersOf
+  late final List<double> prices = [for (final f in sellers) f.price[good]!];
+  List<double>? _pulls;
+  final List<Firm> byPrice;
+  final double imported; // prix d'importation, ou l'infini
+  final double fallback; // plus bas prix affiché, sinon le prix mondial
+  int _next = 0; // premier vendeur qui peut encore avoir une unité en stock
+  _BestOffers._(this.good, this.sellers, this.byPrice, this.imported, this.fallback);
+
+  /// Attrait de chaque vendeur pour un ménage (la notoriété ne change pas pendant la consommation).
+  List<double> householdPulls(Sim s) => _pulls ??= [for (final f in sellers) 1 / (1 + s.brandPull(f))];
+
+  factory _BestOffers(Sim s, String good) {
+    final sellers = List<Firm>.of(s.sellersOf(good));
+    final list = List<Firm>.of(sellers)..sort((a, b) => a.price[good]!.compareTo(b.price[good]!));
+    final p = s.params;
+    final g = goods[good]!;
+    final imported = p.trade && !g.perish && g.tradable ? s.worldPrice[good]! * p.importMarkup : double.infinity;
+    final fallback = list.isEmpty ? s.worldPrice[good]! : list.first.price[good]!;
+    return _BestOffers._(good, sellers, list, imported, fallback);
+  }
+
+  double quote() {
+    while (_next < byPrice.length && (byPrice[_next].inv[good] ?? 0) < 1 - eps) {
+      _next++;
+    }
+    final best = _next < byPrice.length ? byPrice[_next].price[good]! : double.infinity;
+    return math.min(best, imported);
+  }
+
+  double bestPrice() {
+    final q = quote();
+    return q == double.infinity ? fallback : q;
+  }
+
+}
+
+/// Toutes les offres d'un achat, tirées et ordonnées : clé croissante, à égalité l'ordre des vendeurs (tri stable). Un
+/// achat s'arrête presque toujours après une ou deux offres : les premières sont prises par sélection de la plus petite
+/// clé (la première à égalité), le reste n'est trié que s'il en faut plus de 4. L'ordre obtenu est exactement celui du
+/// tri stable de toutes les offres (performance).
+class _AllOffers {
+  final List<_Offer> offers = [];
+  late final List<double> keys;
+  late final List<bool> used;
+  List<int>? rest;
+
+  _AllOffers(Sim s, Account buyer, String good, int base, bool household, [_BestOffers? cached]) {
+    if (cached != null) {
+      // mêmes vendeurs, même ordre, mêmes valeurs : seuls les stocks sont relus
+      final sellers = cached.sellers, prices = cached.prices, pulls = cached.householdPulls(s);
+      for (var i = 0; i < sellers.length; i++) {
+        final f = sellers[i];
+        if ((f.inv[good] ?? 0) > eps) {
+          offers.add(_Offer(f, prices[i], s.sansHasard ? 0.5 : Mulberry32(hash32(base, f.id)).next(), pulls[i]));
+        }
+      }
+    } else {
+      for (final f in s.sellersOf(good)) {
+        if (identical(f, buyer)) continue;
+        if ((f.inv[good] ?? 0) > eps) {
+          offers.add(_Offer(f, f.price[good]!, s.sansHasard ? 0.5 : Mulberry32(hash32(base, f.id)).next(),
+              household ? 1 / (1 + s.brandPull(f)) : 1));
+        }
+      }
+    }
+    final p = s.params;
+    if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
+      offers.add(
+          _Offer(null, s.worldPrice[good]! * p.importMarkup, s.sansHasard ? 0.5 : Mulberry32(hash32(base, 0)).next(), 1));
+    }
+    keys = [for (final o in offers) o.p * (1 + 0.03 * o.r) * o.pull];
+    used = List<bool>.filled(offers.length, false);
+  }
+
+  _Offer? pick(int k) {
+    if (k >= offers.length) return null;
+    if (k < 4) {
+      var m = -1;
+      for (var i = 0; i < offers.length; i++) {
+        if (!used[i] && (m < 0 || keys[i] - keys[m] < 0)) m = i;
+      }
+      used[m] = true;
+      return offers[m];
+    }
+    if (rest == null) {
+      rest = [for (var i = 0; i < offers.length; i++) if (!used[i]) i];
+      stableSort<int>(rest!, (a, b) {
+        final d = keys[a] - keys[b];
+        return d < 0 ? -1 : (d > 0 ? 1 : 0);
+      });
+    }
+    return offers[rest![k - 4]];
+  }
+}
+
 class _Offer {
   final Firm? firm; // null = extérieur
   final double p;
@@ -163,6 +262,9 @@ class Sim {
   // Drapeau de test (tâche 4, cas extrêmes) : tous les tirages valent 0,5 et tous les ordres du jour suivent les
   // identifiants. Jamais actif dans le jeu.
   bool sansHasard = false;
+  // Drapeau de vérification (performance) : le chemin rapide (meilleurs prix en cache pendant la consommation) est aussi
+  // calculés par le chemin complet, et la moindre différence lève une erreur. Jamais actif dans le jeu.
+  bool verifyFastPaths = false;
   int day = 0;
   // identifiants stables, jamais réutilisés : les citoyens sont numérotés à partir de 1 ; une entreprise reçoit
   // 100 000 + 10 000 × (rang de son type) + son rang de création dans ce type (voir _newFirmId)
@@ -852,8 +954,23 @@ class Sim {
 
   List<Firm> sellersOf(String good) => _sellers[good] ?? const <Firm>[];
 
+  /// Meilleurs prix par bien, tenus pendant la consommation des ménages seulement (null en dehors). Pendant cette
+  /// phase, aucun prix ne change et les stocks ne font que baisser : un vendeur passé sous une unité n'y revient pas.
+  /// Le cache donne donc exactement les mêmes valeurs que le parcours de tous les vendeurs (performance).
+  Map<String, _BestOffers>? _quoteCache;
+
   /// Meilleur prix pour une unité en stock (ou importée) ; infini si rien n'est disponible.
   double quote(String good) {
+    final cache = _quoteCache;
+    if (cache != null) {
+      final q = (cache[good] ??= _BestOffers(this, good)).quote();
+      if (verifyFastPaths && q != _quoteAll(good)) throw StateError('Meilleur prix différent au jour $day ($good)');
+      return q;
+    }
+    return _quoteAll(good);
+  }
+
+  double _quoteAll(String good) {
     var best = double.infinity;
     for (final f in sellersOf(good)) {
       if ((f.inv[good] ?? 0) >= 1 - eps && f.price[good]! < best) best = f.price[good]!;
@@ -866,7 +983,17 @@ class Sim {
 
   /// Prix de référence : le meilleur disponible, sinon le plus bas affiché, sinon le prix mondial.
   double bestPrice(String good) {
-    var best = quote(good);
+    final cache = _quoteCache;
+    if (cache != null) {
+      final b = (cache[good] ??= _BestOffers(this, good)).bestPrice();
+      if (verifyFastPaths && b != _bestPriceAll(good)) throw StateError('Prix de référence différent au jour $day ($good)');
+      return b;
+    }
+    return _bestPriceAll(good);
+  }
+
+  double _bestPriceAll(String good) {
+    var best = _quoteAll(good);
     if (best == double.infinity) {
       for (final f in sellersOf(good)) {
         best = math.min(best, f.price[good]!);
@@ -916,28 +1043,18 @@ class Sim {
     final gi = _goodIndex[good]!;
     final n = _buySeq[who * 64 + gi] = (_buySeq[who * 64 + gi] ?? -1) + 1;
     final base = hash32(hash32(_dayKey(Flux.offres), who), hash32(gi, n));
-    final offers = <_Offer>[];
-    for (final f in sellersOf(good)) {
-      if (identical(f, buyer)) continue;
-      if ((f.inv[good] ?? 0) > eps) {
-        offers.add(_Offer(f, f.price[good]!, sansHasard ? 0.5 : Mulberry32(hash32(base, f.id)).next(),
-            household ? 1 / (1 + brandPull(f)) : 1));
-      }
-    }
-    final p = params;
-    if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
-      offers.add(_Offer(null, worldPrice[good]! * p.importMarkup, sansHasard ? 0.5 : Mulberry32(hash32(base, 0)).next(), 1));
-    }
-    stableSort<_Offer>(offers, (a, b) {
-      final d = a.p * (1 + 0.03 * a.r) * a.pull - b.p * (1 + 0.03 * b.r) * b.pull;
-      return d < 0 ? -1 : (d > 0 ? 1 : 0);
-    });
+    // pendant la consommation, prix et attrait des vendeurs sont lus une fois par bien et par jour (ils ne changent pas)
+    final qc = _quoteCache;
+    final cached = household && buyer is! Firm && qc != null ? (qc[good] ??= _BestOffers(this, good)) : null;
+    final pick = _AllOffers(this, buyer, good, base, household, cached).pick;
 
     var remaining = qty;
     var spent = 0.0;
     var broke = false;
-    for (final o in offers) {
+    for (var k = 0;; k++) {
       if (remaining <= eps) break;
+      final o = pick(k);
+      if (o == null) break;
       final double avail = o.firm == null ? double.infinity : (o.firm!.inv[good] ?? 0.0);
       final afford = (budget - spent) / o.p;
       double q = math.min(remaining, math.min(avail, afford));
@@ -1619,6 +1736,7 @@ class Sim {
 
   void _consume() {
     final p = params;
+    _quoteCache = {};
     needCost = _needCost();
     // pression publicitaire : notoriété des vendeurs de chaque bien
     hype = {};
@@ -1666,6 +1784,7 @@ class Sim {
       c.happiness = happinessOf(c);
     }
     if (modules.publicBudget) _serveQueues();
+    _quoteCache = null;
   }
 
   /// Le bien qui apporte le plus de satisfaction par dollar, parmi ceux en stock et abordables.

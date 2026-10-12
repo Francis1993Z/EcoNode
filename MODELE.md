@@ -711,6 +711,7 @@ Choix de jeu : c'est le débouché de la filière informatique.
 | Drapeau | Effet | Fonction | Usage |
 |---|---|---|---|
 | `Sim.sansHasard` | tirages à 0,5, ordres par identifiant | `draw`, `orderKey`, `buy` | cas extrêmes (§ 4) |
+| `Sim.verifyFastPaths` | recalcule chaque meilleur prix mis en cache pendant la consommation par le parcours complet et lève une erreur à la moindre différence | `quote`, `bestPrice` | vérification des optimisations (journal, § 7) |
 | `Params.healthWearIfDeprived` (A1) | la santé ne s'use que les jours de faim ou sans logis ; les maladies restent | `_health` | variante de l'usure de la santé (décision réservée à Francis) |
 | `Params.partTime` (A2) | travail divisible : l'équipe est payée pour la part de sa capacité produite ce jour, au moins 20 % ; le coût de revient ne compte plus les heures oisives | `hoursToday`, `_payWages`, `unitCost` | variante du travail indivisible (décision réservée à Francis) |
 
