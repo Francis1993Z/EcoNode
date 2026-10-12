@@ -11,6 +11,7 @@ import 'model.dart';
 import 'monitor.dart';
 
 part 'snapshot.dart';
+part 'buildings.dart';
 
 /// mulberry32 (arithmétique 32 bits non signée) : même graine, même partie.
 class Mulberry32 {
@@ -71,7 +72,8 @@ enum Flux {
   capital(13), // ordre des entreprises pour l'usure, la dette et l'investissement
   offres(14), // départage des offres à prix voisins
   prix(15), // pas d'ajustement de la marge
-  divin(16); // actions du god mode (épidémie)
+  divin(16), // actions du god mode (épidémie)
+  logement(17); // bâtiments : état à la naissance, déménagement, regard sur le marché
 
   const Flux(this.code);
   final int code;
@@ -139,6 +141,8 @@ const Map<String, double> _basicDemand = {
   'soins': 0.03,
   'cours': 0.12,
   'tele': 0.3,
+  // module buildings : remplacement du parc (≈ 1 %/an de 10 modules par logement et 1,06 logement par citoyen)
+  'batiment': 0.0004,
 };
 const Map<String, double> _extraDemand = {
   'tele': 0.5,
@@ -214,6 +218,16 @@ class Sim {
   final List<int> schoolQueue = [];
   final Map<String, ServiceStats> services = {'soins': ServiceStats(), 'cours': ServiceStats()};
   final Monitor monitor = Monitor();
+  // bâtiments et hypothèques (module buildings, voir buildings.dart)
+  final List<Building> buildings = [];
+  final Map<int, Building> _bmap = {};
+  final List<Mortgage> mortgages = [];
+  final Map<int, Mortgage> _mmap = {};
+  int _nextBuildingId = 1;
+  int _nextMortgageId = 1;
+  bool _buildingsSeeded = false;
+  double housingHeat = 0; // −1 : logements vacants en abondance ; +1 : marché serré
+  final BuildingStats bstats = BuildingStats();
   final Invariants inv = Invariants();
   final DayFlows dayFlows = DayFlows(); // flux depuis la dernière vérification
   DayFlows lastFlows = DayFlows(); // flux de la dernière journée vérifiée
@@ -320,6 +334,15 @@ class Sim {
     services['soins'] = ServiceStats();
     services['cours'] = ServiceStats();
     monitor.clear();
+    buildings.clear();
+    _bmap.clear();
+    mortgages.clear();
+    _mmap.clear();
+    _nextBuildingId = 1;
+    _nextMortgageId = 1;
+    _buildingsSeeded = false;
+    housingHeat = 0;
+    bstats.clear();
     dayFlows.reset();
     lastFlows = DayFlows();
     final p = this.params;
@@ -330,7 +353,11 @@ class Sim {
       marketStats[g] = MarketStat();
     }
 
-    final full = scenario ?? defaultScenario;
+    // module buildings : l'entreprise de construction fait partie du scénario ; elle n'est créée que si elle a une demande
+    final full = <ScenarioFirm>[...(scenario ?? defaultScenario)];
+    if (this.modules.buildings && !full.any((s) => s.type == 'construction')) {
+      full.add(const ScenarioFirm('construction', 'Construction Pelletier'));
+    }
     final perType = <String, int>{};
     for (final s in full) {
       perType[s.type] = (perType[s.type] ?? 0) + 1;
@@ -426,6 +453,7 @@ class Sim {
       final f = c.employer != null ? firm(c.employer!) : null;
       c.incomeEma = f != null ? f.wage * (1 - p.taxRate) : p.benefit;
     }
+    if (this.modules.buildings) _seedBuildings();
     m0 = totalMoney();
     bank.reserves = m0; // toute la monnaie de départ est « extérieure »
     bank.equity = bank.money;
@@ -458,6 +486,7 @@ class Sim {
     final basic = Map<String, double>.from(_basicDemand);
     if (!m.health) basic.remove('soins');
     if (!m.education) basic.remove('cours');
+    if (!m.buildings) basic.remove('batiment');
 
     double perW(String ty) {
       final t = templates[ty]!;
@@ -607,6 +636,7 @@ class Sim {
     }
     final c = Citizen(id, name, quantize(cash), skill, t(3));
     if (t(4) < const [0.2, 0.6, 0.7][c.level]) c.computerDays = (t(5) * params.computerLife).floor();
+    c.wantsToOwn = modules.buildings && t(6) < params.ownerShare;
     citizens.add(c);
     _cmap[c.id] = c;
     return c;
@@ -672,11 +702,24 @@ class Sim {
 
   double expectedMoney() => m0 + ledgerGod + ledgerExports - ledgerImports + ledgerCredit;
 
+  /// Exposition de la Caisse, pondérée par le risque : dettes des entreprises à 100 %, hypothèques à
+  /// Params.mortgageRiskWeight (35 %, Bâle III). Sert aux fonds propres exigés (I4) et à la cible de ristourne.
   double totalDebt() {
     var d = 0.0;
     for (final f in firms) {
       d += f.debt;
     }
+    if (mortgages.isNotEmpty) d += params.mortgageRiskWeight * mortgageDebt();
+    return d;
+  }
+
+  /// Tous les prêts de la Caisse au nominal : dettes des entreprises et hypothèques (pour l'invariant des prêts).
+  double totalLoans() {
+    var d = 0.0;
+    for (final f in firms) {
+      d += f.debt;
+    }
+    if (mortgages.isNotEmpty) d += mortgageDebt();
     return d;
   }
 
@@ -803,7 +846,7 @@ class Sim {
     for (final f in sellersOf(good)) {
       if ((f.inv[good] ?? 0) >= 1 - eps && f.price[good]! < best) best = f.price[good]!;
     }
-    if (params.trade && !goods[good]!.perish) {
+    if (params.trade && !goods[good]!.perish && goods[good]!.tradable) {
       best = math.min(best, worldPrice[good]! * params.importMarkup);
     }
     return best;
@@ -834,7 +877,7 @@ class Sim {
     for (final e in f.inputs.entries) {
       batch += e.value * bestPrice(e.key);
     }
-    var fixed = f.overheadEma + f.debt * loanRate(f) / 365;
+    var fixed = f.overheadEma + f.debt * loanRate(f) / 365 + f.carry;
     if (modules.capital) fixed += f.machines * p.depreciation * bestPrice('machines');
     batch += fixed / planned;
     var tot = 0.0;
@@ -870,7 +913,7 @@ class Sim {
       }
     }
     final p = params;
-    if (p.trade && !goods[good]!.perish) {
+    if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
       offers.add(_Offer(null, worldPrice[good]! * p.importMarkup, sansHasard ? 0.5 : Mulberry32(hash32(base, 0)).next(), 1));
     }
     stableSort<_Offer>(offers, (a, b) {
@@ -987,10 +1030,12 @@ class Sim {
       }
     }
 
+    if (modules.buildings) _buildingsMorning();
     _laborMarket();
     if (modules.publicBudget) _publicBudget();
     _produce();
     _payWages();
+    if (modules.buildings) _buildingsDay();
     _buyInputs();
     _consume();
     _safetyNets();
@@ -1593,7 +1638,8 @@ class Sim {
       }
       c.hungerDays = c.sat['faim']! < 0.5 ? c.hungerDays + 1 : 0;
       // 2. se loger
-      final rl = buy(c, 'M', 'logement', 1, c.money, true);
+      // un propriétaire-occupant habite chez lui (module buildings) : pas de nuitée à payer
+      final rl = c.homeId != null ? const BuyResult(1, 0) : buy(c, 'M', 'logement', 1, c.money, true);
       c.homeless = rl.qty < 1;
       c.homelessDays = c.homeless ? c.homelessDays + 1 : 0;
       c.sat['logement'] = c.homeless ? 0 : 1;
@@ -1875,7 +1921,7 @@ class Sim {
   void _export() {
     for (final f in firms) {
       for (final g in f.outputs.keys) {
-        if (goods[g]!.perish) continue;
+        if (goods[g]!.perish || !goods[g]!.tradable) continue;
         final excess = (f.inv[g] ?? 0) - 8 * math.max(f.demandEma[g] ?? 0, 0.5);
         if (excess <= eps) continue;
         final value = transfer(null, f, excess * worldPrice[g]! * params.exportDiscount);
@@ -2158,6 +2204,7 @@ class Sim {
       final t = templates[ty]!;
       final g = t.outputs.keys.first;
       if (publicGood(g)) continue; // l'État fournit ce service : pas de concurrent privé
+      if (g == 'logement' && modules.buildings) continue; // un bailleur sans bâtiment n'a rien à louer : on construit
       final want = unmetEma[g] ?? 0; // unités par jour non servies
       final perWorker0 = t.rate * t.outputs[g]!; // unités par employé et par jour, sans machines
       if (want < p.entryMinShare * perWorker0) continue;
@@ -2242,6 +2289,7 @@ class Sim {
 
   /// Fermeture faute d'activité : la trésorerie revient au propriétaire, la dette est radiée, la place est libérée.
   void _close(Firm f) {
+    if (buildings.isNotEmpty) _firmGone(f); // ses bâtiments passent en liquidation (la Caisse les vend)
     final repaid = modules.bankruptcy ? _repayFromCash(f) : 0.0;
     final lost = f.debt;
     _writeOff(f, 'fermeture');
@@ -2418,7 +2466,7 @@ class Sim {
       f.retained += profit;
       f.profitEma = 0.9 * f.profitEma + 0.1 * profit;
       f.inputSpendEma = 0.9 * f.inputSpendEma + 0.1 * f.inputSpend;
-      final reserve = 8 * (f.wage * f.workers.length + f.inputSpendEma + f.overheadEma) + f.debt * 0.1;
+      final reserve = 8 * (f.wage * f.workers.length + f.inputSpendEma + f.overheadEma) + f.debt * 0.1 + f.reinvest;
       final owner = f.ownerId != null ? _cmap[f.ownerId!] : null;
       f.dividends = 0;
       if (owner != null && f.money > reserve && !publicService(f)) {
@@ -2666,7 +2714,7 @@ class Sim {
   /// Vérifie les quatre identités ; en mode développement, un écart lève une exception.
   void _checkInvariants() {
     final d = deposits();
-    final loans = totalDebt();
+    final loans = totalLoans();
     inv.money = totalMoney() - expectedMoney();
     inv.loans = loans - (bank.lent + bank.capitalized - bank.repaid - bank.writtenOff);
     inv.bank = (bank.reserves + loans) - (d + bank.equity);
@@ -2780,6 +2828,7 @@ class Sim {
       if (c.employer != null) _fire(firm(c.employer!), c, 'départ de la région');
       if (trace != null) _t('entrees_sorties', 'depart', c.name, c.id, 'god mode', 'émigration', c.money);
       money += c.money;
+      _citizenGone(c); // son logement passe en liquidation
       _godIn(-c.money);
       c.money = 0;
       citizens.remove(c);
@@ -2893,6 +2942,7 @@ class Sim {
     for (final wid in List<int>.from(f.workers)) {
       _fire(f, _cmap[wid], 'fermeture de l’entreprise (god mode)');
     }
+    if (buildings.isNotEmpty) _firmGone(f);
     if (modules.bankruptcy) _repayFromCash(f);
     final hadDebt = f.debt > 0;
     _writeOff(f, 'fermeture (god mode)');

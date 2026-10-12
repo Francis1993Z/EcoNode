@@ -11,7 +11,8 @@ class Good {
   final bool perish; // service ou bien périssable : l'invendu est perdu en fin de journée
   final double guess; // point de départ de la résolution des prix
   final String sector; // primaire | secondaire | tertiaire
-  const Good(this.label, this.unit, this.perish, this.guess, this.sector);
+  final bool tradable; // faux : ne s'importe ni ne s'exporte (module de construction : il reste sur place)
+  const Good(this.label, this.unit, this.perish, this.guess, this.sector, {this.tradable = true});
 }
 
 // L'ordre d'insertion sert à l'affichage (tableaux, listes).
@@ -52,6 +53,8 @@ const Map<String, Good> goods = {
   'soins': Good('Soins de santé', 'visite', true, 80, 'tertiaire'),
   'cours': Good('Formation', 'cours', true, 25, 'tertiaire'),
   'logement': Good('Logement', 'nuitée', true, 40, 'tertiaire'),
+  // Module de construction (module « buildings ») : un logement en demande Params.dwellingModules. Ni importé ni exporté.
+  'batiment': Good('Construction (module)', 'module', false, 1800, 'secondaire', tradable: false),
 };
 
 const List<String> sectors = ['primaire', 'secondaire', 'tertiaire'];
@@ -223,6 +226,10 @@ const Map<String, Template> templates = {
   // la nuitée ne consomme ni bois ni acier : ils serviront à la construction (plan de stabilisation, tâche 6)
   'immobilier': Template('Immobilier', 'IM', 'tertiaire', {}, {'logement': 1}, 24, capital: 0.4),
   'divertissement': Template('Divertissement', 'DI', 'tertiaire', {}, {'loisirs': 1}, 8, capital: 0.3, ads: true),
+  // Module « buildings » : un module = environ 6 jours-personnes de chantier + 5 m³ de bois + 2 lingots d'acier. Un logement
+  // en demande Params.dwellingModules (10 par défaut). Créée au départ seulement si le module est actif.
+  'construction': Template('Construction', 'CO', 'secondaire', {'bois': 5, 'acier': 2}, {'batiment': 1}, 0.17,
+      capital: 0.5, rnd: 'genie'),
 };
 
 /// Le type d'entreprise qui produit chaque bien.
@@ -330,6 +337,51 @@ class Params {
   // A2. Travail divisible : une équipe sous-employée travaille, et est payée, à temps partiel selon la production du
   // jour (au moins 20 % du temps, un jour par semaine) ; le coût de revient ne répartit plus les heures oisives.
   bool partTime = false;
+
+  // ---- Bâtiments et hypothèques (module « buildings »). Le temps du jeu est le temps réel : taux annuels / 365, durées en jours.
+  // Un logement = N modules de construction. Le module coûte 1 800 à 3 000 $ selon l'activité du constructeur (un seul
+  // employé, mal occupé, renchérit le module), donc un logement 18 000 à 30 000 $, soit 5 à 8 ans du loyer actuel du modèle
+  // (~10 $ la nuitée = 3 650 $/an). C'est l'échelle du loyer du modèle, pas celle de l'immobilier canadien (prix de 5 à 8
+  // ans de revenu, loyer de 25 à 30 % du revenu). À valider (voir rapports/batiments-hypotheques.md).
+  int dwellingModules = 10;
+  // Usure structurelle : 4 %/an (durée de vie ~25 ans sans rénovation). Un entretien complet (heures de réparation)
+  // compense la part buildingMaintShare de l'usure ; sans entretien, l'état baisse de 4 %/an.
+  double buildingWearYear = 0.04;
+  double buildingMaintShare = 0.75;
+  // Entretien complet : 0,012 heure de réparation par logement et par jour (~0,7 $/j, soit ~1,5 %/an de la valeur ;
+  // règle courante de 1 à 2 % par an).
+  double maintHoursPerDwelling = 0.012;
+  // Mise de fonds (LTV maximal) : 95 % pour un ménage (assurance hypothécaire canadienne : mise de fonds minimale de
+  // 5 %), 70 % pour une entreprise qui construit (prêt commercial).
+  double ltvHousehold = 0.95;
+  double ltvFirm = 0.70;
+  // Taux : taux de base + prime croissante avec le levier, de 0 (LTV ≤ 50 %) à mortgageSpreadMax (LTV ≥ 95 %).
+  double mortgageSpreadMax = 0.02;
+  // Durée d'amortissement : 25 ans pour un ménage, 10 ans pour une entreprise.
+  int mortgageTermHousehold = 9125;
+  int mortgageTermFirm = 3650;
+  // Pondération du risque d'une hypothèque résidentielle dans les fonds propres exigés de la Caisse (Bâle III, approche
+  // standard : 35 %). Les prêts aux entreprises restent pondérés à 100 %. Sans elle, 100 $ de capital par citoyen ne
+  // financent presque aucun logement (voir Caisse : minCapitalRatio).
+  double mortgageRiskWeight = 0.35;
+  // Après ce nombre de jours de retard consécutifs, la Caisse saisit le bâtiment et le met en vente.
+  int foreclosureDays = 60;
+  // Part des citoyens qui voudraient devenir propriétaires (trait fixe, tiré à la naissance).
+  double ownerShare = 0.7;
+  // Chance quotidienne qu'un locataire désireux d'acheter regarde le marché ; chance quotidienne qu'un propriétaire vende
+  // pour déménager.
+  double buyLookChance = 0.02;
+  double relocateChance = 0.0005;
+  // Prix demandé : valeur courante × (1 + marge) ; sans acheteur, il baisse de listingDecay par jour jusqu'à
+  // listingFloor × la valeur courante.
+  double listingMargin = 0.05;
+  double listingDecay = 0.005;
+  double listingFloor = 0.7;
+  // Un bailleur lance un chantier quand la demande de nuitées dépasse cette part de son parc (y compris les chantiers) ;
+  // il ne met en vente que si la demande reste sous cette part du parc restant (il garde de quoi loger ses locataires).
+  double landlordBuildAbove = 0.96;
+  // Un ménage achète si son coût mensuel de propriétaire (versement + entretien) ne dépasse pas ce multiple du loyer.
+  double buyRentRatio = 1.2;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
@@ -372,6 +424,10 @@ class Modules {
   // dette était radiée avant que la trésorerie revienne au propriétaire : l'argent d'un prêt finissait chez lui et la
   // Caisse encaissait la perte. Aucun paramètre.
   bool bankruptcy = true;
+  // Bâtiments et hypothèques : le parc de logements est fait de bâtiments qu'on construit, qu'on loue, qu'on achète à
+  // crédit (hypothèque de la Caisse), qu'on revend et qui s'usent. Coupé par défaut : le parc suit alors la capacité fixée
+  // au départ (comportement historique).
+  bool buildings = false;
 
   Modules();
 
@@ -397,7 +453,7 @@ class Modules {
 
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
-    'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation', 'bankruptcy',
+    'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation', 'bankruptcy', 'buildings',
   ];
   static const Map<String, String> labels = {
     'credit': 'Crédit bancaire (Caisse)',
@@ -415,6 +471,7 @@ class Modules {
     'insurance': 'Assurance-emploi indexée et aide sociale',
     'bankRegulation': 'Caisse : règles prudentielles',
     'bankruptcy': 'Faillite ordonnée',
+    'buildings': 'Bâtiments, construction et hypothèques',
   };
 
   bool get(String k) {
@@ -449,6 +506,8 @@ class Modules {
         return bankRegulation;
       case 'bankruptcy':
         return bankruptcy;
+      case 'buildings':
+        return buildings;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -485,6 +544,8 @@ class Modules {
         bankRegulation = v;
       case 'bankruptcy':
         bankruptcy = v;
+      case 'buildings':
+        buildings = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -801,6 +862,8 @@ class Citizen extends Account {
   int eiDaysLeft = 0; // jours de prestations restants
   double eiBenefit = 0; // prestation quotidienne de la demande en cours
   int? schoolSince; // jour d'inscription dans la file de l'école publique
+  int? homeId; // bâtiment dont il est propriétaire-occupant (module buildings) ; null : locataire
+  bool wantsToOwn = false; // trait : veut devenir propriétaire (module buildings)
   Citizen(this.id, this.name, super.money, this.skill, this.ambition);
 
   /// 0 manœuvre, 1 technicien, 2 professionnel.
@@ -917,6 +980,8 @@ class Firm extends Account {
   int missedPayments = 0;
   int idleDays = 0; // jours consécutifs sans employé
   int creditBanUntil = -1;
+  double carry = 0; // bâtiments : coût quotidien du parc (intérêts hypothécaires + provision d'usure), pour le loyer
+  double reinvest = 0; // bâtiments : produit de ventes de logements à garder pour reconstruire (exclu des dividendes)
   final List<FirmPoint> hist = [];
 
   Firm(this.id, this.type, this.name, this.inputs, this.outputs, this.rate, this.capacity, double money, this.ownerId,
@@ -989,6 +1054,44 @@ class BuyResult {
   final double qty;
   final double spent;
   const BuyResult(this.qty, this.spent);
+}
+
+// ------------------------------------------------------------------ bâtiments et hypothèques (module « buildings »)
+
+/// Un bâtiment : un logement d'une unité, en chantier (modules posés < Params.dwellingModules) ou terminé.
+class Building {
+  final int id;
+  int ownerKind; // 0 entreprise (bailleur), 1 citoyen (propriétaire-occupant), 2 liquidation (saisie ou succession)
+  int? ownerId; // identifiant de l'entreprise ou du citoyen
+  int? payee; // en liquidation : le citoyen qui touchera le surplus de la vente (null : l'État)
+  int modules = 0; // modules de construction posés
+  bool done = false; // terminé : habitable (si son état le permet) et vendable
+  double cond = 1; // état de 0 (ruine) à 1 (neuf)
+  double basis = 0; // ce que le propriétaire actuel a payé (achat) ou dépensé (construction)
+  int? mortgageId;
+  int? listedDay; // jour de mise en vente (null : pas en vente)
+  final int builtDay;
+  Building(this.id, this.ownerKind, this.ownerId, this.builtDay);
+
+  /// Sous ce seuil d'état, le logement est inhabitable.
+  static const double minCond = 0.3;
+  bool get habitable => done && cond >= minCond;
+}
+
+/// Une hypothèque de la Caisse : prêt garanti par un bâtiment. Le prêt crée de la monnaie, chaque remboursement de capital
+/// en détruit. Tant que le bâtiment est en chantier, seuls les intérêts sont dus.
+class Mortgage {
+  final int id;
+  final int buildingId;
+  int borrowerKind; // 0 entreprise, 1 citoyen, 2 plus de débiteur (bâtiment saisi ou débiteur disparu)
+  int? borrowerId;
+  double principal; // capital dû (intérêts impayés capitalisés compris)
+  final double rate; // taux annuel fixé à l'octroi
+  int termLeft; // jours d'amortissement restants
+  double payment = 0; // versement quotidien (intérêts + capital), fixé à l'octroi puis à chaque tirage
+  int missed = 0; // jours consécutifs de versement manqué
+  final int since;
+  Mortgage(this.id, this.buildingId, this.borrowerKind, this.borrowerId, this.principal, this.rate, this.termLeft, this.since);
 }
 
 /// Cible d'une injection ou d'un retrait d'argent.
