@@ -191,6 +191,9 @@ class Sim {
   final Map<String, int> lastShortage = {};
   final Map<String, double> unmetEma = {}; // demande non servie lissée (~10 jours), par bien
   final Map<String, int> _lastEntry = {}; // dernier jour de création, par type d'entreprise
+  /// Entonnoir de création (mesure seulement) : projets envisagés (un type dont le bien a une demande non servie
+  /// suffisante, un jour donné), refus par cause, créations ; cumulé depuis le début de la partie.
+  final Map<String, int> entryFunnel = {};
   final Map<String, List<double>> _slots = {}; // place laissée dans le graphe par une entreprise fermée, par type
   int firmsCreated = 0;
   int firmsClosed = 0;
@@ -322,6 +325,7 @@ class Sim {
     lastShortage.clear();
     unmetEma.clear();
     _lastEntry.clear();
+    entryFunnel.clear();
     _slots.clear();
     firmsCreated = 0;
     firmsClosed = 0;
@@ -353,8 +357,16 @@ class Sim {
       marketStats[g] = MarketStat();
     }
 
+    // le scénario par défaut suit la taille de la population (une seule copie jusqu'à 1,5 × scenarioPopulation)
+    final copies = scenario == null ? math.max(1, (p.population / p.scenarioPopulation).round()) : 1;
+    final full = <ScenarioFirm>[
+      ...(scenario ??
+          [
+            for (var k = 1; k <= copies; k++)
+              for (final s in defaultScenario) k == 1 ? s : ScenarioFirm(s.type, '${s.name} $k'),
+          ]),
+    ];
     // module buildings : l'entreprise de construction fait partie du scénario ; elle n'est créée que si elle a une demande
-    final full = <ScenarioFirm>[...(scenario ?? defaultScenario)];
     if (this.modules.buildings && !full.any((s) => s.type == 'construction')) {
       full.add(const ScenarioFirm('construction', 'Construction Pelletier'));
     }
@@ -2199,34 +2211,63 @@ class Sim {
       if (f.idleDays >= p.exitIdleDays && !publicService(f)) _close(f); // un établissement public ne ferme pas
     }
     if (day < 30) return; // pas pendant le démarrage
+    // Entonnoir (mesure) : les conditions sont lues dans un ordre qui permet de nommer la première qui manque ; la
+    // décision est la même qu'avant (toutes les conditions sont requises, une seule création par jour).
+    var created = false;
     for (final ty in templates.keys) {
-      if (day - (_lastEntry[ty] ?? -100000) < p.entryCooldown) continue;
       final t = templates[ty]!;
       final g = t.outputs.keys.first;
       if (publicGood(g)) continue; // l'État fournit ce service : pas de concurrent privé
       if (g == 'logement' && modules.buildings) continue; // un bailleur sans bâtiment n'a rien à louer : on construit
       final want = unmetEma[g] ?? 0; // unités par jour non servies
       final perWorker0 = t.rate * t.outputs[g]!; // unités par employé et par jour, sans machines
-      if (want < p.entryMinShare * perWorker0) continue;
+      if (want < p.entryMinShare * perWorker0) continue; // pas de signal : pas de projet
+      String? refused;
+      String why = '';
+      String detail = '';
       final active = sellersOf(g).where((f) => f.workers.isNotEmpty).toList();
-      String why;
-      if (active.isEmpty) {
+      if (created) {
+        refused = 'plafond_quotidien';
+      } else if (day - (_lastEntry[ty] ?? -100000) < p.entryCooldown) {
+        refused = 'delai';
+      } else if (active.isEmpty) {
         why = 'plus personne ne produit';
-      } else {
+      } else if (day < 100) {
         // concurrence : seulement après le démarrage, si les marges sont fortes et que la demande laissée occupe
         // un employé à plein temps
-        if (day < 100 || active.length >= 3 || want < perWorker0) continue;
-        if (!active.every((f) => f.profitEma > 0 && f.price[g]! >= p.entryMarginRatio * (f.unitCostCache[g] ?? double.infinity))) {
-          continue;
-        }
+        (refused, detail) = ('concurrence', 'avant le jour 100');
+      } else if (active.length >= 3) {
+        (refused, detail) = ('concurrence', '${active.length} producteurs actifs');
+      } else if (want < perWorker0) {
+        (refused, detail) = ('demande', 'n’occupe pas un employé');
+      } else if (!active.every((f) => f.profitEma > 0 && f.price[g]! >= p.entryMarginRatio * (f.unitCostCache[g] ?? double.infinity))) {
+        (refused, detail) = ('concurrence', 'marges des producteurs en place trop faibles');
+      } else {
         why = 'demande non servie et fortes marges';
       }
-      if (_found(ty, want, why)) return; // au plus une création par jour
+      refused ??= _found(ty, want, why);
+      _funnel('projet', ty, want);
+      if (refused == null) {
+        created = true; // au plus une création par jour
+        _funnel('creation', ty, want);
+      } else {
+        _funnel(refused, ty, want, detail);
+      }
+    }
+  }
+
+  /// Compte une étape de l'entonnoir de création ; dans le journal complet, chaque refus est un événement.
+  void _funnel(String step, String ty, double want, [String detail = '']) {
+    entryFunnel[step] = (entryFunnel[step] ?? 0) + 1;
+    if (trace != null && step != 'projet' && step != 'creation') {
+      _t('entrees_sorties', 'projet_refuse', templates[ty]!.label, null, 'entonnoir de création', step, want,
+          detail.isEmpty ? 'demande non servie ${fmtNum1(want)} ${goods[templates[ty]!.outputs.keys.first]!.unit}/j' : detail);
     }
   }
 
   /// Un citoyen fonde une entreprise de ce type avec son épargne (10 jours de salaires, 5 jours d'intrants).
-  bool _found(String ty, double want, String why) {
+  /// Rend null si l'entreprise est créée, sinon la cause du refus : main_oeuvre, viabilite ou capital.
+  String? _found(String ty, double want, String why) {
     final p = params;
     final t = templates[ty]!;
     final g = t.outputs.keys.first;
@@ -2240,21 +2281,21 @@ class Sim {
     }
     // une entreprise nouvelle embauche des chômeurs ; au plein emploi, elle ne ferait que débaucher ses voisines
     final available = citizens.where((c) => c.employer == null && c.skill + eps >= t.skill).length;
-    if (available < team) return false;
+    if (available < team) return 'main_oeuvre';
     // viabilité : au prix que le marché paie (borné au double du prix mondial), les ventes attendues doivent couvrir
     // l'équipe et ses intrants ; un marché trop petit pour un employé reste sans producteur
     var revenue0 = 0.0;
     for (final e in t.outputs.entries) {
       revenue0 += batches * e.value * math.min(bestPrice(e.key), 2 * worldPrice[e.key]!);
     }
-    if (revenue0 < 1.1 * (team * wage + inputCost)) return false;
+    if (revenue0 < 1.1 * (team * wage + inputCost)) return 'viabilite';
     final capital = 10 * wage * team + 5 * inputCost;
     final buffer = p.bufferDays * needCost;
     Citizen? founder;
     for (final c in citizens) {
       if (c.money - buffer >= 1.5 * capital && (founder == null || c.money > founder.money)) founder = c;
     }
-    if (founder == null) return false;
+    if (founder == null) return 'capital';
     final same = firms.where((o) => o.type == ty).toList();
     final slot = _slots.remove(ty) ?? (same.isNotEmpty ? [same.last.x, same.last.y + 170] : [600.0, 300.0]);
     final f = _newFirm(ty, '${t.label} ${founder.name.split(' ').last}', 0, founder.id, slot[0], slot[1]);
@@ -2284,7 +2325,7 @@ class Sim {
     }
     _log('info', '${founder.name} fonde ${f.name} avec ${fmtMoney0(paid)} : $why '
         '(${goods[g]!.label.toLowerCase()}, ${fmtNum1(want)} ${goods[g]!.unit}/j non servis).');
-    return true;
+    return null;
   }
 
   /// Fermeture faute d'activité : la trésorerie revient au propriétaire, la dette est radiée, la place est libérée.

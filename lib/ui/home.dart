@@ -36,6 +36,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   /// Écran de départ : taille de la population et graine, avant de lancer la simulation.
   Future<void> _askStart() async {
     var pop = 240.0;
+    var housing = ctrl.sim.modules.buildings;
     final seedCtl = TextEditingController(text: '42');
     final go = await showDialog<bool>(
       context: context,
@@ -57,7 +58,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               const Text('Les entreprises et leurs effectifs sont dimensionnés pour cette population. '
                   'Au-delà de 500 citoyens, la simulation ralentit.', style: TextStyle(fontSize: 12)),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: housing,
+                onChanged: (v) => set(() => housing = v),
+                title: const Text('Marché immobilier', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Bâtiments construits, loués, achetés et revendus ; hypothèques de la Caisse.',
+                    style: TextStyle(fontSize: 12)),
+              ),
+              const SizedBox(height: 8),
               TextField(
                 controller: seedCtl,
                 keyboardType: TextInputType.number,
@@ -66,7 +76,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             ]),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Garder 240')),
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Partie par défaut')),
             FilledButton.icon(
               onPressed: () => Navigator.pop(context, true),
               icon: const Icon(Icons.play_arrow),
@@ -79,6 +89,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     if (!mounted) return;
     if (go == true) {
       final seed = int.tryParse(seedCtl.text.trim())?.abs() ?? 42;
+      // la nouvelle partie reprend les modules en cours : on y règle le marché immobilier avant de la créer
+      ctrl.sim.modules.buildings = housing;
       ctrl.newGame(seed, params: Params()..population = pop.round());
     }
     seedCtl.dispose();

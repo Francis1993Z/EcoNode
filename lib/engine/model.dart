@@ -330,6 +330,10 @@ class Params {
   // Admissibilité : au moins 420 heures d'emploi assurable (le minimum, exigé dans les régions au chômage le plus élevé),
   // soit 12 semaines à 35 heures : 84 jours employés depuis la dernière demande.
   int eiQualifyingDays = 84;
+  // Population pour laquelle le scénario par défaut (une entreprise de chaque type) a été réglé. Une population plus
+  // grande reçoit ce scénario répété round(population ÷ scenarioPopulation) fois : mêmes équipes, même nombre
+  // d'entreprises par habitant (initialisation seulement ; aucune règle de comportement ne change).
+  int scenarioPopulation = 240;
   // Variantes de test (tâche 4, artefacts) : jamais actives par défaut, la décision reste à Francis.
   // A1. La santé ne s'use (desireDecay['sante'] par jour) que les jours de faim ou sans logis ; les maladies restent.
   // Variante aussi plausible que l'usure constante : sans vieillissement, une personne nourrie et logée ne s'use pas.

@@ -268,7 +268,11 @@ graine ne compte plus. Il sert aux cas extrêmes (`test/extremes_test.dart`) et 
 1. **Comptes publics.** Trésor de l'État = 250 $ × population (choix de jeu). Caisse : capital =
    `bankCapitalPerCitizen` × population, en parts sociales (justification § 5.3).
 2. **Plan de départ** (`sim.dart:_plan`, § 5.2) : prix, effectifs, lots et machines par type, qui équilibrent l'offre et
-   une demande estimée. Une entreprise dont le produit n'a aucune demande n'est pas créée.
+   une demande estimée. Une entreprise dont le produit n'a aucune demande n'est pas créée. Le scénario par défaut (une
+   entreprise de chaque type) est réglé pour `scenarioPopulation` = 240 habitants. Une population N le reçoit répété
+   round(N ÷ 240) fois : mêmes équipes et même nombre d'entreprises par habitant à toutes les tailles. Sans cela, une
+   partie de 13 240 habitants gardait 31 entreprises, avec des équipes de plus de 2 400 personnes (journal, § 6,
+   tâche 1).
 3. **Indice des prix.** Les poids (`cpiWeights`) sont la demande par citoyen du plan, pour les biens des ménages. Les
    modules coupés et les services publics gratuits en sont exclus.
 4. **Qualifications.** Les besoins par classe découlent des effectifs du plan :
@@ -328,7 +332,8 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 
 | Paramètre | Défaut | Rôle | Source ou justification |
 |---|---|---|---|
-| `population` | 240 | citoyens au départ | choix de jeu |
+| `population` | 240 | citoyens au départ (`--population N` dans les outils) | choix de jeu |
+| `scenarioPopulation` | 240 | population pour laquelle le scénario par défaut a été réglé ; au-delà, il est répété | taille de réglage du modèle (journal, § 6, tâche 1) |
 | `startWallet` | 3 000 $ | argent de départ de référence | choix de jeu |
 | `startWage` | 150 $/j | salaire de base d'un manœuvre | choix de jeu |
 | `markup` | 1,15 | majoration normale du coût | choix de jeu |
@@ -647,6 +652,14 @@ Choix de jeu : c'est le débouché de la filière informatique.
   - capital = 10 jours de salaires + 5 jours d'intrants, apporté par le citoyen le plus riche qui en a 1,5 fois au-delà
     de son coussin ;
   - prix de départ = min(coût × `markup` ; plus bas prix des concurrents).
+- **Entonnoir de création (mesure seulement)** (`Sim.entryFunnel`, `sim.dart:_funnel`).
+  - **Ce qu'il compte :** chaque jour, chaque type dont le bien a une demande suffisante est un projet. Le premier refus
+    est nommé : `plafond_quotidien`, `delai`, `concurrence`, `demande`, `main_oeuvre`, `viabilite` ou `capital`.
+  - **Où le lire :** dans le journal complet, chaque refus est un événement `projet_refuse`.
+  - **Effet :** aucun sur les décisions.
+- **Ne passe pas à l'échelle** (mesuré, non corrigé). Une création par jour pour toute l'économie, le délai par type et
+  le plafond de 3 producteurs sont des nombres absolus : à 13 240 habitants, il y a environ 7 naissances par an pour
+  370 morts (journal, § 6, tâche 1).
 
 ### 6.13 État et institutions publiques
 

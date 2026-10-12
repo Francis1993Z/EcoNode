@@ -9,6 +9,7 @@
 //   --modules credit=0,...   coupe (0) ou active (1) des modules
 //   --noyau                  coupe tous les modules ajoutés au modèle de base (les institutions restent actives)
 //   --param nom=valeur       change un paramètre (comme tool/stabilite.dart)
+//   --population 1000        taille de la population (comme --param population=1000)
 //   --sans-hasard            tous les tirages valent 0,5 et les ordres du jour suivent les identifiants (cas extrême de
 //                            la tâche 4 : une partie lisible à la main ; la graine ne compte plus)
 //
@@ -102,6 +103,11 @@ class _Opts {
             applyParam(Params(), kv.substring(0, k), kv.substring(k + 1));
             params[kv.substring(0, k)] = kv.substring(k + 1);
           }
+          keep(v);
+        case '--population':
+          final v = next();
+          applyParam(Params(), 'population', v);
+          params['population'] = v;
           keep(v);
         case '--sans-hasard':
           noRandom = true;

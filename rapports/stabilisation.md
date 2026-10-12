@@ -1526,3 +1526,166 @@ Chaque règle porte sa justification et un renvoi `fichier:fonction`.
   exposées aux artefacts.
 - **Maintenance manuelle.** Le document doit changer avec le code, dans le même commit. Aucun test ne vérifie que les
   règles décrites sont celles du code : seule l'existence des renvois est contrôlée.
+
+## 6. Entrepreneuriat, échelle et création d'entreprise
+
+### Tâche 1 — Diagnostic du passage à l'échelle (11 et 12 octobre 2026)
+
+**Constat de départ (Francis, dans l'application).** Avec 13 240 citoyens au jour 1 000 : chômage 75 %, 6 300 affamés,
+6 330 sans logis. Avec un revenu de base de 10 $/j et 30 000 $ donnés à chacun, la faim et le logement se résorbent,
+mais le chômage reste à 35 %. Deux hypothèses : (1) l'initialisation ne suit pas la population ; (2) la création
+d'entreprise ne passe pas à l'échelle.
+
+**Ce qui a changé.** Aucune règle de comportement ne change.
+
+- **`--population N`** dans `tool/stabilite.dart` et `tool/partie.dart`. On peut aussi l'écrire
+  `--param population=N`.
+- **`tool/echelle.dart`** affiche les ratios du jour 1 à plusieurs tailles.
+- **Entonnoir de création (mesure).**
+  - **Compteurs :** `Sim.entryFunnel` les tient, enregistrés dans les instantanés. Dans le journal complet, chaque
+    refus est un événement `entrees_sorties` / `projet_refuse`, avec sa cause.
+  - **Un projet,** c'est un type d'entreprise dont le bien a, ce jour-là, une demande non servie suffisante.
+  - **Causes de refus,** dans l'ordre où la règle les lit : une création déjà ce jour (`plafond_quotidien`), délai de
+    60 jours entre deux créations du type (`delai`), concurrence (avant le jour 100, 3 producteurs actifs ou plus,
+    marges des producteurs en place trop faibles), demande qui n'occupe pas un employé (`demande`), pas assez de
+    chômeurs qualifiés (`main_oeuvre`), viabilité (`viabilite`), aucun fondateur assez riche (`capital`).
+  - **Décision inchangée :** les conditions sont relues dans un ordre qui nomme la première qui manque. L'empreinte de
+    parité est identique au bit près, et les 42 tests passent.
+- **Protocole.** Naissances et morts d'entreprises par an, entonnoir sur la partie. Aux jours 500 et 1 000 : postes
+  vacants, chômeurs, entonnoir, nombre d'entreprises.
+- **Correction de l'initialisation (point 7).**
+  - **Nouveau paramètre :** `scenarioPopulation` = 240, la population pour laquelle le scénario par défaut (une
+    entreprise de chaque type) a été réglé. Une population N reçoit ce scénario répété round(N ÷ 240) fois.
+  - **À 240 habitants, rien ne change :** une seule copie, partie identique au bit près.
+
+**Ce que le modèle n'a pas : quatre causes demandées valent zéro par construction.**
+
+- **Crédit, motivation, connaissance.** Aucun citoyen n'« envisage » de créer : chaque jour, l'économie examine chaque
+  type de bien, et le fondateur est le citoyen le plus riche. Le crédit (le fondateur n'emprunte jamais), la
+  motivation et la connaissance ne sont pas des conditions de la règle.
+- **Créations par des entreprises existantes :** il n'y en a pas.
+- **Inactifs par choix :** il n'y en a pas. Chaque jour, le marché du travail examine tous les sans-emploi.
+
+**Résultats : ratios du jour 1** (graine 1, `tool/echelle.dart`).
+
+| Jour 1 | 240 | 1 000 | 3 000 | 13 240 |
+|---|---|---|---|---|
+| **Avant la correction** | | | | |
+| Postes offerts ÷ population | 0,99 | 0,95 | 0,93 | 0,92 |
+| Logements ÷ ménages | 1,06 | 1,06 | 1,06 | 1,06 |
+| Argent par habitant | 6 457 $ | 6 274 $ | 6 283 $ | 6 289 $ |
+| Fonds propres de la Caisse par habitant | 100 $ | 100 $ | 100 $ | 100 $ |
+| Enveloppes publiques par habitant et par jour (jours 1 à 30) | 5,15 $ | 3,57 $ | 2,81 $ | 2,67 $ |
+| Entreprises (primaire / secondaire / tertiaire) | 7 / 12 / 12 | 7 / 12 / 12 | 7 / 12 / 12 | 7 / 12 / 12 |
+| … secondaire pour 1 000 habitants | 50,0 | 12,0 | 4,0 | 0,91 |
+| Taille médiane d'une équipe ; plus grande | 3 ; 43 | 12 ; 182 | 34 ; 546 | 155 ; 2 409 |
+| **Après la correction** | | | | |
+| Postes offerts ÷ population | 0,99 | 1,00 | 1,01 | 1,00 |
+| Enveloppes publiques par habitant et par jour (jours 1 à 30) | 5,15 $ | 5,45 $ | 4,98 $ | 5,34 $ |
+| Entreprises (primaire / secondaire / tertiaire) | 7 / 12 / 12 | 28 / 48 / 48 | 91 / 156 / 156 | 385 / 660 / 660 |
+| … secondaire pour 1 000 habitants | 50,0 | 48,0 | 52,0 | 49,9 |
+| Taille médiane d'une équipe ; plus grande | 3 ; 43 | 3 ; 45 | 3 ; 42 | 3 ; 44 |
+
+Après la correction, les ratios ne diffèrent plus que par l'arrondi du nombre de copies (1 000 ÷ 240 = 4,17 → 4).
+
+**Résultats : avant et après la correction.**
+
+- **Protocole.** 1 500 jours, sans et avec filets, sans chocs. Avant : 10 graines. Après : 6 graines ; la série à
+  10 graines a été arrêtée pendant la taille 13 240, trop longue.
+- **Vérification.** À 240 habitants, la série d'après reproduit exactement celle d'avant sur les graines 1 à 6. La
+  branche bâtiments, fusionnée et coupée, ne change donc pas les parties ordinaires.
+
+Valeurs médianes [écart interquartile] :
+
+| Sans filets | 240 | 1 000 | 3 000 | 13 240 |
+|---|---|---|---|---|
+| Chômage, avant | 8,1 % [7,2–9,3] | 38,0 % [27,3–45,6] | 90,6 % [90,2–91,0] | 94,4 % [94,3–94,5] |
+| Chômage, après | 8,4 % [7,4–10,4] | 17,6 % [15,4–19,6] | 36,1 % [31,8–36,8] | 65,4 % [63,6–67,4] |
+| Faim, avant → après | 6,7 % → 7,5 % | 9,7 % → 0,7 % | 87,4 % → 4,5 % | 94,6 % → 54,7 % |
+| Sans-abri, avant → après | 1,8 % → 1,7 % | 19,6 % → 3,1 % | 84,4 % → 18,3 % | 86,1 % → 37,7 % |
+| Gini, avant → après | 0,36 → 0,36 | 0,63 → 0,46 | 0,89 → 0,82 | 0,95 → 0,92 |
+| Naissances d'entreprises / an, après | 30,4 | 18,0 | 16,8 | 6,9 |
+| Morts d'entreprises / an, après | 33,8 | 36,1 | 95,6 | 369,5 |
+| Entreprises au départ ; jour 500 ; jour 1 000 (après) | 31 ; — ; — | 124 ; — ; — | 403 ; 125 ; 78 | 1 705 ; 447 ; 232 |
+| Postes vacants ÷ chômeurs au jour 1 000 (après) | — | — | 0,016 | 0,003 |
+
+| Avec filets | 240 | 1 000 | 3 000 | 13 240 |
+|---|---|---|---|---|
+| Chômage, avant | 7,5 % | 42,1 % | 66,7 % | 86,7 % |
+| Chômage, après | 7,8 % [7,5–9,9] | 22,5 % [21,0–23,4] | 33,0 % [17,5–36,2] | 68,6 % [66,9–69,9] |
+| Naissances / morts d'entreprises par an, après | 3,3 / 5,6 | 6,2 / 25,1 | 4,6 / 82,9 | 1,7 / 364,0 |
+
+*Les cases « — » ne sont pas extraites ici ; les valeurs sont dans `rapports/stat/echelle-apres6-*.json`.*
+
+**Entonnoir après la correction** (sans filets, médianes sur la partie) :
+
+| Projets et refus | 240 | 1 000 | 3 000 | 13 240 |
+|---|---|---|---|---|
+| Projets envisagés | 17 725 | 11 844 | 13 354 | 9 662 |
+| Créations | 125 | 74 | 69 | 29 |
+| Refus : concurrence | 1 771 | 4 395 | 6 350 | 6 378 |
+| Refus : délai du type | 6 215 | 3 188 | 3 251 | 1 328 |
+| Refus : viabilité | 5 986 | 1 380 | 1 011 | 1 262 |
+| Refus : demande | 1 582 | 2 784 | 1 768 | 541 |
+| Refus : une création déjà ce jour | 832 | 456 | 504 | 111 |
+| Refus : capital | 845 | 58 | 0 | 0 |
+| Refus : main-d'œuvre | 565 | 2 | 0 | 0 |
+
+**Lecture.**
+
+1. **L'initialisation expliquait la majeure partie de l'écart.** Avec 31 entreprises quelle que soit la population, une
+   équipe atteignait 2 409 personnes et le secteur secondaire comptait 0,91 entreprise pour 1 000 habitants. Avec la
+   correction, sans filets, le chômage à 3 000 habitants passe de 90,6 % à 36,1 %, et à 13 240 de 94,4 % à 65,4 %.
+2. **Le reste vient de la création d'entreprise, qui ne passe pas à l'échelle** (mécanisme rapporté, non corrigé) :
+   - **Les fermetures croissent avec le nombre d'entreprises,** de 34 par an à 240 habitants à 370 par an à 13 240.
+   - **Les naissances, elles, baissent :** de 30 à 7 par an. Elles sont plafonnées en nombre absolu : une création par
+     jour dans toute l'économie, 60 jours entre deux créations d'un même type, aucun nouvel arrivant dès que 3
+     producteurs sont actifs.
+   - **Le parc fond :** à 13 240 habitants, de 1 705 entreprises au départ à 232 au jour 1 000. Il reste 0,003 poste
+     vacant par chômeur.
+3. **La cause de refus qui domine est la concurrence,** dès 1 000 habitants et de plus en plus avec la taille. C'est
+   surtout le plafond de 3 producteurs actifs : avec la correction, il y en a déjà 4 à 55 par type au départ. Viennent
+   ensuite le délai par type et la viabilité. Le capital et la main-d'œuvre ne bloquent plus au-delà de 1 000
+   habitants.
+
+**Seuils absolus qui devraient être par habitant ou en proportion** (relevés dans le code ; aucun n'est corrigé).
+
+| Domaine | Seuil | Où |
+|---|---|---|
+| Initialisation | une entreprise par type, quelle que soit la population (corrigé : `scenarioPopulation`) | `sim.dart:reset` |
+| Initialisation | trésorerie de départ au moins 6 000 $ par entreprise | `sim.dart:reset` |
+| Création | une création par jour pour toute l'économie | `sim.dart:_entryExit` |
+| Création | 60 jours entre deux créations d'un même type (`entryCooldown`) | `sim.dart:_entryExit` |
+| Création | pas de concurrent dès 3 producteurs actifs | `sim.dart:_entryExit` |
+| Création | équipe de départ de 1 à 3 personnes | `sim.dart:_found` |
+| Création | un seul fondateur possible : le citoyen le plus riche | `sim.dart:_found` |
+| Embauche | 3 postes ouverts au plus par entreprise et par jour (`maxPostsPerDay`) ; repris par I1 et l'enveloppe I2 | `sim.dart:_decide`, `solventDividend`, `serviceBudget` |
+| Filet de renflouement | équipe voulue bornée à l'effectif + 3 ; montant minimal d'un salaire | `sim.dart:_finance` |
+| Dette | remboursement minimal de 5 $ par jour | `sim.dart:_capital` |
+| Publicité | notoriété saturant à 20 unités (`brandPull`) et 10 unités (attrait d'un bien) | `sim.dart:brandPull`, `_choose` |
+| R-D | coût d'un niveau : 40 × niveau², quel que soit l'effectif | `sim.dart:rndCost` |
+| Détecteurs | écart comptable toléré de 1e-6 $ | `monitor.dart:MonitorConfig` |
+| Protocole | choc « +25 immigrants » | `tool/stabilite.dart` |
+
+Déjà proportionnels : trésor de départ (250 $ par habitant), capital de la Caisse (100 $ par habitant), parc de
+logements (1,06 par habitant), plancher et réserve de l'État (en multiple de max(4 ; population ÷ 10)), seuils des
+détecteurs (parts de la population), mises à pied (8 % de l'équipe), effet de la publicité sur la dépense (rapporté à
+la population).
+
+**Limites.**
+
+- **Taille des séries.** 6 graines par taille après la correction au lieu de 10. À 13 240 habitants, les deux séries
+  (sans et avec filets) ont pris une heure.
+- **Coût d'une journée.** Il croît à peu près comme le carré de la taille : chaque achat compare toutes les offres du
+  bien. Il faut l'optimiser avant de mesurer plus de graines à grande taille, ce qui doit se vérifier au bit près.
+- **L'entonnoir compte des projets par type, pas des citoyens.** Les causes « crédit », « motivation » et
+  « connaissance » n'existeront qu'avec la tâche 2.
+- **Arrondi du nombre de copies.** Entre 1,5 et 2,5 fois 240 habitants, on obtient 2 copies ; le nombre d'entreprises par
+  habitant va de +33 % (360 habitants) à −20 % (599 habitants) de celui de 240.
+
+**Critère de sortie.**
+
+- L'écart venait d'abord de l'initialisation, corrigée.
+- Ce qui reste vient de la création d'entreprise, plafonnée en nombre absolu.
+- La cause de refus dominante est la concurrence (plafond de 3 producteurs), suivie du délai par type.
+- La tâche 2 se justifie : la création est trop rare à grande taille, et bloquée par des conditions fixes.

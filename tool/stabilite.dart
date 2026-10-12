@@ -17,6 +17,7 @@
 //   --modules credit=0,...   coupe (0) ou active (1) des modules
 //   --noyau                  coupe tous les modules ajoutés au modèle de base (les institutions restent actives)
 //   --param nom=valeur       change un paramètre (variantes mesurées ; voir applyParam)
+//   --population 1000        taille de la population (comme --param population=1000)
 //   --key raffinerie         type de la « firme clé » mise en faillite
 //   --out rapport.md         écrit le rapport Markdown (sinon : sortie standard)
 //   --save synthese.json     enregistre les résultats de chaque graine (relus par --compare et --relire)
@@ -130,6 +131,10 @@ class Options {
           final n = int.parse(next());
           if (n < 1) throw ArgumentError('--graines : au moins 1');
           seeds = [for (var k = 1; k <= n; k++) k];
+        case '--population':
+          final v = next();
+          applyParam(Params(), 'population', v);
+          config.params['population'] = v;
         case '--seeds':
           seeds = next().split(',').map(int.parse).toList();
         case '--isolats':
@@ -196,9 +201,29 @@ class Options {
 }
 
 /// Paramètres modifiables en ligne de commande, pour mesurer une variante.
+/// Étapes de l'entonnoir de création (Sim.entryFunnel), dans l'ordre du rapport.
+const List<String> funnelSteps = [
+  'projet', 'creation', 'plafond_quotidien', 'delai', 'concurrence', 'demande', 'main_oeuvre', 'viabilite', 'capital',
+];
+const Map<String, String> funnelLabels = {
+  'projet': 'projets envisagés',
+  'creation': 'créations',
+  'plafond_quotidien': 'refus, une création déjà ce jour',
+  'delai': 'refus, délai entre deux créations du type',
+  'concurrence': 'refus, concurrence',
+  'demande': 'refus, demande insuffisante',
+  'main_oeuvre': 'refus, pas assez de chômeurs qualifiés',
+  'viabilite': 'refus, viabilité',
+  'capital': 'refus, aucun fondateur assez riche',
+};
+
 void applyParam(Params p, String k, String v) {
   bool b() => v == '1' || v == 'true';
   switch (k) {
+    case 'population': // taille de la population (tâche 1 de l'entrepreneuriat : passage à l'échelle)
+      p.population = int.parse(v);
+    case 'scenarioPopulation': // population du scénario par défaut (au-delà, il est répété)
+      p.scenarioPopulation = int.parse(v);
     case 'dividendFromRetained':
       p.dividendFromRetained = b();
     case 'healthWearIfDeprived': // variante de test A1 (tâche 4)
@@ -260,6 +285,10 @@ class RunStats {
   int typesActiveEnd = 0;
   double machinesEnd = 0;
   int lowUtilEnd = 0; // entreprises avec employés qui utilisent moins de 15 % de la capacité de leur équipe
+  // création et fermeture d'entreprises (passage à l'échelle)
+  int days = 0, population = 0, firmsStart = 0, firmsCreated = 0, firmsClosed = 0;
+  Map<String, int> funnel = {}; // entonnoir de création, cumulé sur la partie (Sim.entryFunnel)
+  Map<String, Map<String, num>> samples = {}; // jours 500 et 1 000 : postes vacants, chômeurs, entonnoir
   String? crash;
 
   RunStats(this.seed, this.nets);
@@ -328,6 +357,15 @@ class RunStats {
         'typesActiveEnd': typesActiveEnd,
         'machinesEnd': machinesEnd,
         'lowUtilEnd': lowUtilEnd,
+        'days': days,
+        'population': population,
+        'firmsStart': firmsStart,
+        'firmsCreated': firmsCreated,
+        'firmsClosed': firmsClosed,
+        'birthsPerYear': days > 0 ? firmsCreated * 365 / days : 0,
+        'deathsPerYear': days > 0 ? firmsClosed * 365 / days : 0,
+        'funnel': funnel,
+        'samples': samples,
         'debtEnd': debtEnd,
         'lent': lent,
         'writtenOff': writtenOff,
@@ -414,6 +452,10 @@ void finish(Sim s, RunStats r) {
     r.machinesEnd += f.machines;
     if (f.workers.isNotEmpty && f.outputEma < 0.15 * f.workers.length * s.perWorker(f)) r.lowUtilEnd++;
   }
+  r.days = s.day;
+  r.firmsCreated = s.firmsCreated;
+  r.firmsClosed = s.firmsClosed;
+  r.funnel = Map.of(s.entryFunnel);
   r.typesActiveEnd = {for (final f in s.firms) if (f.workers.isNotEmpty) f.type}.length;
   final tot = emp.fold(0, (a, b) => a + b);
   r.sectorShare = [for (final e in emp) tot > 0 ? e / tot : 0.0];
@@ -423,17 +465,37 @@ void finish(Sim s, RunStats r) {
   r.writtenOff = s.bank.writtenOff;
 }
 
+/// État du marché du travail et de la création, un jour donné. Tout chômeur cherche un emploi : le modèle n'a pas
+/// d'inactifs par choix (le marché du travail examine chaque jour tous les sans-emploi).
+Map<String, num> sample(Sim s) {
+  final unemployed = s.citizens.where((c) => c.employer == null).length;
+  final vacancies = s.firms.fold(0, (a, f) => a + f.vacancies);
+  return {
+    'population': s.citizens.length,
+    'unemployed': unemployed,
+    'vacancies': vacancies,
+    'vacPerUnemp': unemployed > 0 ? vacancies / unemployed : 0,
+    'firms': s.firms.length,
+    'created': s.firmsCreated,
+    'closed': s.firmsClosed,
+    for (final e in s.entryFunnel.entries) 'funnel.${e.key}': e.value,
+  };
+}
+
 Map<String, dynamic> runBase(int seed, Config c, int days, int warmup, bool nets, Set<String> except) {
   final sg = nets ? Safeguards() : Safeguards.none();
   for (final k in except) {
     sg.set(k, false);
   }
   final s = Sim(seed: seed, params: c.newParams(), modules: c.modules.copy(), safeguards: sg);
-  final r = RunStats(seed, nets);
+  final r = RunStats(seed, nets)
+    ..population = s.citizens.length
+    ..firmsStart = s.firms.length;
   try {
     for (var d = 1; d <= days; d++) {
       s.step();
       observe(s, r, warmup);
+      if (d == 500 || d == 1000) r.samples['$d'] = sample(s);
     }
   } catch (e) {
     r.crash = 'j${s.day} : $e';
@@ -782,6 +844,9 @@ List<Ind> runIndicators(String phase) {
     Ind('criticalDays', 'Jours-alerte critiques (somme des types)', 'count', -1, 'partie', fn: criticalDays),
     Ind('alertsTotal', 'Alertes ouvertes (toutes)', 'count', -1, 'partie'),
     Ind('healthMean', 'Santé moyenne', 'dec', 1, 'régime'),
+    Ind('birthsPerYear', 'Naissances d’entreprises / an', 'dec1', 0, 'partie'),
+    Ind('deathsPerYear', 'Morts d’entreprises / an', 'dec1', 0, 'partie'),
+    for (final k in funnelSteps) Ind('funnel.$k', 'Entonnoir : ${funnelLabels[k]}', 'count', 0, 'partie'),
     Ind('typesActiveEnd', 'Types d’entreprise actifs en fin', 'count', 1, 'fin'),
     Ind('machinesEnd', 'Machines en fin', 'dec1', 1, 'fin'),
     Ind('lowUtilEnd', 'Équipes utilisées à moins de 15 % (fin)', 'count', -1, 'fin'),

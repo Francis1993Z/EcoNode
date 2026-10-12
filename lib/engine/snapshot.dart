@@ -110,6 +110,7 @@ Map<String, Object?> _paramsJson(Params p) => {
       'listingFloor': _d(p.listingFloor),
       'landlordBuildAbove': _d(p.landlordBuildAbove),
       'buyRentRatio': _d(p.buyRentRatio),
+      'scenarioPopulation': p.scenarioPopulation,
     };
 
 Params _paramsFrom(Map j) => Params()
@@ -184,7 +185,8 @@ Params _paramsFrom(Map j) => Params()
   ..listingDecay = _rdOr(j['listingDecay'], 0.005)
   ..listingFloor = _rdOr(j['listingFloor'], 0.7)
   ..landlordBuildAbove = _rdOr(j['landlordBuildAbove'], 0.96)
-  ..buyRentRatio = _rdOr(j['buyRentRatio'], 1.2);
+  ..buyRentRatio = _rdOr(j['buyRentRatio'], 1.2)
+  ..scenarioPopulation = (j['scenarioPopulation'] as int?) ?? 240;
 
 Map<String, Object?> _safeguardsJson(Safeguards s) => {
       for (final k in Safeguards.keys) k: s.get(k),
@@ -644,6 +646,7 @@ extension SimSnapshot on Sim {
         'unmetEma': _dm(unmetEma),
         'lastShortage': lastShortage,
         'lastEntry': _lastEntry,
+        'entryFunnel': entryFunnel,
         'slots': {for (final e in _slots.entries) e.key: [for (final v in e.value) _d(v)]},
         'nodePos': {for (final e in nodePos.entries) e.key: [for (final v in e.value) _d(v)]},
         'marketStats': {for (final e in marketStats.entries) e.key: [_d(e.value.qty), _d(e.value.value)]},
@@ -766,6 +769,9 @@ extension SimSnapshot on Sim {
     _lastEntry
       ..clear()
       ..addAll(_rim(j['lastEntry']));
+    entryFunnel
+      ..clear()
+      ..addAll(_rim(j['entryFunnel'] ?? const {}));
     _slots
       ..clear()
       ..addAll({for (final e in (j['slots'] as Map).entries) e.key as String: [for (final v in e.value as List) _rd(v)]});
