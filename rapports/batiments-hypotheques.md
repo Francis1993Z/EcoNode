@@ -44,7 +44,7 @@ Branche `feature/batiments-hypotheques` (base : `main` au commit 7b6c5dc).
 | `lib/engine/model.dart` | `Good.tradable`, bien `batiment`, gabarit `construction`, `Params` (voir ci-dessous), `Modules.buildings`, `Building`, `Mortgage`, champs `Citizen.homeId/wantsToOwn`, `Firm.carry/reinvest` |
 | `lib/engine/sim.dart` | état, flux `logement`, crochets dans `step()`, `totalDebt/totalLoans`, biens non échangeables, nettoyage à la fermeture |
 | `lib/engine/snapshot.dart` | sérialisation (rétrocompatible : anciennes sauvegardes lisibles), empreinte `batiments` seulement si le parc existe |
-| `test/batiments_test.dart` | **nouveau** : 17 tests |
+| `test/batiments_test.dart` | **nouveau** : 18 tests |
 
 ## Paramètres ajoutés (`Params`)
 
