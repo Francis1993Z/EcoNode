@@ -9,6 +9,8 @@
 //   --modules credit=0,...   coupe (0) ou active (1) des modules
 //   --noyau                  coupe tous les modules ajoutés au modèle de base (les institutions restent actives)
 //   --param nom=valeur       change un paramètre (comme tool/stabilite.dart)
+//   --sans-hasard            tous les tirages valent 0,5 et les ordres du jour suivent les identifiants (cas extrême de
+//                            la tâche 4 : une partie lisible à la main ; la graine ne compte plus)
 //
 //   --trace dossier/         écrit evenements.jsonl, series.csv, agents_fin.csv et entreprises.csv
 //   --categories a,b         catégories gardées dans evenements.jsonl (défaut : toutes) :
@@ -40,6 +42,7 @@ class _Opts {
   Set<String> sauf = {};
   Modules modules = Modules();
   Map<String, String> params = {};
+  bool noRandom = false;
   String? trace;
   Set<String>? categories;
   int? every;
@@ -100,6 +103,9 @@ class _Opts {
             params[kv.substring(0, k)] = kv.substring(k + 1);
           }
           keep(v);
+        case '--sans-hasard':
+          noRandom = true;
+          passThrough.add(a);
         case '--trace':
           trace = next();
         case '--categories':
@@ -134,7 +140,13 @@ class _Opts {
     for (final k in sauf) {
       sg.set(k, false);
     }
-    return Sim(seed: seed, params: p, modules: modules, safeguards: sg);
+    final s = Sim(seed: seed, params: p, modules: modules, safeguards: sg);
+    if (noRandom) {
+      // le drapeau joue dès la naissance des citoyens : la partie est refaite avec lui
+      s.sansHasard = true;
+      s.reset(seed: seed, params: p, modules: modules, safeguards: sg);
+    }
+    return s;
   }
 }
 

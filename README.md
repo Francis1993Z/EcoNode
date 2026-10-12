@@ -9,6 +9,9 @@ Ce dépôt contient la version **Flutter (Android en mode paysage, et web)**. La
 
 ## Le modèle (v2)
 
+Description complète, règle par règle, avec justifications et renvois au code : [`MODELE.md`](MODELE.md) (protocole
+ODD). Ci-dessous, un résumé.
+
 - **Trois secteurs** : primaire (ferme, pêche, pétrole, bois, fer, or, bauxite, cuivre, ressources illimitées),
   secondaire (boucherie, boulangerie, raffinerie, pétrochimie, fonderie, aluminerie, électronique, puces, ordinateurs,
   bijouterie, garage, machinerie), tertiaire (ingénierie pétrolière et de CPU, marketing, comptabilité, restaurant,
@@ -120,7 +123,8 @@ flutter build web
   `sim.dart` (simulation, filets, invariants), `monitor.dart` (détecteurs d'anomalies).
 - `lib/ui/` : contrôleur, disposition et dessin du graphe, inspecteurs, onglets Diagnostic, God mode, Économie, Modèle.
 - `tool/stabilite.dart` : protocole de stabilité en ligne de commande.
-- `tool/partie.dart` : une partie en ligne de commande, avec ses journaux complets, ses instantanés et `--diff`.
+- `tool/partie.dart` : une partie en ligne de commande, avec ses journaux complets, ses instantanés et `--diff` ;
+  `--sans-hasard` joue une partie où tous les tirages valent 0,5, lisible à la main.
 - `tool/detresse.dart` : ce qui distingue les citoyens en détresse des autres (à partir d'`agents_fin.csv`).
 - `tool/parite.dart` : empreinte d'une partie, à comparer entre la VM et la version JavaScript.
 - `rapports/` : rapports du protocole et plan de stabilisation.
@@ -128,10 +132,14 @@ flutter build web
 - `test/hasard_test.dart` : flux de hasard (valeurs de référence VM / web, indépendance, ordre du jour stable).
 - `test/protocole_test.dart` : statistiques du protocole (quantiles, bootstrap, appariement) et parties en isolat.
 - `test/instantane_test.dart` : reprise exacte depuis un instantané, traceur sans effet sur la partie, empreintes.
+- `test/proprietes_test.dart` : propriétés vérifiées chaque jour sur des parties tirées au hasard (dividendes et fonds
+  propres, plafonds quotidiens des prix et salaires, emplois, plancher de la Caisse, admissibilité à l'assurance-emploi).
+- `test/extremes_test.dart` : cas extrêmes au résultat connu d'avance (zéro citoyen, une entreprise par secteur,
+  salaires figés, monnaie × 100, aucun hasard) ; deux attendus non obtenus sont sautés, avec ce qui a été mesuré.
 
 ## État
 
-`flutter analyze` ne signale rien et `flutter test` passe (33 tests). Le hasard est en flux indépendants (nombres
+`flutter analyze` ne signale rien et `flutter test` passe (42 tests, 2 sautés volontairement). Le hasard est en flux indépendants (nombres
 aléatoires communs) : une même graine donne la même partie sur la VM et en JavaScript (`tool/parite.dart`). Tâches 1, 2, 3, 4, 5, 7 et 8 du plan de
 stabilisation faites (coût de revient réel, intrants secondaires non bloquants, prix et salaires limités à 1,5 %/j,
 consommation stock-flux, entrée et sortie d'entreprises, fonds de roulement, Caisse capitalisée et prudente). Avec
@@ -144,7 +152,8 @@ entreprises et une aide sociale qui laisse des sans-logis. Voir l'état des lieu
 
 ## À faire
 
-- Décisions en attente : importations de dépannage (A2), usure de la santé sans maladie ; suites des institutions
+- Décisions en attente : importations de dépannage (A2), usure de la santé sans maladie (variantes de test A1 et A2
+  mesurées : journal, tâche 4) ; jour assurable sans cotisation (I3) ; non-neutralité d'un choc monétaire ; suites des institutions
   (trésorerie bloquée par I1, aide sociale de I3, recapitalisation de la Caisse) ; institutions au-delà de I5 (douane,
   dette publique, migration).
 - Stabilisation : la ferme (coproduit, A3), puis les tâches 6, 9 et 10 du plan.

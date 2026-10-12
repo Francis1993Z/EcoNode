@@ -156,6 +156,9 @@ class Sim {
   late Modules modules;
   late Safeguards safeguards;
   bool devChecks; // mode développement : un invariant rompu lève une exception
+  // Drapeau de test (tâche 4, cas extrêmes) : tous les tirages valent 0,5 et tous les ordres du jour suivent les
+  // identifiants. Jamais actif dans le jeu.
+  bool sansHasard = false;
   int day = 0;
   // identifiants stables, jamais réutilisés : les citoyens sont numérotés à partir de 1 ; une entreprise reçoit
   // 100 000 + 10 000 × (rang de son type) + son rang de création dans ce type (voir _newFirmId)
@@ -250,13 +253,14 @@ class Sim {
   /// Tirage uniforme dans [0, 1) qui ne dépend que de (graine, flux, jour, agent, sous-tirage), jamais de l'ordre des
   /// appels. Le sous-tirage distingue plusieurs tirages d'une même décision, pour un même agent, le même jour.
   double draw(Flux flux, int id, [int sub = 0]) {
+    if (sansHasard) return 0.5;
     var h = hash32(_dayKey(flux), id);
     if (sub != 0) h = hash32(h, sub);
     return Mulberry32(h).next();
   }
 
   /// Clé d'ordre du jour d'un agent dans un flux.
-  int orderKey(Flux flux, int id) => hash32(_dayKey(flux), id);
+  int orderKey(Flux flux, int id) => sansHasard ? 0 : hash32(_dayKey(flux), id);
 
   /// Les agents rangés selon leur clé d'ordre du jour (égalités départagées par l'identifiant). Retirer un agent ne
   /// change pas l'ordre relatif des autres ; le mélange de Fisher-Yates qu'il remplace consommait un nombre de tirages
@@ -414,7 +418,8 @@ class Sim {
       f.revenueEma = revenue;
       f.outputEma = batches;
       f.money = quantize(math.max(6000.0, 12 * (f.wage * f.workers.length + inputCost)));
-      f.ownerId = citizens[(draw(Flux.proprietaire, f.id) * citizens.length).floor()].id;
+      // sans citoyen (cas extrême), pas de propriétaire : la trésorerie d'une fermeture revient à l'État
+      if (citizens.isNotEmpty) f.ownerId = citizens[(draw(Flux.proprietaire, f.id) * citizens.length).floor()].id;
       if (publicService(f)) f.ownerId = null; // établissement public : l'État en est le propriétaire
     }
     for (final c in citizens) {
@@ -823,7 +828,8 @@ class Sim {
     final capacity = math.max(1, f.workers.length) * per;
     // utilisation de l'équipe sur ~20 jours : les achats des clients arrivent par lots, le coût ne doit pas suivre chaque creux
     final util = f.workers.isEmpty ? 1.0 : (f.outputEma / capacity).clamp(0.05, 1.0);
-    var batch = f.wage / (per * util);
+    // variante A2 (temps partiel) : seules les heures travaillées sont payées
+    var batch = f.wage * (p.partTime ? math.max(util, minHours) : 1.0) / (per * util);
     final planned = math.max(math.max(f.lastBatches, _plannedBatches(f)), 0.05 * capacity);
     for (final e in f.inputs.entries) {
       batch += e.value * bestPrice(e.key);
@@ -859,12 +865,13 @@ class Sim {
     for (final f in sellersOf(good)) {
       if (identical(f, buyer)) continue;
       if ((f.inv[good] ?? 0) > eps) {
-        offers.add(_Offer(f, f.price[good]!, Mulberry32(hash32(base, f.id)).next(), household ? 1 / (1 + brandPull(f)) : 1));
+        offers.add(_Offer(f, f.price[good]!, sansHasard ? 0.5 : Mulberry32(hash32(base, f.id)).next(),
+            household ? 1 / (1 + brandPull(f)) : 1));
       }
     }
     final p = params;
     if (p.trade && !goods[good]!.perish) {
-      offers.add(_Offer(null, worldPrice[good]! * p.importMarkup, Mulberry32(hash32(base, 0)).next(), 1));
+      offers.add(_Offer(null, worldPrice[good]! * p.importMarkup, sansHasard ? 0.5 : Mulberry32(hash32(base, 0)).next(), 1));
     }
     stableSort<_Offer>(offers, (a, b) {
       final d = a.p * (1 + 0.03 * a.r) * a.pull - b.p * (1 + 0.03 * b.r) * b.pull;
@@ -1195,12 +1202,24 @@ class Sim {
     }
   }
 
+  /// Variante A2 : part minimale du temps de travail (un jour par semaine).
+  static const double minHours = 0.2;
+
+  /// Part du temps payée aujourd'hui : 1, sauf dans la variante A2 (temps partiel), où l'équipe n'est payée que pour
+  /// la part de sa capacité du jour qu'elle a produite.
+  double hoursToday(Firm f) {
+    if (!params.partTime || f.workers.isEmpty) return 1;
+    final cap = _capBatches(f, f.effWorkers * perWorker(f));
+    return cap > eps ? (f.lastBatches / cap).clamp(minHours, 1.0).toDouble() : 1.0;
+  }
+
   void _payWages() {
     for (final f in firms) {
       final n = f.workers.length;
       if (n == 0) continue;
-      final bill = f.wage * n;
-      final each = f.money >= bill ? f.wage : f.money / n;
+      final wage = f.wage * hoursToday(f);
+      final bill = wage * n;
+      final each = f.money >= bill ? wage : f.money / n;
       final t = params.taxRate;
       // assurance-emploi (I3) : cotisation sur la rémunération assurable, plafonnée au salaire moyen
       final ins = modules.insurance;
@@ -1213,7 +1232,7 @@ class Sim {
         tax += transfer(f, state, each * t);
         if (ins) {
           premiums += transfer(f, state, cot);
-          c.lastWage = f.wage;
+          c.lastWage = wage;
           c.insuredDays++;
         }
         c.income += a;
@@ -1230,9 +1249,9 @@ class Sim {
       if (trace != null) {
         _t('compta', 'salaires', f.name, f.id, 'paie', '$n employé(s)', net + tax + premiums,
             'net ${fmtMoney0(net)}, impôt ${fmtMoney0(tax)}, cotisations ${fmtMoney0(premiums)}'
-                '${each < f.wage - eps ? ' ; salaires versés en partie' : ''}');
+                '${each < wage - eps ? ' ; salaires versés en partie' : ''}');
       }
-      if (each < f.wage - eps) {
+      if (each < wage - eps) {
         // ne peut pas payer : mise à pied du dernier embauché
         final c = _cmap[f.workers.last];
         _fire(f, c, 'salaires impayables : mise à pied du dernier embauché');
@@ -1635,7 +1654,9 @@ class Sim {
       c.sat['sante'] = 1;
       return;
     }
-    var h = c.health - desireDecay['sante']!;
+    // variante A1 : pas d'usure les jours où le citoyen est nourri et logé
+    final wear = p.healthWearIfDeprived && c.hungerDays == 0 && !c.homeless ? 0.0 : desireDecay['sante']!;
+    var h = c.health - wear;
     if (draw(Flux.maladie, c.id) < p.illness) h -= 0.2 + 0.3 * draw(Flux.maladie, c.id, 1);
     h = h.clamp(0.05, 1.0).toDouble();
     if (publicGood('soins')) {

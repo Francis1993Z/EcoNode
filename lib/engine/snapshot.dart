@@ -88,6 +88,8 @@ Map<String, Object?> _paramsJson(Params p) => {
       'eiDaysLow': p.eiDaysLow,
       'eiDaysHigh': p.eiDaysHigh,
       'eiQualifyingDays': p.eiQualifyingDays,
+      'healthWearIfDeprived': p.healthWearIfDeprived,
+      'partTime': p.partTime,
     };
 
 Params _paramsFrom(Map j) => Params()
@@ -141,7 +143,9 @@ Params _paramsFrom(Map j) => Params()
   ..eiRate = _rd(j['eiRate'])
   ..eiDaysLow = j['eiDaysLow'] as int
   ..eiDaysHigh = j['eiDaysHigh'] as int
-  ..eiQualifyingDays = j['eiQualifyingDays'] as int;
+  ..eiQualifyingDays = j['eiQualifyingDays'] as int
+  ..healthWearIfDeprived = (j['healthWearIfDeprived'] as bool?) ?? false
+  ..partTime = (j['partTime'] as bool?) ?? false;
 
 Map<String, Object?> _safeguardsJson(Safeguards s) => {
       for (final k in Safeguards.keys) k: s.get(k),
@@ -529,6 +533,7 @@ extension SimSnapshot on Sim {
         'seed': seed,
         'day': day,
         'devChecks': devChecks,
+        'sansHasard': sansHasard,
         'params': _paramsJson(params),
         'modules': {for (final k in Modules.keys) k: modules.get(k)},
         'safeguards': _safeguardsJson(safeguards),
@@ -635,6 +640,7 @@ extension SimSnapshot on Sim {
     seed = j['seed'] as int;
     day = j['day'] as int;
     devChecks = j['devChecks'] as bool;
+    sansHasard = (j['sansHasard'] as bool?) ?? false;
     params = _paramsFrom(j['params'] as Map);
     modules = Modules();
     for (final e in (j['modules'] as Map).entries) {

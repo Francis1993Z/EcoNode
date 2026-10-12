@@ -201,6 +201,10 @@ void applyParam(Params p, String k, String v) {
   switch (k) {
     case 'dividendFromRetained':
       p.dividendFromRetained = b();
+    case 'healthWearIfDeprived': // variante de test A1 (tâche 4)
+      p.healthWearIfDeprived = b();
+    case 'partTime': // variante de test A2 (tâche 4)
+      p.partTime = b();
     default:
       throw ArgumentError('Paramètre inconnu : $k');
   }
@@ -252,6 +256,10 @@ class RunStats {
   List<double> sectorShare = [0, 0, 0];
   double debtEnd = 0, lent = 0, writtenOff = 0;
   int firmsWithoutStaff = 0;
+  // filière (anomalie A2) : types d'entreprise qui ont au moins un employé, machines, équipes peu utilisées, en fin
+  int typesActiveEnd = 0;
+  double machinesEnd = 0;
+  int lowUtilEnd = 0; // entreprises avec employés qui utilisent moins de 15 % de la capacité de leur équipe
   String? crash;
 
   RunStats(this.seed, this.nets);
@@ -317,6 +325,9 @@ class RunStats {
         'netRates': {for (final k in Safeguards.keys) k: netRate(k)},
         'sectorShare': sectorShare,
         'firmsWithoutStaff': firmsWithoutStaff,
+        'typesActiveEnd': typesActiveEnd,
+        'machinesEnd': machinesEnd,
+        'lowUtilEnd': lowUtilEnd,
         'debtEnd': debtEnd,
         'lent': lent,
         'writtenOff': writtenOff,
@@ -400,7 +411,10 @@ void finish(Sim s, RunStats r) {
   for (final f in s.firms) {
     emp[sectors.indexOf(f.template.sector)] += f.workers.length;
     if (f.workers.isEmpty) r.firmsWithoutStaff++;
+    r.machinesEnd += f.machines;
+    if (f.workers.isNotEmpty && f.outputEma < 0.15 * f.workers.length * s.perWorker(f)) r.lowUtilEnd++;
   }
+  r.typesActiveEnd = {for (final f in s.firms) if (f.workers.isNotEmpty) f.type}.length;
   final tot = emp.fold(0, (a, b) => a + b);
   r.sectorShare = [for (final e in emp) tot > 0 ? e / tot : 0.0];
   r.debtEnd = s.totalDebt();
@@ -768,6 +782,9 @@ List<Ind> runIndicators(String phase) {
     Ind('criticalDays', 'Jours-alerte critiques (somme des types)', 'count', -1, 'partie', fn: criticalDays),
     Ind('alertsTotal', 'Alertes ouvertes (toutes)', 'count', -1, 'partie'),
     Ind('healthMean', 'Santé moyenne', 'dec', 1, 'régime'),
+    Ind('typesActiveEnd', 'Types d’entreprise actifs en fin', 'count', 1, 'fin'),
+    Ind('machinesEnd', 'Machines en fin', 'dec1', 1, 'fin'),
+    Ind('lowUtilEnd', 'Équipes utilisées à moins de 15 % (fin)', 'count', -1, 'fin'),
     Ind('happyMean', 'Bonheur moyen', 'dec', 1, 'régime'),
     Ind('waitMean', 'Hôpital public : attente moyenne (j)', 'dec1', -1, 'régime'),
     Ind('benefitCutDays', 'Jours de prestations réduites', 'count', -1, 'régime'),

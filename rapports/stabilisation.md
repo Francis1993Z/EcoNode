@@ -1341,3 +1341,188 @@ filets, 1 500 jours d'historique) ; l'outil en ligne de commande écrit des fich
   d'avant ne se relisent plus.
 - **Agents disparus.** Une entreprise fermée ou un citoyen parti n'ont plus d'inspecteur ; leurs lignes ne sont pas
   cliquables.
+
+### Tâche 4 — Tests de propriétés et cas extrêmes (11 octobre 2026)
+
+Repères : Thaler et Siebers (tests par propriétés en simulation à agents) ; Galán et al. 2009 (erreurs et artefacts).
+Aucune règle économique ne change, à une correction de robustesse près (zéro citoyen, ci-dessous). Tous les
+nouveaux drapeaux sont coupés par défaut.
+
+**Ce qui a changé.**
+
+- **`test/proprietes_test.dart`** (générateur maison, reproductible). 24 parties de 250 jours sont tirées au hasard :
+  - graine, population de 40 à 300 ;
+  - chaque module actif à 75 %, chaque filet à 50 % ;
+  - impôt, prestation, taux d'intérêt, plafonds quotidiens des prix et des salaires, taux de dividende, mobilité,
+    maladies, admissibilité à l'assurance-emploi, plafond des dividendes, commerce ;
+  - capital de la Caisse : nul dans 30 % des cas, sinon de 0 à 200 $ par citoyen ;
+  - 0 à 4 chocs du god mode : argent, destruction de stocks, épidémie, arrivées, départs, faillite.
+
+  Les parties tournent en mode développement : un invariant rompu lève une exception. Les propriétés sont vérifiées
+  chaque jour, ou au moment même de l'événement grâce au journal complet (`Sim.trace`) :
+  - **I1 :** pas de dividende versé par une entreprise à fonds propres négatifs. Fonds propres = trésorerie + stocks
+    (extrants au prix affiché, intrants au meilleur prix) + machines au prix du marché − dette, avant le versement ;
+  - **prix et salaire du jour** dans ±`priceMaxDaily` / ±`wageMaxDaily` de la veille (sauf plancher) ;
+  - **postes pourvus ≤ population ;** un citoyen a au plus un employeur, et les registres des citoyens et des
+    entreprises concordent ;
+  - **I4 :** à chaque prêt accordé, fonds propres de la Caisse ≥ 11,5 % de l'encours, prêt compris ;
+  - **I3 :** toute demande admise a au moins `eiQualifyingDays` jours assurables et un dernier salaire ; aucune
+    prestation hors d'une demande admise pendant le chômage en cours ; aucune prestation si le module est coupé ; un
+    jour assurable n'est compté qu'avec une paie versée.
+
+  La conservation des flux du jour n'est pas retestée : les invariants exacts la couvrent déjà.
+- **`test/extremes_test.dart`.** Chaque test énonce son résultat attendu avant de jouer : zéro citoyen ; une seule
+  entreprise par secteur ; salaires figés ; toute la monnaie × 100 ; aucun hasard.
+- **`Sim.sansHasard`** (drapeau de test). Tous les tirages valent 0,5, les ordres du jour suivent les identifiants, les
+  offres sont départagées à 0,5. Il est aussi dans `tool/partie.dart --sans-hasard` et dans les instantanés.
+- **Variantes d'artefacts** (paramètres de test, coupés par défaut, lisibles par `--param` et les instantanés) :
+  - **A1 (`healthWearIfDeprived`) :** la santé ne s'use que les jours de faim ou sans logis ; les maladies restent ;
+  - **A2 (`partTime`) :** travail divisible. L'équipe est payée pour la part de sa capacité du jour qu'elle a produite,
+    au moins 20 %, et le coût de revient ne compte plus les heures oisives. Les règles fondées sur le salaire
+    contractuel ne changent pas : seuil d'embauche, réserve des dividendes, mise à pied sous 2 jours de salaires.
+- **Protocole.** Trois indicateurs de filière en fin de partie : types d'entreprise actifs, machines, équipes utilisées
+  à moins de 15 % de leur capacité.
+- **Correction de robustesse.** Avec zéro citoyen, `reset` tirait un propriétaire dans une liste vide (`RangeError`).
+  Sans citoyen, il n'y a plus de propriétaire ; la trésorerie d'une fermeture revient alors à l'État, comme pour un
+  établissement public.
+
+**Vérifications.**
+
+- **Rien ne change par défaut.**
+  - L'empreinte de `tool/parite.dart` est identique, au bit près, avant et après, sur la VM et en JavaScript (dart2js
+    `-O2`, `node`).
+  - La référence du protocole, relancée (`rapports/stat/tache4-ref.md`), reproduit exactement
+    `rapports/stat/complet-i1-i5.json` : 2 640 valeurs sur 30 graines, sans et avec filets, et les 300 chocs.
+  - Les 44 tests (33 d'avant, 11 nouveaux) : 42 passent, 2 sont sautés volontairement (ci-dessous).
+- **Couverture des propriétés.** Sur les 24 parties, on a vérifié 32 400 dividendes, 138 prêts accordés (189 refusés),
+  1 332 demandes d'assurance-emploi, 131 493 prix et 125 997 salaires.
+- **Les tests attrapent les fautes.** Chaque mutation a été faite sur une copie de `sim.dart`, puis annulée :
+  - **plafond des prix retiré :** attrapé dès le jour 2 du cas 1 ;
+  - **admissibilité à l'assurance-emploi retirée :** attrapé (cas 1, jour 83 : demande admise avec 14 jours sur 22) ;
+  - **plancher de fonds propres de la Caisse retiré :** d'abord *non attrapé*, car le plancher ne mordait dans aucun
+    cas tiré. Une fois ajoutées les Caisses sans capital, il est attrapé (cas 2, jour 7 : fonds propres 155 $ pour un
+    plancher de 285 $) ;
+  - **test de solvabilité I1 retiré :** des dividendes à fonds propres négatifs apparaissent (cas 2, la ferme au
+    jour 124 : fonds propres −417 $, trésorerie 330 $, dette 761 $). Avec I1, il n'y en a aucun sur 32 400. La propriété
+    distingue donc bien le moteur avec I1 du moteur sans.
+
+**Résultats : propriétés.**
+
+- **Toutes tiennent, sauf un écart, rapporté et non corrigé.**
+  - **Le cas.** Le jour d'une faillite du god mode, l'entreprise n'a plus rien en caisse à la paie : ses employés ne
+    sont pas payés et ne cotisent pas, mais le jour compte quand même comme emploi assurable. Exemple : cas 13,
+    jour 126, Château Simard, au moins 20 employés (la liste des échecs est plafonnée à 20).
+  - **Pourquoi seulement ce jour-là.** Une paie partielle cotise toujours. Une caisse à exactement 0 $ avec des
+    employés ne s'observe qu'après `godBankrupt` dans ces 24 parties.
+  - **Le test.** Il épingle l'écart : il échoue si un jour assurable sans cotisation apparaît un autre jour.
+  - **La décision reste à Francis.** Faut-il un jour cotisé pour compter un jour assurable ?
+- **Un faux positif corrigé dans le test, pas dans le moteur.** Un citoyen mis à pied pendant la paie finit la journée
+  sans emploi, avec les jours restants d'une ancienne demande. Il n'est pas payé ce jour-là : son dossier est revu le
+  lendemain.
+
+**Résultats : cas extrêmes.**
+
+| Cas | Attendu | Obtenu |
+|---|---|---|
+| Zéro citoyen | rien ne se produit ; masse monétaire constante ; entreprises sans employé fermées | ✅ après la correction de robustesse : 3 entreprises de services naissent sans employé, ferment au jour 30, l'État récupère leurs 18 000 $ |
+| Une entreprise par secteur (ferme, boulangerie, immobilier ; modules et filets coupés) | personne n'a faim ni ne dort dehors après le jour 100 | ❌ **sauté.** La ferme vend toutes ses céréales mais perd de l'argent dès le jour 5 : son bétail (≈ 45 % de la valeur d'un lot) n'a aucun acheteur. Elle licencie à partir du jour 20 et n'a plus d'employé au jour 30 ; 240 affamés dès le jour 36. C'est l'anomalie A3 |
+| Salaires figés | aucun salaire ne bouge en 300 jours ; salaire moyen dans les bornes de départ ; invariants exacts | ✅ |
+| Monnaie × 100 : les prix suivent | indice des prix × > 10 au jour 500 | ✅ graine 1 : ×18. Graines 1 à 8 : ×16 à ×55 au jour 500, ×15 à ×85 au jour 1 500 |
+| Monnaie × 100 : économie réelle inchangée | jours 1 001 à 1 500 : dépense réelle à ±20 %, chômage à ±3 points | ❌ **sauté.** Salaires ×72 à ×244 au jour 1 500, plus que les prix ; dépense réelle des ménages ×2 à ×23 environ ; chômage de −3,1 à +6,5 points ; graine 8 : 153 affamés en moyenne contre 1 |
+| Aucun hasard | traits, argent et propriétaire se calculent à la main ; en 30 jours, aucune maladie (santé = 1 − 0,003 × jour), aucun changement d'emploi, aucun cours, aucun achat d'ordinateur ; la graine ne compte plus | ✅ |
+
+- **Les deux attendus non obtenus restent écrits.** Les tests sont sautés, avec ce qui a été mesuré ; `flutter test
+  --run-skipped` les fait échouer sur ces valeurs.
+- **Partie sans hasard, lisible à la main** (`tool/partie.dart --sans-hasard --jours 30 --trace`) : 2 244 événements,
+  dont 930 paies et 917 dividendes versés ou retenus. Au jour 30 : chômage 2,1 %, aucun affamé ni sans logis, indice
+  des prix 1,266, écart comptable 0.
+- **Choc monétaire avec les filets.** Il a été mesuré avec les filets actifs, comme dans le jeu (`Sim` par défaut).
+
+**Résultats : artefacts.** Protocole complet : 30 graines × 1 500 jours, comparaisons appariées contre la référence
+(`rapports/stat/tache4-compare-a1.md`, `rapports/stat/tache4-compare-a2.md`). Différences médianes par graine et IC 95 %
+bootstrap.
+
+| Sans filets | Référence | A1 : usure si privation | A2 : temps partiel |
+|---|---|---|---|
+| Santé moyenne | 0,18 | 0,56 (+0,36 [+0,30 ; +0,48]) | 0,88 (+0,70 [+0,67 ; +0,73]) |
+| Graines où la santé moyenne reste < 0,5 | 30/30 | 12/30 | — |
+| Alerte « santé effondrée » ouverte | 30/30 | 26/30 | — |
+| Faim moyenne | 6,1 % | 1,6 % (−4,0 pt [−5,2 ; −2,8]) | 0,1 % (−6,0 pt [−7,5 ; −4,9]) |
+| Sans-abri moyen | 2,6 % | 1,1 % (−1,3 pt [−1,9 ; −0,5]) | 0,4 % (−1,7 pt [−2,5 ; −1,3]) |
+| Chômage moyen | 8,0 % | 9,5 % (non concluant) | 8,6 % (non concluant) |
+| Types d'entreprise actifs en fin | 13 | 17 (+3,5 [+1,5 ; +6,5]) | 28 (+15 [+13,5 ; +15,5]) |
+| Machines en fin | 0,2 | 0,5 | 362 (+362 [+303 ; +394]) |
+| Attente à l'hôpital public | 513 j | 264 j | 0,4 j |
+| Jours-alerte critiques | 1 525 | 904 (−616 [−807 ; −465]) | 71 (−1 440 [−1 489 ; −1 369]) |
+| Chocs résolus en < 200 j | 8/150 | 35/150 | 70/150 |
+| Critère « faim et sans-abri < 2 % » | 29/30 graines hors bande | 17/30 | 3/30 |
+| Critère « chômage ≤ 10 % » | 4/30 hors bande | 13/30 | 11/30 |
+
+- **A1, l'usure de la santé.**
+  - **Le phénomène s'atténue mais survit en partie :** la santé moyenne reste sous 0,5 dans 12 graines sur 30, et
+    l'alerte s'ouvre dans 26.
+  - **La cause amont est toujours là :** l'hôpital public a toujours 264 jours d'attente médiane.
+  - **Avec filets :** santé 0,88 → 0,94 ; mais pire sans-abri maximal (+21 pt [+6 ; +26]).
+- **A2, le travail indivisible.**
+  - **Le phénomène ne survit pas :** la filière se maintient (28 types actifs au lieu de 13, 362 machines au lieu de
+    0), et la santé avec elle.
+  - **Avec filets :** les renflouements passent de 13,1 à 5,2 par 50 jours (−7,8 [−9,6 ; −6,4]). Mais le chômage
+    augmente de +1,5 pt [+0,6 ; +3,6] et les alertes critiques ouvertes de +5,5 [+1 ; +9].
+  - **Sans filets :** l'inflation moyenne devient légèrement négative (−0,054 %/j).
+- **Je ne propose pas d'adopter l'une ou l'autre.** La décision reste à Francis (importations de dépannage et usure de
+  la santé : décisions réservées).
+
+**Limites.**
+
+- **Rigueur.** Une première série A1 / A2 a été jetée : mes tests de mutation modifiaient `sim.dart` pendant qu'elle
+  tournait, et chaque `dart run` compile le moteur à son démarrage. Les trois séries rapportées ont été relancées avec
+  le moteur figé.
+- **Propriétés.**
+  - 24 parties de 250 jours (≈ 40 s) : un défaut rare peut échapper. Le générateur cite le cas, le jour et l'agent ;
+    on peut en ajouter.
+  - **Fonds propres (I1) :** leur valeur dépend de la valorisation choisie des stocks et des machines.
+  - **Cotisations (I3) :** elles ne s'observent pas par citoyen. Le test se fonde sur la paie versée par l'entreprise
+    (`wagesPaid`).
+- **A2 et le chômage.** Le chômage compte les personnes, pas les heures : un employé à 20 % du temps compte comme
+  employé. Le sous-emploi n'est pas mesuré.
+- **Cas extrêmes.**
+  - Une seule graine pour la plupart, 8 graines pour le choc monétaire.
+  - « Une entreprise par secteur » est lu au sens strict (une entreprise par secteur primaire, secondaire et
+    tertiaire), avec la chaîne alimentaire la plus courte.
+  - Le choc monétaire multiplie l'argent détenu, pas les prix ni les paramètres nominaux (`benefit`, seuils en dollars) :
+    ceux-ci sont des points d'ancrage nominaux, une cause possible, non vérifiée, de la non-neutralité.
+- **Instantanés.** Les nouveaux champs se relisent avec une valeur par défaut. La version de format n'a pas changé : les
+  instantanés d'avant se relisent. Les trois nouveaux réglages sont écrits même coupés : un `--diff` contre une
+  révision antérieure à cette tâche les signale comme réglages différents.
+
+### Tâche 5 — Description stable du modèle (format ODD) (11 octobre 2026)
+
+Référence : Grimm et al. 2020, « The ODD Protocol for Describing Agent-Based and Other Simulation Models: A Second
+Update », *JASSS* 23(2) 7.
+
+**Ce qui a changé.** [`MODELE.md`](../MODELE.md), à la racine et distinct de ce journal. C'est le document à donner aux
+prochains lecteurs (humains ou LLM) à la place d'un résumé refait. Il compte sept sections :
+
+1. objectif et faits stylisés visés (les critères de sortie, présentés comme des cibles de plausibilité, pas comme une
+   calibration) ;
+2. entités et variables d'état ;
+3. ordre exact des étapes d'une journée ;
+4. usage du hasard : les 16 flux de la tâche 1, leurs codes et leurs fonctions ;
+5. initialisation, plan de départ, et chaque paramètre avec sa source ou la mention « choix de jeu » ;
+6. sous-modèles ;
+7. vérification.
+
+Chaque règle porte sa justification et un renvoi `fichier:fonction`.
+
+**Vérifications.**
+
+- Les 49 renvois `fichier:fonction` et tous les identifiants cités existent dans le code (vérification automatique).
+- Les comptes du document sont recomptés dans `model.dart` : 33 biens (9, 12, 12), 32 types.
+- Les règles ont été relues dans le code, pas recopiées du journal.
+
+**Limites.**
+
+- **Beaucoup de « choix de jeu ».** Le document le dit au lieu d'inventer une source ; ce sont les valeurs les plus
+  exposées aux artefacts.
+- **Maintenance manuelle.** Le document doit changer avec le code, dans le même commit. Aucun test ne vérifie que les
+  règles décrites sont celles du code : seule l'existence des renvois est contrôlée.

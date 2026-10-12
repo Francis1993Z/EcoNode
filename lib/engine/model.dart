@@ -323,6 +323,13 @@ class Params {
   // Admissibilité : au moins 420 heures d'emploi assurable (le minimum, exigé dans les régions au chômage le plus élevé),
   // soit 12 semaines à 35 heures : 84 jours employés depuis la dernière demande.
   int eiQualifyingDays = 84;
+  // Variantes de test (tâche 4, artefacts) : jamais actives par défaut, la décision reste à Francis.
+  // A1. La santé ne s'use (desireDecay['sante'] par jour) que les jours de faim ou sans logis ; les maladies restent.
+  // Variante aussi plausible que l'usure constante : sans vieillissement, une personne nourrie et logée ne s'use pas.
+  bool healthWearIfDeprived = false;
+  // A2. Travail divisible : une équipe sous-employée travaille, et est payée, à temps partiel selon la production du
+  // jour (au moins 20 % du temps, un jour par semaine) ; le coût de revient ne répartit plus les heures oisives.
+  bool partTime = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
