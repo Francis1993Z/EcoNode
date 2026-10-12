@@ -341,6 +341,11 @@ class Params {
   // A2. Travail divisible : une équipe sous-employée travaille, et est payée, à temps partiel selon la production du
   // jour (au moins 20 % du temps, un jour par semaine) ; le coût de revient ne répartit plus les heures oisives.
   bool partTime = false;
+  // Recherche limitée des vendeurs (coupée : 0, chaque achat d'un ménage compare tous les vendeurs du bien). k > 0 :
+  // chaque achat d'un ménage n'examine que k vendeurs tirés parmi ceux qui ont du stock, plus celui de son dernier achat
+  // de ce bien (habitude), et prend le meilleur de cet échantillon selon la règle habituelle (prix, notoriété).
+  // Information imparfaite sur les prix (choix de jeu ; mesure au journal, § 8).
+  int sellerSample = 0;
 
   // ---- Bâtiments et hypothèques (module « buildings »). Le temps du jeu est le temps réel : taux annuels / 365, durées en jours.
   // Un logement = N modules de construction. Le module coûte 1 800 à 3 000 $ selon l'activité du constructeur (un seul
@@ -984,6 +989,7 @@ class Firm extends Account {
   int missedPayments = 0;
   int idleDays = 0; // jours consécutifs sans employé
   int creditBanUntil = -1;
+  String lastLoss = ''; // raison de la dernière fin d'emploi (mesure des causes de fermeture)
   double carry = 0; // bâtiments : coût quotidien du parc (intérêts hypothécaires + provision d'usure), pour le loyer
   double reinvest = 0; // bâtiments : produit de ventes de logements à garder pour reconstruire (exclu des dividendes)
   final List<FirmPoint> hist = [];

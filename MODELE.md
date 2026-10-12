@@ -225,7 +225,7 @@ Les agents sont rangés selon `orderKey` = `hash32(clé du jour, identifiant)`, 
 Retirer un agent ne change pas l'ordre relatif des autres. Avant, un mélange de Fisher-Yates consommait un nombre
 variable de tirages et décalait toute la suite de la partie.
 
-### Les 16 flux
+### Les 18 flux
 
 | Code | Flux | Usage | Fonction |
 |---|---|---|---|
@@ -245,6 +245,8 @@ variable de tirages et décalait toute la suite de la partie.
 | 14 | `offres` | départage des offres à prix voisins : un tirage par (acheteur, bien, n-ième achat du jour, vendeur) | `buy` |
 | 15 | `prix` | pas d'ajustement de la marge | `_decide` |
 | 16 | `divin` | actions du god mode (épidémie) | `godEpidemic` |
+| 17 | `logement` | bâtiments : état à la naissance, déménagement, regard sur le marché (module `buildings`) | `buildings.dart` |
+| 18 | `vendeurs` | recherche limitée : vendeurs examinés par un achat de ménage (`sellerSample` > 0) | `_AllOffers.sampled` |
 
 La création d'entreprise ne tire rien : le fondateur est le citoyen le plus riche.
 
@@ -334,6 +336,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 |---|---|---|---|
 | `population` | 240 | citoyens au départ (`--population N` dans les outils) | choix de jeu |
 | `scenarioPopulation` | 240 | population pour laquelle le scénario par défaut a été réglé ; au-delà, il est répété | taille de réglage du modèle (journal, § 6, tâche 1) |
+| `sellerSample` | 0 | recherche limitée : un achat de ménage n'examine que k vendeurs tirés (plus celui de son dernier achat) ; 0 = tous | choix de jeu, coupé par défaut (journal, § 8) |
 | `startWallet` | 3 000 $ | argent de départ de référence | choix de jeu |
 | `startWage` | 150 $/j | salaire de base d'un manœuvre | choix de jeu |
 | `markup` | 1,15 | majoration normale du coût | choix de jeu |
@@ -657,6 +660,10 @@ Choix de jeu : c'est le débouché de la filière informatique.
     est nommé : `plafond_quotidien`, `delai`, `concurrence`, `demande`, `main_oeuvre`, `viabilite` ou `capital`.
   - **Où le lire :** dans le journal complet, chaque refus est un événement `projet_refuse`.
   - **Effet :** aucun sur les décisions.
+- **Causes de fermeture (mesure)** (`sim.dart:closeCause`). Une entreprise ferme toujours après `exitIdleDays` jours
+  sans employé. La cause enregistrée est ce qui l'y a menée, lue dans cet ordre : prix aberrant (plus de 5 fois le prix
+  de référence), faillite (dernière fin d'emploi faute de pouvoir payer), demande perdue, sans employé, autre. Elle est
+  lue dans `Firm.lastLoss`, et comptée dans `fermeture_<cause>`.
 - **Ne passe pas à l'échelle** (mesuré, non corrigé). Une création par jour pour toute l'économie, le délai par type et
   le plafond de 3 producteurs sont des nombres absolus : à 13 240 habitants, il y a environ 7 naissances par an pour
   370 morts (journal, § 6, tâche 1).

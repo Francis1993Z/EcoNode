@@ -73,7 +73,8 @@ enum Flux {
   offres(14), // départage des offres à prix voisins
   prix(15), // pas d'ajustement de la marge
   divin(16), // actions du god mode (épidémie)
-  logement(17); // bâtiments : état à la naissance, déménagement, regard sur le marché
+  logement(17), // bâtiments : état à la naissance, déménagement, regard sur le marché
+  vendeurs(18); // recherche limitée : vendeurs examinés par un achat de ménage (Params.sellerSample)
 
   const Flux(this.code);
   final int code;
@@ -162,6 +163,43 @@ class _AllOffers {
   late final List<double> keys;
   late final List<bool> used;
   List<int>? rest;
+
+  /// Recherche limitée (Params.sellerSample = k) : seuls k vendeurs tirés parmi ceux qui ont du stock, plus le vendeur
+  /// du dernier achat (habitude), sont examinés. Les tirages se font par place dans la liste des vendeurs (au plus 4k
+  /// essais) : le coût est en O(k), pas en nombre de vendeurs. Flux « vendeurs », sous-tirage (bien, n-ième achat,
+  /// essai). Les offres retenues gardent l'ordre des vendeurs, pour départager les égalités comme d'habitude.
+  _AllOffers.sampled(Sim s, Account buyer, String good, int base, int k, int who, int gi, int n) {
+    final sellers = s.sellersOf(good);
+    final index = s._sellerIndex[good] ?? const <int, int>{};
+    final chosen = <int>{};
+    bool open(int i) => !identical(sellers[i], buyer) && (sellers[i].inv[good] ?? 0) > eps;
+    final habit = s.lastSeller[who * 64 + gi];
+    final hi = habit == null ? null : index[habit];
+    if (hi != null && open(hi)) chosen.add(hi);
+    final want = chosen.length + k;
+    if (sellers.length <= want) {
+      for (var i = 0; i < sellers.length; i++) {
+        if (open(i)) chosen.add(i);
+      }
+    } else {
+      final sub0 = hash32(gi, n);
+      for (var a = 1; a <= 4 * k && chosen.length < want; a++) {
+        final i = (s.draw(Flux.vendeurs, who, hash32(sub0, a)) * sellers.length).floor();
+        if (open(i)) chosen.add(i);
+      }
+    }
+    for (final i in chosen.toList()..sort()) {
+      final f = sellers[i];
+      offers.add(_Offer(f, f.price[good]!, s.sansHasard ? 0.5 : Mulberry32(hash32(base, f.id)).next(), 1 / (1 + s.brandPull(f))));
+    }
+    final p = s.params;
+    if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
+      offers.add(
+          _Offer(null, s.worldPrice[good]! * p.importMarkup, s.sansHasard ? 0.5 : Mulberry32(hash32(base, 0)).next(), 1));
+    }
+    keys = [for (final o in offers) o.p * (1 + 0.03 * o.r) * o.pull];
+    used = List<bool>.filled(offers.length, false);
+  }
 
   _AllOffers(Sim s, Account buyer, String good, int base, bool household, [_BestOffers? cached]) {
     if (cached != null) {
@@ -428,6 +466,7 @@ class Sim {
     unmetEma.clear();
     _lastEntry.clear();
     entryFunnel.clear();
+    lastSeller.clear();
     _slots.clear();
     firmsCreated = 0;
     firmsClosed = 0;
@@ -779,12 +818,21 @@ class Sim {
 
   void _rebuildSellers() {
     _sellers.clear();
+    _sellerIndex.clear();
     for (final f in firms) {
       for (final g in f.outputs.keys) {
-        (_sellers[g] ??= []).add(f);
+        final l = _sellers[g] ??= [];
+        (_sellerIndex[g] ??= {})[f.id] = l.length;
+        l.add(f);
       }
     }
   }
+
+  /// Place de chaque vendeur dans sellersOf(bien), par identifiant (recherche limitée des vendeurs).
+  final Map<String, Map<int, int>> _sellerIndex = {};
+
+  /// Recherche limitée (Params.sellerSample) : dernier vendeur de chaque ménage, par (acheteur × 64 + bien).
+  final Map<int, int> lastSeller = {};
 
   /// Identifiant stable d'une entreprise : 100 000 + 10 000 × (rang du type) + rang de création dans ce type. Créer
   /// une entreprise d'un type ne décale pas les identifiants (donc les tirages) des entreprises des autres types.
@@ -872,6 +920,7 @@ class Sim {
   void _fire(Firm? f, Citizen? c, [String why = '']) {
     if (f == null || c == null) return;
     f.workers.remove(c.id);
+    f.lastLoss = why;
     c.employer = null;
     if (trace != null) _t('travail', 'fin_emploi', c.name, c.id, why, f.name, f.wage, 'entreprise ${f.id}');
   }
@@ -1046,7 +1095,11 @@ class Sim {
     // pendant la consommation, prix et attrait des vendeurs sont lus une fois par bien et par jour (ils ne changent pas)
     final qc = _quoteCache;
     final cached = household && buyer is! Firm && qc != null ? (qc[good] ??= _BestOffers(this, good)) : null;
-    final pick = _AllOffers(this, buyer, good, base, household, cached).pick;
+    final k = params.sellerSample;
+    final pick = (k > 0 && household
+            ? _AllOffers.sampled(this, buyer, good, base, k, who, gi, n)
+            : _AllOffers(this, buyer, good, base, household, cached))
+        .pick;
 
     var remaining = qty;
     var spent = 0.0;
@@ -1074,6 +1127,7 @@ class Sim {
         s.inv[good] = (s.inv[good] ?? 0) - q;
         s.sold[good] = (s.sold[good] ?? 0) + q;
         s.revenue += paid;
+        if (k > 0 && household) lastSeller[who * 64 + gi] = s.id; // habitude
       }
       _flow(o.firm == null ? 'X' : o.firm!.id.toString(), buyerKey, good, q, paid);
       final ms = marketStats[good]!;
@@ -2448,7 +2502,24 @@ class Sim {
   }
 
   /// Fermeture faute d'activité : la trésorerie revient au propriétaire, la dette est radiée, la place est libérée.
+  /// Cause d'une fermeture (mesure seulement). Une entreprise ferme toujours faute d'employé depuis exitIdleDays
+  /// jours ; la cause est ce qui l'y a menée, lue dans cet ordre : prix aberrant (plus de 5 fois le prix de référence
+  /// corrigé des salaires), faillite (dernière fin d'emploi faute de pouvoir payer), demande perdue (effectif au-dessus
+  /// du plan de production, ou demande lissée quasi nulle), sans employé (départs volontaires, ou postes jamais
+  /// pourvus), autre.
+  String closeCause(Firm f) {
+    final g = f.g0;
+    if ((f.price[g] ?? 0) > 5 * referencePrice(g)) return 'prix_aberrant';
+    final why = f.lastLoss;
+    if (why.startsWith('salaires impayables') || why.startsWith('trésorerie sous')) return 'faillite';
+    if (why.startsWith('effectif au-dessus') || (f.demandEma[g] ?? 0) < 0.05) return 'demande_perdue';
+    if (why.isEmpty || why.startsWith('départ')) return 'sans_employe';
+    return 'autre';
+  }
+
   void _close(Firm f) {
+    final cause = closeCause(f);
+    entryFunnel['fermeture_$cause'] = (entryFunnel['fermeture_$cause'] ?? 0) + 1;
     if (buildings.isNotEmpty) _firmGone(f); // ses bâtiments passent en liquidation (la Caisse les vend)
     final repaid = modules.bankruptcy ? _repayFromCash(f) : 0.0;
     final lost = f.debt;
@@ -2458,7 +2529,7 @@ class Sim {
     if (left > 0) transfer(f, owner ?? state, left);
     if (trace != null) {
       _t('entrees_sorties', 'fermeture', f.name, f.id, 'sortie : aucun employé depuis ${params.exitIdleDays} jours',
-          'aucun employé', left, 'trésorerie rendue à ${owner?.name ?? 'l’État'} ; dette remboursée '
+          cause, left, 'trésorerie rendue à ${owner?.name ?? 'l’État'} ; dette remboursée '
               '${fmtMoney0(repaid)}, radiée ${fmtMoney0(lost)}');
     }
     if (repaid > 0 || lost > 0) {

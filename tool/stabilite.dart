@@ -226,6 +226,16 @@ class Options {
 }
 
 /// Paramètres modifiables en ligne de commande, pour mesurer une variante.
+/// Causes de fermeture (Sim.closeCause), dans l'ordre du rapport.
+const List<String> closeCauses = ['prix_aberrant', 'faillite', 'demande_perdue', 'sans_employe', 'autre'];
+const Map<String, String> closeLabels = {
+  'prix_aberrant': 'prix aberrant',
+  'faillite': 'faillite (salaires impayables)',
+  'demande_perdue': 'demande perdue',
+  'sans_employe': 'sans employé (départs, postes non pourvus)',
+  'autre': 'autre',
+};
+
 /// Étapes de l'entonnoir de création (Sim.entryFunnel), dans l'ordre du rapport.
 const List<String> funnelSteps = [
   'projet', 'creation', 'plafond_quotidien', 'delai', 'concurrence', 'demande', 'main_oeuvre', 'viabilite', 'capital',
@@ -245,6 +255,8 @@ const Map<String, String> funnelLabels = {
 void applyParam(Params p, String k, String v) {
   bool b() => v == '1' || v == 'true';
   switch (k) {
+    case 'sellerSample': // recherche limitée des vendeurs (0 : tous)
+      p.sellerSample = int.parse(v);
     case 'population': // taille de la population (tâche 1 de l'entrepreneuriat : passage à l'échelle)
       p.population = int.parse(v);
     case 'scenarioPopulation': // population du scénario par défaut (au-delà, il est répété)
@@ -314,6 +326,10 @@ class RunStats {
   int days = 0, population = 0, firmsStart = 0, firmsCreated = 0, firmsClosed = 0;
   Map<String, int> funnel = {}; // entonnoir de création, cumulé sur la partie (Sim.entryFunnel)
   Map<String, Map<String, num>> samples = {}; // jours 500 et 1 000 : postes vacants, chômeurs, entonnoir
+  // parc et concentration des ventes (après la chauffe) : par bien, somme des parts de la plus grande entreprise et de
+  // l'indice de Herfindahl, et nombre de jours avec des ventes
+  double firmsSum = 0;
+  final Map<String, List<double>> conc = {};
   String? crash;
 
   RunStats(this.seed, this.nets);
@@ -390,6 +406,15 @@ class RunStats {
         'birthsPerYear': days > 0 ? firmsCreated * 365 / days : 0,
         'deathsPerYear': days > 0 ? firmsClosed * 365 / days : 0,
         'funnel': funnel,
+        'firmsMean': steady > 0 ? firmsSum / steady : 0,
+        'birthsPctPark': steady > 0 && firmsSum > 0 && days > 0 ? 100 * firmsCreated * 365 / days / (firmsSum / steady) : 0,
+        'deathsPctPark': steady > 0 && firmsSum > 0 && days > 0 ? 100 * firmsClosed * 365 / days / (firmsSum / steady) : 0,
+        // par bien : part moyenne de la plus grande entreprise, Herfindahl moyen, nombre moyen de vendeurs actifs
+        'concentration': {
+          for (final e in conc.entries) e.key: [e.value[0] / e.value[3], e.value[1] / e.value[3], e.value[2] / e.value[3]],
+        },
+        'topShareMed': _medianOf([for (final c in conc.values) c[0] / c[3]]),
+        'hhiMed': _medianOf([for (final c in conc.values) c[1] / c[3]]),
         'samples': samples,
         'debtEnd': debtEnd,
         'lent': lent,
@@ -422,6 +447,28 @@ void observe(Sim s, RunStats r, int warmup) {
   }
   if (h.day > warmup) {
     r.steady++;
+    r.firmsSum += s.firms.length;
+    // concentration : parts des ventes du jour de chaque entreprise, par bien
+    final sales = <String, List<double>>{};
+    for (final f in s.firms) {
+      for (final e in f.sold.entries) {
+        if (e.value > 0) (sales[e.key] ??= []).add(e.value);
+      }
+    }
+    for (final e in sales.entries) {
+      final tot = e.value.fold(0.0, (a, b) => a + b);
+      var top = 0.0, hhi = 0.0;
+      for (final q in e.value) {
+        final sh = q / tot;
+        if (sh > top) top = sh;
+        hhi += sh * sh;
+      }
+      final c = r.conc[e.key] ??= [0, 0, 0, 0];
+      c[0] += top;
+      c[1] += hhi;
+      c[2] += e.value.length;
+      c[3] += 1;
+    }
     r.unempSum += h.unemp;
     r.unempMin = math.min(r.unempMin, h.unemp);
     r.hungerSum += hs;
@@ -488,6 +535,13 @@ void finish(Sim s, RunStats r) {
   r.refusals = s.bank.refusals;
   r.lent = s.bank.lent;
   r.writtenOff = s.bank.writtenOff;
+}
+
+double _medianOf(List<double> v) {
+  if (v.isEmpty) return 0;
+  v.sort();
+  final m = v.length ~/ 2;
+  return v.length.isOdd ? v[m] : (v[m - 1] + v[m]) / 2;
 }
 
 /// État du marché du travail et de la création, un jour donné. Tout chômeur cherche un emploi : le modèle n'a pas
@@ -929,6 +983,12 @@ List<Ind> runIndicators(String phase) {
     Ind('alertsTotal', 'Alertes ouvertes (toutes)', 'count', -1, 'partie'),
     Ind('healthMean', 'Santé moyenne', 'dec', 1, 'régime'),
     Ind('birthsPerYear', 'Naissances d’entreprises / an', 'dec1', 0, 'partie'),
+    Ind('birthsPctPark', 'Naissances / an, en % du parc moyen', 'dec1', 0, 'partie'),
+    Ind('deathsPctPark', 'Morts / an, en % du parc moyen', 'dec1', 0, 'partie'),
+    Ind('firmsMean', 'Parc moyen d’entreprises (après la chauffe)', 'dec1', 0, 'régime'),
+    Ind('topShareMed', 'Part de la plus grande entreprise (médiane des biens)', 'pc', 0, 'régime'),
+    Ind('hhiMed', 'Herfindahl des ventes (médiane des biens)', 'dec', 0, 'régime'),
+    for (final c in closeCauses) Ind('funnel.fermeture_$c', 'Fermetures : ${closeLabels[c]}', 'count', 0, 'partie'),
     Ind('deathsPerYear', 'Morts d’entreprises / an', 'dec1', 0, 'partie'),
     for (final k in funnelSteps) Ind('funnel.$k', 'Entonnoir : ${funnelLabels[k]}', 'count', 0, 'partie'),
     Ind('typesActiveEnd', 'Types d’entreprise actifs en fin', 'count', 1, 'fin'),

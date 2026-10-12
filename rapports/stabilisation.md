@@ -1829,3 +1829,186 @@ l'effet de la tâche 2. Le gain des chocs branchés est celui de l'échantillon 
   sélection des premières offres y reste. L'écart réel avec le moteur d'origine est donc un peu plus grand.
 - **Vérification pas à pas.** `verifyFastPaths` couvre les meilleurs prix. L'ordre des offres et les attraits lus une
   fois ne sont vérifiés que par les empreintes, la parité et les protocoles identiques.
+
+## 8. Recherche limitée des vendeurs et causes de fermeture (12 octobre 2026)
+
+Aucune règle de comportement ne change par défaut. Le nouveau paramètre `sellerSample` est coupé (0) ; les causes de
+fermeture et la concentration sont des mesures.
+
+### Tâche 1 — Profil à 13 240 habitants
+
+- **Conditions.** `sellerSample` coupé, une graine, 140 s d'échantillonnage. L'échantillonnage commence après
+  170 s de partie, vers le jour 120 : au-delà de la chauffe.
+- **Ce qui domine.** La consommation des ménages prend 95,5 % du temps, dont 79,7 % pour les loisirs. Parts inclusives :
+  - `Sim.buy` : 82,5 % ;
+  - choix de l'offre (`_AllOffers.pick`) : 37,5 % ;
+  - construction de toutes les offres d'un achat (`_AllOffers`, un tirage par vendeur) : 32,1 % ;
+  - tri stable des offres restantes : 29,7 %. Beaucoup d'achats demandent plus de 4 offres, faute de stock chez les
+    premiers vendeurs.
+- **Ce qui ne domine pas.** Le marché du travail et les ordres du jour ne figurent pas parmi les 20 premières
+  fonctions.
+- **Conclusion.** La boucle d'achat est bien la source du terme quadratique.
+
+### Tâche 2 — Causes de fermeture et concentration (mesure)
+
+- **Causes de fermeture** (`sim.dart:closeCause`).
+  - Une entreprise ferme toujours après `exitIdleDays` jours sans employé. La cause est ce qui l'y a menée, lue dans cet
+    ordre :
+    1. **prix aberrant :** plus de 5 fois le prix de référence corrigé des salaires ;
+    2. **faillite :** dernière fin d'emploi faute de pouvoir payer (salaires impayables, ou trésorerie sous 2 jours de
+       salaires) ;
+    3. **demande perdue :** effectif au-dessus du plan de production, ou demande lissée quasi nulle ;
+    4. **sans employé :** départs volontaires, ou postes jamais pourvus ;
+    5. **autre.**
+  - **Où le lire :** dans le journal complet, l'événement `fermeture` porte la cause. Dans l'entonnoir, le compteur est
+    `fermeture_<cause>`.
+  - **Comment c'est su :** chaque entreprise garde la raison de sa dernière fin d'emploi (`Firm.lastLoss`, dans les
+    instantanés).
+- **Concentration** (protocole). Elle est calculée chaque jour, par bien, sur les ventes de chaque entreprise : part de
+  la plus grande et indice de Herfindahl, puis moyennées après la chauffe. Le rapport donne leur médiane sur les biens.
+- **Parc.** Parc moyen après la chauffe, naissances et morts par an en % de ce parc.
+
+### Tâche 3 — `sellerSample`
+
+- **Règle** (`sim.dart:_AllOffers.sampled`). Avec k > 0, chaque achat d'un ménage examine au plus k vendeurs, plus le
+  vendeur de son dernier achat du même bien (habitude, `Sim.lastSeller`, dans les instantanés). Il prend le meilleur de
+  cet échantillon selon la règle habituelle (prix, notoriété).
+  - **Les vendeurs examinés** sont tirés par leur place dans la liste. Le tirage vient du flux `vendeurs` (code 18) et
+    dépend de (graine, jour, acheteur), avec un sous-tirage (bien, rang de l'achat, essai). On fait au plus 4k essais,
+    et on ne garde que les vendeurs qui ont du stock.
+  - **Coût :** O(k) par achat. S'il y a k vendeurs ou moins, tous sont examinés.
+  - **Choix du meilleur :** les offres retenues gardent l'ordre des vendeurs, pour départager les égalités comme
+    d'habitude.
+- **k = 0 ne change rien.**
+  - L'empreinte de parité est identique au bit près, sur la VM et en JavaScript (dart2js `-O2`, `node`). Seule s'ajoute
+    la ligne du tirage du nouveau flux.
+  - Le niveau 1 relancé reproduit le précédent : 3 360 valeurs et 300 chocs identiques. Seuls changent les nouveaux
+    compteurs de fermeture, ajoutés à l'entonnoir et aux relevés des jours 500 et 1 000.
+- **k > 0** (1 000 habitants, k = 5) : la partie est déterministe, les invariants sont exacts en mode développement, et
+  la reprise depuis un instantané est exacte.
+
+**Temps par jour** (`tool/perf.dart`, exécutable natif, graine 1, avec filets, médiane des jours 100 à 300 ; machine au
+repos, une mesure à la fois) :
+
+| Population | k = 0 | k = 3 | k = 5 | k = 8 |
+|---|---|---|---|---|
+| 240 | 4,72 ms | 5,09 ms | 5,16 ms | 5,40 ms |
+| 1 000 | 24,2 ms | 28,5 ms | 28,5 ms | 30,7 ms |
+| 3 000 | 101 ms | 66,0 ms | 96,8 ms | 108 ms |
+| 13 240 | 1 322 ms | 344 ms | 408 ms | 484 ms |
+| Temps par habitant à 13 240 | 99,8 µs | 26,0 µs | 30,8 µs | 36,5 µs |
+
+**Exposant b**, par tranche, log(t₂ / t₁) ÷ log(N₂ / N₁) :
+
+| Tranche | k = 0 | k = 3 | k = 5 | k = 8 |
+|---|---|---|---|---|
+| 240 → 1 000 | 1,15 | 1,21 | 1,20 | 1,22 |
+| 1 000 → 3 000 | 1,30 | 0,76 | 1,11 | 1,14 |
+| 3 000 → 13 240 | 1,73 | 1,11 | 0,97 | 1,01 |
+| Ajustement sur les 4 tailles | 1,40 | 1,03 | 1,09 | 1,12 |
+
+- **À 240 et 1 000 habitants, k = 5 et k = 8 donnent la même partie que k = 0** (même empreinte). Il n'y a jamais plus
+  de k + 1 vendeurs d'un même bien : l'échantillon les couvre tous. Le léger surcoût vient de la tenue de l'habitude.
+- **Le temps dépend aussi de la partie.** Le parc varie avec k (589, 706, 682 et 647 entreprises au jour 300 à 13 240
+  habitants). C'est pourquoi k = 3 est plus rapide que k = 5 à 3 000 habitants.
+
+**À 13 240 habitants, 1 000 jours, 3 graines appariées** (graines 1 à 3). Pour k = 0, les valeurs sur les graines 1 à 3
+sont celles des 6 graines à ±1 point près. Médianes :
+
+| Sans filets | k = 0 | k = 3 | k = 5 |
+|---|---|---|---|
+| Chômage moyen | 62,2 % | 53,8 % | 58,3 % |
+| Faim moyenne | 50,9 % | 21,3 % | 30,1 % |
+| Sans-abri moyen | 32,8 % | 57,8 % | 66,0 % |
+| Gini moyen | 0,88 | 0,91 | 0,93 |
+| Parc : départ ; jour 500 ; jour 1 000 | 1 705 ; 441 ; 230 | 1 705 ; 605 ; 540 | 1 705 ; 556 ; 432 |
+| Naissances / an, en % du parc moyen | 0,66 % | 0,41 % | 1,44 % |
+| Morts / an, en % du parc moyen | 124 % | 67 % | 81 % |
+| Naissances ; morts (en 1 000 jours) | 8 ; 1 489 | 7 ; 1 175 | 23 ; 1 285 |
+| Fermetures : faillite | 1 067 | 1 101 | 1 119 |
+| Fermetures : prix aberrant | 264 | 65 | 137 |
+| Fermetures : demande perdue | 91 | 4 | 12 |
+| Fermetures : sans employé | 69 | 5 | 21 |
+| Part de la plus grande entreprise (médiane des biens) | 81 % | 80 % | 68 % |
+| Herfindahl (médiane des biens) | 0,77 | 0,76 | 0,61 |
+
+| Avec filets | k = 0 | k = 3 | k = 5 |
+|---|---|---|---|
+| Chômage moyen | 63,8 % | 53,8 % | 58,8 % |
+| Faim moyenne | 35,7 % | 21,0 % | 28,3 % |
+| Sans-abri moyen | 36,7 % | 39,2 % | 46,5 % |
+| Parc : jour 500 ; jour 1 000 | 488 ; 228 | 630 ; 581 | 592 ; 536 |
+| Naissances ; morts par an, en % du parc moyen | 0,23 % ; 114 % | 0,33 % ; 62 % | 0,35 % ; 68 % |
+| Fermetures : faillite ; prix aberrant | 900 ; 325 | 1 024 ; 69 | 996 ; 129 |
+
+- **Sens des effets, k = 5 contre k = 0, graine par graine.** Les 3 graines vont dans le même sens, sans et avec filets :
+  - chômage : −2 à −7 points ;
+  - faim : −7 à −24 points ;
+  - sans-abri : +8 à +40 points ;
+  - morts en % du parc : −40 à −47 points ;
+  - parc moyen : +139 à +160 entreprises.
+
+  Avec 3 graines, il n'y a pas d'intervalle de confiance : ce sont des tendances, pas des conclusions.
+- **Concentration par bien** (13 240 habitants, sans filets ; part de la plus grande / Herfindahl / vendeurs actifs) :
+
+| Bien | k = 0 | k = 3 | k = 5 |
+|---|---|---|---|
+| Pain | 57 % / 0,51 / 4,2 | 13 % / 0,07 / 29,2 | 22 % / 0,13 / 17,6 |
+| Repas | 86 % / 0,82 / 1,8 | 11 % / 0,06 / 35,3 | 26 % / 0,17 / 16,5 |
+| Télé | 51 % / 0,49 / 19,1 | 11 % / 0,06 / 43,0 | 17 % / 0,10 / 28,6 |
+| Logement | 3 % / 0,03 / 44,1 | 11 % / 0,05 / 46,0 | 9 % / 0,05 / 46,0 |
+| Électronique | 95 % / 0,94 / 1,3 | 99 % / 0,99 / 1,0 | 99 % / 0,99 / 1,1 |
+| Carburant | 87 % / 0,84 / 2,2 | 90 % / 0,88 / 1,7 | 90 % / 0,88 / 1,8 |
+
+**Niveau 1 à 240 habitants, k = 5 contre k = 0, apparié (30 graines)**
+(`rapports/stat/vendeurs-k5-contre-k0-niveau1.md`).
+
+- **Aucune différence**, sur aucun indicateur, sans et avec filets : intervalles [0 ; 0], 30 graines égales sur 30.
+- **C'est attendu.** À 240 habitants, un bien n'a jamais plus de k + 1 vendeurs : la recherche limitée examine tous les
+  vendeurs, comme k = 0.
+- **Ce que cela dit :** k = 5 ne change rien à la taille de réglage du modèle. Ce n'est pas une preuve d'innocuité aux
+  autres tailles.
+
+**À 240 habitants** (k = 0, 6 graines, 1 000 jours) :
+
+- **Sans filets.** Naissances 140 % et morts 165 % du parc par an (parc moyen de 19,5) ; la plupart des fermetures sont
+  des faillites (76 sur 86).
+- **Avec filets.** Naissances 12,7 % et morts 29,4 % du parc par an.
+- **Concentration.** Elle vaut 100 % (Herfindahl 1,00) : un seul vendeur actif par bien.
+
+### Conclusion
+
+1. **L'échantillonnage répare le coût de calcul.** À 13 240 habitants, la journée passe de 1 322 à 408 ms avec k = 5,
+   et l'exposant b de 1,40 à 1,09.
+2. **Il ralentit la mortalité, sans la réparer.**
+   - Les morts passent de 124 % à 81 % du parc par an (k = 5, sans filets), et le parc au jour 1 000 de 230 à 432.
+   - Mais la cause dominante reste la faillite, et non la demande perdue : 1 119 fermetures sur 1 285 avec k = 5 (87 %),
+     1 067 sur 1 489 avec k = 0 (72 %).
+   - L'information imparfaite répartit mieux la demande des biens de consommation (pain : 57 % → 22 % pour la plus
+     grande entreprise). Mais elle ne change ni la filière amont (électronique, carburant restent à un vendeur), ni la
+     cause des faillites.
+3. **Le plafond de naissances reste le blocage principal.** Avec k = 5, les naissances valent 1,4 % du parc par an
+   contre 81 % de morts. Le parc ne peut que fondre tant que la création est plafondée en nombre absolu : une par jour,
+   un délai par type, 3 producteurs au plus (§ 6, tâche 1).
+4. **Effet de bord : le logement.** Avec k > 0, un ménage qui n'examine que quelques bailleurs peut dormir dehors alors
+   qu'un autre a de la place. Sans-abri : +8 à +40 points selon la graine et les filets. Si `sellerSample` devient actif,
+   il faudrait sans doute exclure le logement (un bien dont on cherche une place libre, pas un prix), ou prendre un k
+   plus grand pour lui. C'est une décision de règle, réservée à Francis.
+
+**Recommandation** (la décision reste à Francis).
+
+- **Pour les protocoles à grande taille :** k = 5 est un bon compromis de coût. Le temps est quasi linéaire, et à
+  240 habitants il ne change rien.
+- **Comme règle du jeu :** ne pas l'activer avant d'avoir décidé du cas du logement, puis repris la création
+  d'entreprise. Sans cela, le chômage reste au-dessus de 50 % à 13 240 habitants, quel que soit k.
+
+**Limites.**
+
+- **Peu de graines à 13 240 habitants** (3 par valeur de k) : des tendances, pas des conclusions.
+- **Faillite ou demande perdue ?** La cause « faillite » ne dit pas pourquoi l'entreprise manquait d'argent : ventes
+  insuffisantes, prix trop bas ou intrants trop chers. La distinguer de « demande perdue » demanderait de suivre le
+  chiffre d'affaires des derniers jours.
+- **Concentration.** Elle est calculée sur les ventes aux ménages comme aux entreprises, y compris les services publics
+  distribués gratuitement.
+- **Tests.** La suite Flutter n'a pas été relancée pour cette tâche ; la vérification passe par la parité, le niveau 1
+  et les contrôles ci-dessus.
