@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../engine/model.dart';
+
 import 'controller.dart';
 import 'diag_tab.dart';
 import 'eco_tab.dart';
@@ -24,6 +26,64 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     ctrl = SimController(seed: 42)..attach(this);
+    // la partie attend que le joueur choisisse la taille de la population
+    ctrl.playing = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _askStart();
+    });
+  }
+
+  /// Écran de départ : taille de la population et graine, avant de lancer la simulation.
+  Future<void> _askStart() async {
+    var pop = 240.0;
+    final seedCtl = TextEditingController(text: '42');
+    final go = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, set) => AlertDialog(
+          title: const Text('Nouvelle partie'),
+          content: SizedBox(
+            width: 360,
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Population : ${pop.round()} citoyens', style: const TextStyle(fontWeight: FontWeight.w600)),
+              Slider(
+                value: pop,
+                min: 40,
+                max: 1000,
+                divisions: 96,
+                label: '${pop.round()}',
+                onChanged: (v) => set(() => pop = v),
+              ),
+              const Text('Les entreprises et leurs effectifs sont dimensionnés pour cette population. '
+                  'Au-delà de 500 citoyens, la simulation ralentit.', style: TextStyle(fontSize: 12)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: seedCtl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Graine', isDense: true),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Garder 240')),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Lancer'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (go == true) {
+      final seed = int.tryParse(seedCtl.text.trim())?.abs() ?? 42;
+      ctrl.newGame(seed, params: Params()..population = pop.round());
+    }
+    seedCtl.dispose();
+    ctrl.playing = true;
+    ctrl.touch();
   }
 
   @override
