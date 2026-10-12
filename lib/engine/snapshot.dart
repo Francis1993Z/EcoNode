@@ -29,6 +29,7 @@ double _rd(Object? v) {
 }
 
 double? _rdn(Object? v) => v == null ? null : _rd(v);
+double _rdOr(Object? v, double fallback) => v == null ? fallback : _rd(v); // champ absent d'un instantané plus ancien
 Map<String, Object?> _dm(Map<String, double> m) => {for (final e in m.entries) e.key: _d(e.value)};
 Map<String, double> _rdm(Object? m) => {for (final e in (m as Map).entries) e.key as String: _rd(e.value)};
 Map<String, int> _rim(Object? m) => {for (final e in (m as Map).entries) e.key as String: e.value as int};
@@ -90,6 +91,25 @@ Map<String, Object?> _paramsJson(Params p) => {
       'eiQualifyingDays': p.eiQualifyingDays,
       'healthWearIfDeprived': p.healthWearIfDeprived,
       'partTime': p.partTime,
+      'dwellingModules': p.dwellingModules,
+      'buildingWearYear': _d(p.buildingWearYear),
+      'buildingMaintShare': _d(p.buildingMaintShare),
+      'maintHoursPerDwelling': _d(p.maintHoursPerDwelling),
+      'ltvHousehold': _d(p.ltvHousehold),
+      'ltvFirm': _d(p.ltvFirm),
+      'mortgageSpreadMax': _d(p.mortgageSpreadMax),
+      'mortgageTermHousehold': p.mortgageTermHousehold,
+      'mortgageTermFirm': p.mortgageTermFirm,
+      'mortgageRiskWeight': _d(p.mortgageRiskWeight),
+      'foreclosureDays': p.foreclosureDays,
+      'ownerShare': _d(p.ownerShare),
+      'buyLookChance': _d(p.buyLookChance),
+      'relocateChance': _d(p.relocateChance),
+      'listingMargin': _d(p.listingMargin),
+      'listingDecay': _d(p.listingDecay),
+      'listingFloor': _d(p.listingFloor),
+      'landlordBuildAbove': _d(p.landlordBuildAbove),
+      'buyRentRatio': _d(p.buyRentRatio),
     };
 
 Params _paramsFrom(Map j) => Params()
@@ -145,7 +165,26 @@ Params _paramsFrom(Map j) => Params()
   ..eiDaysHigh = j['eiDaysHigh'] as int
   ..eiQualifyingDays = j['eiQualifyingDays'] as int
   ..healthWearIfDeprived = (j['healthWearIfDeprived'] as bool?) ?? false
-  ..partTime = (j['partTime'] as bool?) ?? false;
+  ..partTime = (j['partTime'] as bool?) ?? false
+  ..dwellingModules = (j['dwellingModules'] as int?) ?? 10
+  ..buildingWearYear = _rdOr(j['buildingWearYear'], 0.04)
+  ..buildingMaintShare = _rdOr(j['buildingMaintShare'], 0.75)
+  ..maintHoursPerDwelling = _rdOr(j['maintHoursPerDwelling'], 0.012)
+  ..ltvHousehold = _rdOr(j['ltvHousehold'], 0.95)
+  ..ltvFirm = _rdOr(j['ltvFirm'], 0.70)
+  ..mortgageSpreadMax = _rdOr(j['mortgageSpreadMax'], 0.02)
+  ..mortgageTermHousehold = (j['mortgageTermHousehold'] as int?) ?? 9125
+  ..mortgageTermFirm = (j['mortgageTermFirm'] as int?) ?? 3650
+  ..mortgageRiskWeight = _rdOr(j['mortgageRiskWeight'], 0.35)
+  ..foreclosureDays = (j['foreclosureDays'] as int?) ?? 60
+  ..ownerShare = _rdOr(j['ownerShare'], 0.7)
+  ..buyLookChance = _rdOr(j['buyLookChance'], 0.02)
+  ..relocateChance = _rdOr(j['relocateChance'], 0.0005)
+  ..listingMargin = _rdOr(j['listingMargin'], 0.05)
+  ..listingDecay = _rdOr(j['listingDecay'], 0.005)
+  ..listingFloor = _rdOr(j['listingFloor'], 0.7)
+  ..landlordBuildAbove = _rdOr(j['landlordBuildAbove'], 0.96)
+  ..buyRentRatio = _rdOr(j['buyRentRatio'], 1.2);
 
 Map<String, Object?> _safeguardsJson(Safeguards s) => {
       for (final k in Safeguards.keys) k: s.get(k),
@@ -192,6 +231,8 @@ Map<String, Object?> _citizenJson(Citizen c) => {
       'eiDaysLeft': c.eiDaysLeft,
       'eiBenefit': _d(c.eiBenefit),
       'schoolSince': c.schoolSince,
+      'homeId': c.homeId,
+      'wantsToOwn': c.wantsToOwn,
     };
 
 Citizen _citizenFrom(Map j) {
@@ -211,7 +252,9 @@ Citizen _citizenFrom(Map j) {
     ..insuredDays = j['insuredDays'] as int
     ..eiDaysLeft = j['eiDaysLeft'] as int
     ..eiBenefit = _rd(j['eiBenefit'])
-    ..schoolSince = j['schoolSince'] as int?;
+    ..schoolSince = j['schoolSince'] as int?
+    ..homeId = j['homeId'] as int?
+    ..wantsToOwn = (j['wantsToOwn'] as bool?) ?? false;
   c.sat
     ..clear()
     ..addAll(_rdm(j['sat']));
@@ -279,6 +322,8 @@ Map<String, Object?> _firmJson(Firm f) => {
       'missedPayments': f.missedPayments,
       'idleDays': f.idleDays,
       'creditBanUntil': f.creditBanUntil,
+      'carry': _d(f.carry),
+      'reinvest': _d(f.reinvest),
       'hist': [for (final p in f.hist) _pointJson(p)],
     };
 
@@ -340,7 +385,9 @@ Firm _firmFrom(Map j) {
     ..interestToday = _rd(j['interestToday'])
     ..missedPayments = j['missedPayments'] as int
     ..idleDays = j['idleDays'] as int
-    ..creditBanUntil = j['creditBanUntil'] as int;
+    ..creditBanUntil = j['creditBanUntil'] as int
+    ..carry = _rdOr(j['carry'], 0)
+    ..reinvest = _rdOr(j['reinvest'], 0);
   f.workers.addAll(_ril(j['workers']));
   f.inv.addAll(_rdm(j['inv']));
   f.price.addAll(_rdm(j['price']));
@@ -525,7 +572,43 @@ int _fnv(String t) {
   return h;
 }
 
+List<Object?> _buildingJson(Building b) => [
+      b.id, b.ownerKind, b.ownerId, b.payee, b.modules, b.done, _d(b.cond), _d(b.basis), b.mortgageId, b.listedDay, b.builtDay,
+    ];
+
+Building _buildingFrom(List j) => Building(j[0] as int, j[1] as int, j[2] as int?, j[10] as int)
+  ..payee = j[3] as int?
+  ..modules = j[4] as int
+  ..done = j[5] as bool
+  ..cond = _rd(j[6])
+  ..basis = _rd(j[7])
+  ..mortgageId = j[8] as int?
+  ..listedDay = j[9] as int?;
+
+List<Object?> _mortgageJson(Mortgage m) => [
+      m.id, m.buildingId, m.borrowerKind, m.borrowerId, _d(m.principal), _d(m.rate), m.termLeft, _d(m.payment), m.missed, m.since,
+    ];
+
+Mortgage _mortgageFrom(List j) => Mortgage(
+    j[0] as int, j[1] as int, j[2] as int, j[3] as int?, _rd(j[4]), _rd(j[5]), j[6] as int, j[9] as int)
+  ..payment = _rd(j[7])
+  ..missed = j[8] as int;
+
 extension SimSnapshot on Sim {
+  /// Bâtiments, hypothèques et statistiques du parc (module buildings).
+  Map<String, Object?> _buildingsState() => {
+        'seeded': _buildingsSeeded,
+        'nextBuildingId': _nextBuildingId,
+        'nextMortgageId': _nextMortgageId,
+        'heat': _d(housingHeat),
+        'stats': [
+          bstats.built, bstats.sales, bstats.foreclosures, bstats.opened, bstats.refused, bstats.abandoned,
+          _d(bstats.gains), _d(bstats.losses), _d(bstats.priceEma),
+        ],
+        'list': [for (final b in buildings) _buildingJson(b)],
+        'mortgages': [for (final m in mortgages) _mortgageJson(m)],
+      };
+
   /// L'état complet de la partie, à la fin du jour [day].
   Map<String, dynamic> toSnapshot() => {
         'format': 'econodes-instantane',
@@ -573,6 +656,7 @@ extension SimSnapshot on Sim {
         'careQueue': careQueue,
         'schoolQueue': schoolQueue,
         'services': {for (final e in services.entries) e.key: _serviceJson(e.value)},
+        'buildings': _buildingsState(),
         'nets': _netsJson(nets),
         'monitor': monitor.toJson(),
         'inv': [_d(inv.money), _d(inv.loans), _d(inv.bank), _d(inv.flows)],
@@ -621,6 +705,7 @@ extension SimSnapshot on Sim {
         nets.count, _dm(nets.amount), nets.byAgent, nets.causes,
         [for (final e in nets.log) if (e.day == day) [e.day, e.net, e.agent, _d(e.amount), e.reason]],
       ])),
+      if (buildings.isNotEmpty || mortgages.isNotEmpty) 'batiments': _fnv(j(_buildingsState())),
       'moniteur': _fnv(j(monitor.toJson())),
       'historique': _fnv(j(history.isEmpty ? null : _histJson(history.last))),
       'journal': _fnv(j([for (final e in events) if (e.day == day) [e.day, e.type, e.text]])),
@@ -744,6 +829,42 @@ extension SimSnapshot on Sim {
     services.clear();
     for (final e in (j['services'] as Map).entries) {
       services[e.key as String] = _serviceFrom(e.value as Map);
+    }
+    buildings.clear();
+    _bmap.clear();
+    mortgages.clear();
+    _mmap.clear();
+    final bj = j['buildings'] as Map?;
+    if (bj == null) {
+      _nextBuildingId = 1;
+      _nextMortgageId = 1;
+      _buildingsSeeded = false;
+      housingHeat = 0;
+      bstats.clear();
+    } else {
+      _buildingsSeeded = bj['seeded'] as bool;
+      _nextBuildingId = bj['nextBuildingId'] as int;
+      _nextMortgageId = bj['nextMortgageId'] as int;
+      housingHeat = _rd(bj['heat']);
+      final st = bj['stats'] as List;
+      bstats
+        ..built = st[0] as int
+        ..sales = st[1] as int
+        ..foreclosures = st[2] as int
+        ..opened = st[3] as int
+        ..refused = st[4] as int
+        ..abandoned = st[5] as int
+        ..gains = _rd(st[6])
+        ..losses = _rd(st[7])
+        ..priceEma = _rd(st[8]);
+      buildings.addAll([for (final b in bj['list'] as List) _buildingFrom(b as List)]);
+      for (final b in buildings) {
+        _bmap[b.id] = b;
+      }
+      mortgages.addAll([for (final m in bj['mortgages'] as List) _mortgageFrom(m as List)]);
+      for (final m in mortgages) {
+        _mmap[m.id] = m;
+      }
     }
     _netsLoad(nets, j['nets'] as Map);
     monitor.loadJson(j['monitor'] as Map);
