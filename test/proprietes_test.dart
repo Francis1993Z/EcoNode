@@ -284,6 +284,31 @@ void main() {
     expect(dividends, isEmpty, reason: dividends.take(5).join(nl));
   });
 
+  // Recherche limitée des vendeurs (sellerSample > 0), mission « liste des vendeurs disponibles ». `verifyFastPaths`
+  // fait vérifier par le moteur, avant chaque achat de ménage, que la liste de chaque bien est exactement l'ensemble des
+  // entreprises actives avec une unité en stock, et, à chaque achat d'une unité sans offre, qu'aucun autre vendeur n'a
+  // d'unité en stock (pas de fausse pénurie). Le test vérifie aussi la liste après chaque jour (chocs du god mode
+  // compris : stocks détruits, faillites, arrivées et départs) et que le détecteur du moniteur reste muet.
+  test('vendeurs disponibles : liste exacte et aucune fausse pénurie, avec k = 3, 5, 8 (12 parties)', () {
+    var purchases = 0;
+    for (var n = 1; n <= 12; n++) {
+      final c = Case(100 + n, 150);
+      final s = c.sim;
+      s.params.sellerSample = const [3, 5, 8][n % 3];
+      s.verifyFastPaths = true;
+      for (var d = 1; d <= 150; d++) {
+        for (final sh in c.shocks) {
+          if (sh.$1 == d) sh.$2(s);
+        }
+        s.step();
+        expect(s.availMismatches(), isEmpty, reason: '${c.label} jour $d');
+        expect(s.monitor.active.containsKey('listeVendeurs'), isFalse, reason: '${c.label} jour $d');
+      }
+      purchases += s.marketStats.values.fold(0, (a, m) => a + (m.qty > 0 ? 1 : 0));
+    }
+    expect(purchases, greaterThan(0));
+  });
+
   // Écart connu (rapporté, non corrigé : la règle reste à décider). Un jour où l'entreprise n'a rien en caisse, ses
   // employés ne sont pas payés et ne cotisent pas, mais le jour compte quand même comme emploi assurable. Une paie
   // partielle cotise toujours ; une caisse vide à la paie ne s'observe qu'après une faillite du god mode.

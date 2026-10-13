@@ -257,6 +257,10 @@ void applyParam(Params p, String k, String v) {
   switch (k) {
     case 'sellerSample': // recherche limitée des vendeurs (0 : tous)
       p.sellerSample = int.parse(v);
+    case 'sellerHabit': // test : 0 supprime l'habitude du dernier vendeur
+      Sim.sellerHabit = b();
+    case 'availThreshold': // test : stock minimal d'un vendeur de la liste (« eps » : stock > 0 ; défaut : une unité)
+      Sim.availThreshold = v == 'eps' ? eps : double.parse(v);
     case 'population': // taille de la population (tâche 1 de l'entrepreneuriat : passage à l'échelle)
       p.population = int.parse(v);
     case 'scenarioPopulation': // population du scénario par défaut (au-delà, il est répété)
@@ -330,6 +334,10 @@ class RunStats {
   // l'indice de Herfindahl, et nombre de jours avec des ventes
   double firmsSum = 0;
   final Map<String, List<double>> conc = {};
+  // demande non servie par bien (après la chauffe) : unités non achetées et unités vendues
+  final Map<String, List<double>> unmetSum = {};
+  // dispersion des prix entre les vendeurs actifs d'un même bien : somme des coefficients de variation du jour, et jours
+  final Map<String, List<double>> priceDisp = {};
   String? crash;
 
   RunStats(this.seed, this.nets);
@@ -413,6 +421,11 @@ class RunStats {
         'concentration': {
           for (final e in conc.entries) e.key: [e.value[0] / e.value[3], e.value[1] / e.value[3], e.value[2] / e.value[3]],
         },
+        'cpiRatio': cpiAtWarmup > 0 ? cpiEnd / cpiAtWarmup : 0,
+        'unmetShare': _unmetShare(unmetSum.values),
+        'unmetByGood': {for (final e in unmetSum.entries) e.key: _unmetShare([e.value])},
+        'priceDispByGood': {for (final e in priceDisp.entries) if (e.value[1] > 0) e.key: e.value[0] / e.value[1]},
+        'priceDispMed': _medianOf([for (final d in priceDisp.values) if (d[1] > 0) d[0] / d[1]]),
         'topShareMed': _medianOf([for (final c in conc.values) c[0] / c[3]]),
         'hhiMed': _medianOf([for (final c in conc.values) c[1] / c[3]]),
         'samples': samples,
@@ -468,6 +481,19 @@ void observe(Sim s, RunStats r, int warmup) {
       c[1] += hhi;
       c[2] += e.value.length;
       c[3] += 1;
+    }
+    for (final g in goods.keys) {
+      final u = r.unmetSum[g] ??= [0, 0];
+      u[0] += s.unmet[g] ?? 0;
+      u[1] += s.marketStats[g]?.qty ?? 0;
+      final prices = [for (final f in s.sellersOf(g)) if (f.workers.isNotEmpty) f.price[g]!];
+      if (prices.length >= 2) {
+        final mean = prices.fold(0.0, (a, b) => a + b) / prices.length;
+        final v = prices.fold(0.0, (a, b) => a + (b - mean) * (b - mean)) / prices.length;
+        final d = r.priceDisp[g] ??= [0, 0];
+        d[0] += mean > 0 ? math.sqrt(v) / mean : 0;
+        d[1] += 1;
+      }
     }
     r.unempSum += h.unemp;
     r.unempMin = math.min(r.unempMin, h.unemp);
@@ -535,6 +561,16 @@ void finish(Sim s, RunStats r) {
   r.refusals = s.bank.refusals;
   r.lent = s.bank.lent;
   r.writtenOff = s.bank.writtenOff;
+}
+
+/// Part des unités demandées qui n'ont pas été servies : non servies / (non servies + vendues).
+double _unmetShare(Iterable<List<double>> sums) {
+  var u = 0.0, q = 0.0;
+  for (final x in sums) {
+    u += x[0];
+    q += x[1];
+  }
+  return u + q > 0 ? u / (u + q) : 0;
 }
 
 double _medianOf(List<double> v) {
@@ -986,6 +1022,8 @@ List<Ind> runIndicators(String phase) {
     Ind('birthsPctPark', 'Naissances / an, en % du parc moyen', 'dec1', 0, 'partie'),
     Ind('deathsPctPark', 'Morts / an, en % du parc moyen', 'dec1', 0, 'partie'),
     Ind('firmsMean', 'Parc moyen d’entreprises (après la chauffe)', 'dec1', 0, 'régime'),
+    Ind('unmetShare', 'Demande non servie (part des unités demandées)', 'pc', -1, 'régime'),
+    Ind('priceDispMed', 'Dispersion des prix entre vendeurs (coefficient de variation, médiane des biens)', 'pc', 0, 'régime'),
     Ind('topShareMed', 'Part de la plus grande entreprise (médiane des biens)', 'pc', 0, 'régime'),
     Ind('hhiMed', 'Herfindahl des ventes (médiane des biens)', 'dec', 0, 'régime'),
     for (final c in closeCauses) Ind('funnel.fermeture_$c', 'Fermetures : ${closeLabels[c]}', 'count', 0, 'partie'),

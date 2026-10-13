@@ -31,18 +31,29 @@ void main(List<String> args) {
         ..population = pop
         ..sellerSample = sample, safeguards: nets ? Safeguards() : Safeguards.none());
   final init = sw.elapsedMicroseconds / 1000;
-  final times = <double>[];
+  final times = <double>[], consume = <double>[], buys = <int>[];
   var h = 0;
   for (var d = 1; d <= days; d++) {
-    final t0 = sw.elapsedMicroseconds;
+    final t0 = sw.elapsedMicroseconds, c0 = s.consumeClock.elapsedMicroseconds, b0 = s.consumeBuys;
     s.step();
-    if (d >= 100) times.add((sw.elapsedMicroseconds - t0) / 1000);
+    if (d >= 100) {
+      times.add((sw.elapsedMicroseconds - t0) / 1000);
+      consume.add((s.consumeClock.elapsedMicroseconds - c0) / 1000);
+      buys.add(s.consumeBuys - b0);
+    }
     final x = s.history.last;
     h = hash32(hash32(h, (x.total * 1024).round() & 0xFFFFFFFF), (x.unemp * 1e6).round());
   }
   times.sort();
   final med = times.isEmpty ? double.nan : times[times.length ~/ 2];
+  consume.sort();
+  buys.sort();
+  final medC = consume.isEmpty ? double.nan : consume[consume.length ~/ 2];
+  final medB = buys.isEmpty ? 0 : buys[buys.length ~/ 2];
   stdout.writeln('population $pop, échantillon $sample, graine $seed, filets ${nets ? 1 : 0} : init ${init.toStringAsFixed(0)} ms, '
       'médiane jours 100–$days ${med.toStringAsFixed(2)} ms/j, total ${(sw.elapsedMilliseconds / 1000).toStringAsFixed(1)} s, '
       'mémoire max ${(ProcessInfo.maxRss / 1048576).toStringAsFixed(0)} Mo, entreprises ${s.firms.length}, empreinte $h');
+  // coût par achat : phase de consommation / achats des ménages du jour (médianes des jours 100 à $days)
+  stdout.writeln('  consommation ${medC.toStringAsFixed(2)} ms/j, achats des ménages $medB /j, '
+      '${medB > 0 ? (medC * 1000 / medB).toStringAsFixed(2) : '-'} µs par achat');
 }

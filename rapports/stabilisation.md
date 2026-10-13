@@ -1870,6 +1870,10 @@ fermeture et la concentration sont des mesures.
 
 ### Tâche 3 — `sellerSample`
 
+> **Remplacé pour k > 0 par le § 9 (12 octobre 2026, soir).** Le tirage décrit ici pouvait rater les vendeurs qui avaient encore du
+> stock (fausse pénurie). Tous les résultats à k > 0 de cette tâche, y compris le sans-abri (+8 à +40 points) attribué
+> au logement, sont à reprendre avec le § 9. Les résultats à k = 0 restent valables.
+
 - **Règle** (`sim.dart:_AllOffers.sampled`). Avec k > 0, chaque achat d'un ménage examine au plus k vendeurs, plus le
   vendeur de son dernier achat du même bien (habitude, `Sim.lastSeller`, dans les instantanés). Il prend le meilleur de
   cet échantillon selon la règle habituelle (prix, notoriété).
@@ -2012,3 +2016,91 @@ sont celles des 6 graines à ±1 point près. Médianes :
   distribués gratuitement.
 - **Tests.** La suite Flutter n'a pas été relancée pour cette tâche ; la vérification passe par la parité, le niveau 1
   et les contrôles ci-dessus.
+
+## 9. Recherche limitée des vendeurs : liste des vendeurs disponibles (12 octobre 2026, soir)
+
+Aucune règle de jeu ne change. `sellerSample` reste à 0 par défaut ; la décision de l'adopter revient à Francis. Rapport
+complet : `rapports/vendeurs-correction.md` ; tableaux avec intervalles : `rapports/stat/vendeurs-controle-*.md`. Travail sur
+la branche `correction-vendeurs`, rien n'est poussé.
+
+### Tâche 1 — La liste des vendeurs disponibles
+
+- **Le défaut.** L'ancien tirage prenait des places au hasard dans la liste de tous les vendeurs et ne gardait que ceux
+  qui avaient du stock. Quand presque tous étaient en rupture, il ratait ceux qui en avaient (fausse pénurie), ce qui
+  gonflait `unmet`, les prix et le signal de création d'entreprise.
+- **Le correctif** (`sim.dart`) :
+  - par bien, un tableau de vendeurs disponibles et la place de chacun (`_Avail`) ; entrée en fin de tableau, retrait par
+    échange avec le dernier élément : O(1) ;
+  - un seul point d'entrée pour tout changement de stock d'une entreprise : `_setStock`. Quinze endroits listés dans le rapport
+    (vente, production, intrants, service public, export, péremption, god mode : ajout, destruction, faillite ; fermeture,
+    création, restauration d'un instantané). Marché noir et imports de dépannage : pas de stock, l'offre est le monde
+    extérieur, hors liste ;
+  - le tirage prend d'abord le vendeur habituel s'il est dans la liste, puis jusqu'à k vendeurs de la liste (flux
+    `vendeurs`, mêmes sous-tirages), sans doublon et sans l'acheteur. Liste vide : seulement alors `unmet` augmente.
+- **Définition : une unité entière en stock.** Les ménages achètent des unités entières. Avec « stock > 0 » (lecture littérale),
+  le sans-logis à 3 000 citoyens dépasse celui de k = 0 de 32 points : c'est la fausse pénurie qui revient. Le seuil est
+  `Sim.availThreshold = 1 − 1e-7` ; les achats non entiers des ménages (réparations du module Bâtiments) gardent la
+  recherche complète.
+- **Déterminisme.** La liste est refaite chaque matin et à chaque changement du parc, en identifiant croissant ; rien n'est
+  sérialisé. Reprise depuis un instantané à k = 5 : même état qu'une partie continue.
+- **k = 0 inchangé.** La liste n'existe pas à k = 0 (un test de drapeau par changement de stock) : protocole par défaut,
+  22 516 valeurs et 300 chocs identiques à l'état précédent (`7e8029a`), instantanés identiques octet pour octet (3 parties),
+  empreintes de `tool/perf.dart` identiques à 240, 1 000, 3 000 et 13 240 citoyens. VM et JavaScript : mêmes sorties de
+  `tool/parite.dart`, cas k = 5 ajouté.
+- **Optimisations en route.** Le tirage n'utilise plus d'ensemble ni de tri (les offres gardent l'ordre du tirage), ce qui
+  fait passer un jour à 13 240 citoyens et k = 5 de 510 à 424 ms (même empreinte) ; l'index des places dans la liste de tous
+  les vendeurs (`_sellerIndex`) est supprimé.
+
+### Tâche 2 — Tests de contrôle
+
+- **Moteur** (`Sim.verifyFastPaths`) : avant chaque achat de ménage à k > 0, la liste de chaque bien est exactement
+  l'ensemble des entreprises actives avec une unité ; et un achat d'une unité qui échoue pour « pas d'offre » lève une
+  exception si un autre vendeur a une unité (propriété). Les deux ont été essayées en retirant à la main deux crochets
+  (vente, péremption) : le test échoue dès le jour 1.
+- **Moniteur** : alerte critique `listeVendeurs`, vérifiée chaque jour à k > 0. Aucune ouverture dans 150 parties à k > 0.
+- **Tests** : `proprietes_test.dart` (12 parties aléatoires avec chocs, k = 3, 5, 8 ; liste exacte après chaque jour) ;
+  `vendeurs_test.dart` (reprise depuis un instantané, instantané sans liste, 240 citoyens identiques à k = 0, **k plus grand
+  que tous les vendeurs = k = 0 exactement à 3 000 citoyens**).
+- **Contrôle plus grand** : propriété et liste vérifiées avant chaque achat, 150 jours, 3 000 citoyens, k = 3, 2 graines, avec
+  et sans filets (voir le rapport) ; 1 500 citoyens, k = 5, 200 jours.
+- **Contrôle principal** (10 graines, 1 000 jours, sans et avec filets). Écart médian apparié k = 5 − k = 0, sans-abri :
+  - 3 000 citoyens : −4,6 pt [−14,9 ; +4,4] sans filets, −1,1 pt [−9,2 ; +2,3] avec : indistinguable, **critère rempli** ;
+  - 13 240 citoyens : −27,7 pt [−29,8 ; −24,5] sans filets, −33,3 pt [−34,6 ; −31,2] avec : **critère non rempli, bien en
+    dessous de k = 0**. Faim 50,7 % → 0,2 %, chômage 62 % → 24 %, demande non servie 41 % → 0,3 %, parc 448 → 591.
+  - La cause n'est ni un reste de fausse pénurie ni une erreur : à k assez grand, le chemin reproduit k = 0 exactement ;
+    l'écart croît quand k diminue (13 240 citoyens : k = 20 indistinguable de k = 0 sur le sans-abri, la faim, le chômage
+    et la demande non servie ; k = 12 : sans-abri −4 pt ; k = 8 : −11 ; k = 3 et 5 : −25 à −27). L'habitude du dernier
+    vendeur ne porte pas l'effet (3 000 citoyens). Hypothèse non testée : la comparaison de tous les vendeurs concentre
+    la demande sur le moins cher et fait fermer les autres.
+  - **k = 5 est une autre règle de marché, pas une approximation de k = 0.**
+
+### Tâche 3 — Temps et biais résiduel
+
+- **Temps par jour** (natif, graine 1, avec filets ; bruit ±8 %) :
+
+  | Population | k = 0 | k = 3 | k = 5 | k = 8 | k = 12 | k = 20 |
+  |---|---|---|---|---|---|---|
+  | 240 | 5,07 ms | 5,25 | 5,34 | 5,37 | 5,33 | 5,34 |
+  | 1 000 | 25,5 ms | 26,6 | 25,7 | 26,0 | 25,6 | 25,5 |
+  | 3 000 | 109 ms | 83,8 | 91,9 | 98,8 | 94,3 | 91,4 |
+  | 13 240 | 1 511 ms | 419 | 455 | 530 | 595 | 691 |
+
+  Exposant b sur les quatre tailles : 1,42 (k = 0), 1,09 (k = 3), 1,11 (k = 5), 1,15 (k = 8), 1,18 (k = 12), 1,21 (k = 20).
+- **Coût d'un achat** (`tool/vendeurs_cout.dart`, 10 à 5 000 boulangeries) : k = 0 de 0,99 à 381 µs ; k = 5 de 0,89 à
+  1,18 µs. Plat à ×1,3 près pour ×500 vendeurs.
+- **Biais résiduel.** À k = 5, la concentration baisse (13 240 citoyens : part de la plus grande entreprise −7 pt dans le
+  secondaire, −13 pt dans le tertiaire) et la dispersion des prix monte (13 240 citoyens : +13 pt dans le secondaire ; 3 000 citoyens :
+  +6 pt dans le tertiaire). Il n'est négligeable qu'à partir de k ≈ 12 (3 000 citoyens) et k ≈ 20 (13 240 citoyens), c'est-à-dire
+  quand k couvre à peu près tous les vendeurs des gros marchés et que le gain de temps diminue de moitié.
+
+### Points non résolus
+
+1. Décision de la valeur par défaut (Francis). 2. Quelle règle de marché est la bonne à grande échelle ? k = 0 donne une
+économie en panne à 13 240 citoyens. 3. Hypothèse de concentration non testée. 4. Achats non entiers hors liste. 5. Effet des
+achats arrêtés faute de moyens (`broke`) non isolé. 6. 5 graines seulement pour les balayages à 13 240 citoyens. 7. Les
+drapeaux de test `Sim.availThreshold` et `Sim.sellerHabit` sont statiques. 8. Le § 8 (tâche 3) est remplacé pour k > 0, y compris
+l'idée que le sans-abri venait du logement : après correction, le logement n'est plus un problème majeur (demande non servie du logement :
+0,84 % contre 0,25 % à 13 240 citoyens, écart conclu mais petit). L'exclure de l'échantillonnage reste une décision de règle.
+
+**Vérifications.** `dart analyze` : aucun problème. `flutter test` : 65 réussis, 2 ignorés. Protocole par défaut à k = 0 :
+identique à `7e8029a`.

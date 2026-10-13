@@ -246,7 +246,7 @@ variable de tirages et décalait toute la suite de la partie.
 | 15 | `prix` | pas d'ajustement de la marge | `_decide` |
 | 16 | `divin` | actions du god mode (épidémie) | `godEpidemic` |
 | 17 | `logement` | bâtiments : état à la naissance, déménagement, regard sur le marché (module `buildings`) | `buildings.dart` |
-| 18 | `vendeurs` | recherche limitée : vendeurs examinés par un achat de ménage (`sellerSample` > 0) | `_AllOffers.sampled` |
+| 18 | `vendeurs` | recherche limitée : tirage des vendeurs examinés par un achat de ménage dans la liste des vendeurs avec stock (`sellerSample` > 0) | `_AllOffers.sampled` |
 
 La création d'entreprise ne tire rien : le fondateur est le citoyen le plus riche.
 
@@ -336,7 +336,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 |---|---|---|---|
 | `population` | 240 | citoyens au départ (`--population N` dans les outils) | choix de jeu |
 | `scenarioPopulation` | 240 | population pour laquelle le scénario par défaut a été réglé ; au-delà, il est répété | taille de réglage du modèle (journal, § 6, tâche 1) |
-| `sellerSample` | 0 | recherche limitée : un achat de ménage n'examine que k vendeurs tirés (plus celui de son dernier achat) ; 0 = tous | choix de jeu, coupé par défaut (journal, § 8) |
+| `sellerSample` | 0 | recherche limitée : un achat de ménage (une unité) n'examine que k vendeurs tirés dans la liste de ceux qui ont une unité en stock (plus celui de son dernier achat) ; 0 = tous | choix de jeu, coupé par défaut (journal, §§ 8 et 9) |
 | `startWallet` | 3 000 $ | argent de départ de référence | choix de jeu |
 | `startWage` | 150 $/j | salaire de base d'un manœuvre | choix de jeu |
 | `markup` | 1,15 | majoration normale du coût | choix de jeu |

@@ -126,6 +126,9 @@ flutter build web
 - `tool/stabilite.dart --niveau 0|1|2` : protocole en trois niveaux (fumée, décision, échelle) ; `tool/perf.dart` :
   temps par jour et mémoire d'une partie ; `tool/echelle.dart` : ratios du jour 1 selon la population ;
   `bash tool/compiler.sh` : exécutables natifs des outils dans `build/outils/`.
+- `tool/vendeurs_controle.dart A.json B.json` : comparaison appariée de deux synthèses (k = 0 contre k > 0) avec
+  intervalles ; `tool/vendeurs_cout.dart` : coût d'un achat selon le nombre de vendeurs ; `tool/vendeurs_verif.dart` :
+  liste des vendeurs disponibles vérifiée à grande échelle (rapport : `rapports/vendeurs-correction.md`).
 - `tool/partie.dart` : une partie en ligne de commande, avec ses journaux complets, ses instantanés et `--diff` ;
   `--sans-hasard` joue une partie où tous les tirages valent 0,5, lisible à la main.
 - `tool/detresse.dart` : ce qui distingue les citoyens en détresse des autres (à partir d'`agents_fin.csv`).
