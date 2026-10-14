@@ -37,6 +37,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Future<void> _askStart() async {
     var pop = 240.0;
     var housing = ctrl.sim.modules.buildings;
+    var jobs = ctrl.sim.modules.jobs;
     final seedCtl = TextEditingController(text: '42');
     final go = await showDialog<bool>(
       context: context,
@@ -67,6 +68,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 subtitle: const Text('Bâtiments construits, loués, achetés et revendus ; hypothèques de la Caisse.',
                     style: TextStyle(fontSize: 12)),
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: jobs,
+                onChanged: (v) => set(() => jobs = v),
+                title: const Text('Rôles et négociation salariale',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Organigrammes, salaires négociés à l’embauche, contre-offres, promotions et '
+                    'révisions annuelles.', style: TextStyle(fontSize: 12)),
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: seedCtl,
@@ -91,6 +101,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       final seed = int.tryParse(seedCtl.text.trim())?.abs() ?? 42;
       // la nouvelle partie reprend les modules en cours : on y règle le marché immobilier avant de la créer
       ctrl.sim.modules.buildings = housing;
+      ctrl.sim.modules.jobs = jobs;
       ctrl.newGame(seed, params: Params()..population = pop.round());
     }
     seedCtl.dispose();

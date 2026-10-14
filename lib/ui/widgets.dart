@@ -43,11 +43,17 @@ class KV extends StatelessWidget {
     final pal = Pal.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.5),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(child: Text(k, style: TextStyle(color: pal.ink2, fontSize: 12.5))),
-        const SizedBox(width: 8),
-        Text(v, style: mono(color ?? pal.ink, 12.5, weight: FontWeight.w600)),
-      ]),
+      // une valeur longue (rôle, qualification) passe à la ligne au-delà de 62 % de la largeur au lieu de déborder
+      child: LayoutBuilder(
+        builder: (context, box) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: Text(k, style: TextStyle(color: pal.ink2, fontSize: 12.5))),
+          const SizedBox(width: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: box.maxWidth * 0.62),
+            child: Text(v, textAlign: TextAlign.right, style: mono(color ?? pal.ink, 12.5, weight: FontWeight.w600)),
+          ),
+        ]),
+      ),
     );
   }
 }

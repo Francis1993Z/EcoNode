@@ -29,6 +29,22 @@ ODD). Ci-dessous, un résumé.
 Chaque module ajouté depuis la v0 (crédit, machines, R-D, publicité, comptabilité, santé, formation, services publics)
 se coupe : onglet Diagnostic → Modules.
 
+## Rôles, contrats et négociation salariale (module `jobs`)
+
+- **Organigrammes** : chaque type d'entreprise a 3 à 5 rôles (aide agricole, machiniste, agronome, responsable de la
+  ferme ; préposé aux bénéficiaires, infirmier, médecin, médecin-chef ; etc.) avec une qualification minimale, une part
+  de l'effectif et, pour l'encadrement, une ancienneté minimale (promotion interne seulement).
+- **Contrats** : chaque employé a un rôle, un salaire négocié et une date d'embauche (ancienneté).
+- **Négociation** : salaire de réserve du candidat (dernier salaire qui baisse avec le chômage, prestation), fourchette
+  et plafond de l'employeur (postes vacants, valeur ajoutée), partage du surplus selon l'aplomb et la tension du marché ;
+  refus possibles. Contre-offres quand un concurrent débauche, promotions, renouvellement annuel au taux du marché
+  (ancienneté comprise).
+- **Inspecteur** : la liste des employés d'une entreprise (rôle, qualification, salaire, ancienneté), l'organigramme
+  (effectifs actuels et visés, salaire offert par rôle) et les négociations récentes ; fiche citoyen (contrat, salaire
+  de réserve) ; marché du travail dans la vue Ménages.
+- Coupé par défaut dans le moteur et le protocole ; l'interface lance ses parties avec le module (écran de départ).
+  Description : [`MODELE.md`](MODELE.md) § 6.16 ; mesures et choix : [`rapports/emplois-negociation.md`](rapports/emplois-negociation.md).
+
 ## Stabilisation : filets, détecteurs, protocole
 
 - **Filets de sécurité** (anti-famine, renflouement, plancher de logement, plafond de dérive des prix et salaires,
@@ -119,8 +135,9 @@ flutter build web
 
 ## Structure
 
-- `lib/engine/` : moteur sans dépendance à Flutter. `model.dart` (biens, recettes, désirs, paramètres, modules, filets),
-  `sim.dart` (simulation, filets, invariants), `monitor.dart` (détecteurs d'anomalies).
+- `lib/engine/` : moteur sans dépendance à Flutter. `model.dart` (biens, recettes, désirs, rôles, paramètres, modules,
+  filets), `sim.dart` (simulation, filets, invariants), `jobs.dart` (rôles, contrats, négociation), `buildings.dart`
+  (bâtiments, hypothèques), `monitor.dart` (détecteurs d'anomalies).
 - `lib/ui/` : contrôleur, disposition et dessin du graphe, inspecteurs, onglets Diagnostic, God mode, Économie, Modèle.
 - `tool/stabilite.dart` : protocole de stabilité en ligne de commande.
 - `tool/stabilite.dart --niveau 0|1|2` : protocole en trois niveaux (fumée, décision, échelle) ; `tool/perf.dart` :
@@ -137,12 +154,16 @@ flutter build web
 - `test/instantane_test.dart` : reprise exacte depuis un instantané, traceur sans effet sur la partie, empreintes.
 - `test/proprietes_test.dart` : propriétés vérifiées chaque jour sur des parties tirées au hasard (dividendes et fonds
   propres, plafonds quotidiens des prix et salaires, emplois, plancher de la Caisse, admissibilité à l'assurance-emploi).
+- `test/emplois_test.dart` : module rôles et négociation (contrats cohérents chaque jour, bornes de la négociation,
+  renouvellements, salaire minimum, activation en cours de partie, instantanés).
+- `test/inspecteur_test.dart` : l'inspecteur montre chaque employé (rôle, salaire, ancienneté), l'organigramme, les
+  négociations et la fiche citoyen ; sans le module, le salaire unique et l'interrupteur.
 - `test/extremes_test.dart` : cas extrêmes au résultat connu d'avance (zéro citoyen, une entreprise par secteur,
   salaires figés, monnaie × 100, aucun hasard) ; deux attendus non obtenus sont sautés, avec ce qui a été mesuré.
 
 ## État
 
-`flutter analyze` ne signale rien et `flutter test` passe (42 tests, 2 sautés volontairement). Le hasard est en flux indépendants (nombres
+`flutter analyze` ne signale rien et `flutter test` passe (71 tests réussis, 2 sautés volontairement). Le hasard est en flux indépendants (nombres
 aléatoires communs) : une même graine donne la même partie sur la VM et en JavaScript (`tool/parite.dart`). Tâches 1, 2, 3, 4, 5, 7 et 8 du plan de
 stabilisation faites (coût de revient réel, intrants secondaires non bloquants, prix et salaires limités à 1,5 %/j,
 consommation stock-flux, entrée et sortie d'entreprises, fonds de roulement, Caisse capitalisée et prudente). Avec
