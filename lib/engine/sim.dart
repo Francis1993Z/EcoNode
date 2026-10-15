@@ -12,6 +12,7 @@ import 'monitor.dart';
 
 part 'snapshot.dart';
 part 'buildings.dart';
+part 'jobs.dart';
 
 /// mulberry32 (arithmétique 32 bits non signée) : même graine, même partie.
 class Mulberry32 {
@@ -74,7 +75,8 @@ enum Flux {
   prix(15), // pas d'ajustement de la marge
   divin(16), // actions du god mode (épidémie)
   logement(17), // bâtiments : état à la naissance, déménagement, regard sur le marché
-  vendeurs(18); // recherche limitée : vendeurs examinés par un achat de ménage (Params.sellerSample)
+  vendeurs(18), // recherche limitée : vendeurs examinés par un achat de ménage (Params.sellerSample)
+  anciennete(19); // ancienneté des employés au départ de la partie (affichage ; module jobs : promotions, révisions)
 
   const Flux(this.code);
   final int code;
@@ -371,6 +373,9 @@ class Sim {
   bool _buildingsSeeded = false;
   double housingHeat = 0; // −1 : logements vacants en abondance ; +1 : marché serré
   final BuildingStats bstats = BuildingStats();
+  // rôles, contrats et négociation (module jobs, voir jobs.dart) : contrats en place, compteurs du marché du travail
+  bool jobsActive = false;
+  final LabourStats labour = LabourStats();
   final Invariants inv = Invariants();
   final DayFlows dayFlows = DayFlows(); // flux depuis la dernière vérification
   DayFlows lastFlows = DayFlows(); // flux de la dernière journée vérifiée
@@ -488,6 +493,8 @@ class Sim {
     _buildingsSeeded = false;
     housingHeat = 0;
     bstats.clear();
+    jobsActive = false;
+    labour.clear();
     dayFlows.reset();
     lastFlows = DayFlows();
     final p = this.params;
@@ -541,7 +548,13 @@ class Sim {
     for (final s in scen) {
       final w = math.max(1, (plan.workers[s.type]! / perType[s.type]!).round());
       staff.add(w);
-      needByClass[templates[s.type]!.skill] += w;
+      if (this.modules.jobs) {
+        for (final r in seatOrder(s.type, w)) {
+          needByClass[roles[s.type]![r].level]++;
+        }
+      } else {
+        needByClass[templates[s.type]!.skill] += w;
+      }
     }
     final pop = p.population;
     final pros = math.min(pop, (needByClass[2] * 1.15).ceil() + 1);
@@ -566,16 +579,37 @@ class Sim {
     }
     // les postes les plus qualifiés d'abord, chacun pris par le candidat le moins surqualifié
     final pool = _ordered(citizens, Flux.recrutement, (c) => c.id);
-    final order = List<int>.generate(scen.length, (i) => i);
-    stableSort<int>(order, (a, b) => created[b].template.skill - created[a].template.skill);
-    for (final i in order) {
-      final f = created[i];
-      for (var k = 0; k < staff[i]; k++) {
-        final c = _pickWorker(pool, f.template.skill);
-        if (c == null) break;
+    if (this.modules.jobs) {
+      // module jobs : chaque poste de l'organigramme de chaque entreprise, les plus exigeants d'abord, à l'offre du rôle
+      final seats = <(Firm, int)>[
+        for (var i = 0; i < scen.length; i++)
+          for (final r in seatOrder(created[i].type, staff[i])) (created[i], r),
+      ];
+      stableSort<(Firm, int)>(seats, (a, b) => roles[b.$1.type]![b.$2].minSkill.compareTo(roles[a.$1.type]![a.$2].minSkill));
+      for (final (f, r) in seats) {
+        final c = _pickCandidate(pool, roles[f.type]![r].minSkill, const <int>{});
+        if (c == null) continue;
         pool.remove(c);
-        _hire(f, c);
+        _hire(f, c, 'poste ouvert', r, roleOffer(f, r));
       }
+    } else {
+      final order = List<int>.generate(scen.length, (i) => i);
+      stableSort<int>(order, (a, b) => created[b].template.skill - created[a].template.skill);
+      for (final i in order) {
+        final f = created[i];
+        for (var k = 0; k < staff[i]; k++) {
+          final c = _pickWorker(pool, f.template.skill);
+          if (c == null) break;
+          pool.remove(c);
+          _hire(f, c);
+        }
+      }
+    }
+    // ancienneté de départ : de 0 à 4 ans (les rôles d'encadrement, au moins l'ancienneté qu'ils exigent)
+    for (final c in citizens) {
+      if (c.employer == null) continue;
+      final need = this.modules.jobs && c.role >= 0 ? roles[firm(c.employer!)!.type]![c.role].minTenure : 0;
+      c.hiredDay = -(need + (draw(Flux.anciennete, c.id) * 1460).floor());
     }
 
     for (final f in firms) {
@@ -604,8 +638,9 @@ class Sim {
     }
     for (final c in citizens) {
       final f = c.employer != null ? firm(c.employer!) : null;
-      c.incomeEma = f != null ? f.wage * (1 - p.taxRate) : p.benefit;
+      c.incomeEma = f != null ? (this.modules.jobs ? c.wage : f.wage) * (1 - p.taxRate) : p.benefit;
     }
+    jobsActive = this.modules.jobs;
     if (this.modules.buildings) _seedBuildings();
     m0 = totalMoney();
     bank.reserves = m0; // toute la monnaie de départ est « extérieure »
@@ -717,7 +752,8 @@ class Sim {
         for (final ty in types) {
           final t = templates[ty]!;
           final n = count[ty]!;
-          final wage = p.startWage * classWage[t.skill];
+          // module jobs : salaire moyen de l'organigramme complet (les rôles moins qualifiés coûtent moins)
+          final wage = m.jobs ? p.startWage * classWage[t.skill] * avgRoleRel(ty) : p.startWage * classWage[t.skill];
           if (!scaled) k[ty] = kStar(t, wage);
           final mach = k[ty]! * w[ty]!;
           var cost = wage / (perW(ty) * (scaled ? _minScale(w[ty]!, n) : 1.0));
@@ -790,6 +826,7 @@ class Sim {
     final c = Citizen(id, name, quantize(cash), skill, t(3));
     if (t(4) < const [0.2, 0.6, 0.7][c.level]) c.computerDays = (t(5) * params.computerLife).floor();
     c.wantsToOwn = modules.buildings && t(6) < params.ownerShare;
+    c.aplomb = t(7);
     citizens.add(c);
     _cmap[c.id] = c;
     return c;
@@ -906,23 +943,41 @@ class Sim {
     e.value += value;
   }
 
-  void _hire(Firm f, Citizen c, [String why = 'poste ouvert']) {
+  /// Embauche. Module jobs : au rôle [role] (par défaut, celui du prochain poste de l'organigramme) et au salaire
+  /// [wage] (par défaut, l'offre du rôle).
+  void _hire(Firm f, Citizen c, [String why = 'poste ouvert', int role = -1, double wage = 0]) {
     if (c.employer != null) {
       final old = firm(c.employer!);
       if (old != null) _fire(old, c, 'départ pour un autre emploi');
     }
     c.employer = f.id;
     c.daysUnemployed = 0;
+    c.hiredDay = day;
+    if (modules.jobs) {
+      c.role = role >= 0 ? role : nextRole(f);
+      c.wage = wage > 0 ? wage : roleOffer(f, c.role);
+    } else {
+      c.role = -1;
+    }
     f.workers.add(c.id);
-    if (trace != null) _t('travail', 'embauche', c.name, c.id, why, f.name, f.wage, 'entreprise ${f.id}');
+    _syncWage(f);
+    if (trace != null) {
+      _t('travail', 'embauche', c.name, c.id, why, f.name, modules.jobs ? c.wage : f.wage,
+          'entreprise ${f.id}${modules.jobs ? ' ; ${roles[f.type]![c.role].label}' : ''}');
+    }
   }
 
+  /// Fin d'emploi. Le citoyen garde le salaire de son dernier contrat (base de son salaire de réserve).
   void _fire(Firm? f, Citizen? c, [String why = '']) {
     if (f == null || c == null) return;
     f.workers.remove(c.id);
     f.lastLoss = why;
     c.employer = null;
-    if (trace != null) _t('travail', 'fin_emploi', c.name, c.id, why, f.name, f.wage, 'entreprise ${f.id}');
+    c.role = -1;
+    _syncWage(f);
+    if (trace != null) {
+      _t('travail', 'fin_emploi', c.name, c.id, why, f.name, modules.jobs ? c.wage : f.wage, 'entreprise ${f.id}');
+    }
   }
 
   /// Candidat admissible le moins surqualifié (garde les plus qualifiés pour les postes qui les exigent).
@@ -951,7 +1006,11 @@ class Sim {
   double efficiency(Citizen c, [Firm? f]) {
     final k = efficiencyFactors(c);
     var e = k.faim * k.logement * k.sante * k.moral;
-    if (f != null) e *= 1 + 0.05 * math.min(3.0, math.max(0.0, c.skill - f.template.skill));
+    if (f != null) {
+      // module jobs : la surqualification se mesure par rapport au rôle tenu
+      final req = modules.jobs && c.role >= 0 ? roles[f.type]![c.role].minSkill : f.template.skill.toDouble();
+      e *= 1 + 0.05 * math.min(3.0, math.max(0.0, c.skill - req));
+    }
     return e;
   }
 
@@ -1203,6 +1262,9 @@ class Sim {
     }
     state.taxesToday = 0;
     state.paidToday = 0;
+    labour.newDay();
+    // module jobs activé ou coupé depuis la veille (onglet Diagnostic) : contrats créés ou mis de côté
+    if (modules.jobs != jobsActive) _jobsSwitch();
 
     // 0. Revenu de base divin (création monétaire)
     if (p.ubi > 0) {
@@ -1245,6 +1307,16 @@ class Sim {
   }
 
   void _laborMarket() {
+    if (modules.jobs) {
+      _jobMarket(); // rôles, salaire de réserve, négociation, contre-offres, promotions, révisions (jobs.dart)
+    } else {
+      _postedWageMarket();
+    }
+    _jobDays();
+  }
+
+  /// Marché du travail sans le module jobs : un salaire unique affiché par entreprise.
+  void _postedWageMarket() {
     final unemployed = _ordered(citizens.where((c) => c.employer == null), Flux.embauche, (c) => c.id);
     final hiring = firms.where((f) => f.vacancies > 0).toList();
     stableSort<Firm>(hiring, (a, b) => b.wage.compareTo(a.wage));
@@ -1275,6 +1347,10 @@ class Sim {
         }
       }
     }
+  }
+
+  /// Jours de chômage et prestations, après le marché du travail.
+  void _jobDays() {
     for (final c in citizens) {
       if (c.employer == null) c.daysUnemployed++;
     }
@@ -1445,6 +1521,10 @@ class Sim {
     for (final f in firms) {
       final n = f.workers.length;
       if (n == 0) continue;
+      if (modules.jobs) {
+        _payContracts(f);
+        continue;
+      }
       final wage = f.wage * hoursToday(f);
       final bill = wage * n;
       final each = f.money >= bill ? wage : f.money / n;
@@ -1488,6 +1568,60 @@ class Sim {
           _log('warn', '${f.name} ne peut plus payer ses salaires — mise à pied.');
           f.lastDistressLog = day;
         }
+      }
+    }
+  }
+
+  /// Paie du module jobs : chaque employé reçoit le salaire de son contrat ; si la caisse ne suffit pas, tous sont payés
+  /// dans la même proportion et le dernier embauché est mis à pied (même règle que le salaire unique).
+  void _payContracts(Firm f) {
+    final n = f.workers.length;
+    final hours = hoursToday(f);
+    var bill = 0.0;
+    for (final id in f.workers) {
+      bill += _cmap[id]!.wage * hours;
+    }
+    final k = f.money >= bill ? 1.0 : f.money / bill;
+    final t = params.taxRate;
+    final ins = modules.insurance;
+    final capIns = ins ? insurableCap() : 0.0;
+    var net = 0.0, tax = 0.0, premiums = 0.0;
+    for (final id in f.workers) {
+      final c = _cmap[id]!;
+      final wage = c.wage * hours;
+      final each = k < 1 ? wage * k : wage;
+      final cot = ins ? math.min(each, capIns) * params.eiRate : 0.0;
+      final a = transfer(f, c, each * (1 - t) - cot);
+      net += a;
+      tax += transfer(f, state, each * t);
+      if (ins) {
+        premiums += transfer(f, state, cot);
+        c.lastWage = wage;
+        c.insuredDays++;
+      }
+      c.income += a;
+    }
+    f.wagesPaid = net + tax + premiums;
+    f.costs += net + tax + premiums;
+    state.taxes += tax;
+    state.taxesToday += tax;
+    state.eiPremiums += premiums;
+    if (net > 0) {
+      _flow(f.id.toString(), 'M', '\$salaires', n.toDouble(), net);
+      if (tax > 0) _flow('M', 'E', '\$impôts', 1, tax);
+    }
+    if (trace != null) {
+      _t('compta', 'salaires', f.name, f.id, 'paie (contrats)', '$n employé(s)', net + tax + premiums,
+          'net ${fmtMoney0(net)}, impôt ${fmtMoney0(tax)}, cotisations ${fmtMoney0(premiums)}'
+              '${k < 1 ? ' ; salaires versés en partie' : ''}');
+    }
+    if (k < 1) {
+      final c = _cmap[f.workers.last];
+      _fire(f, c, 'salaires impayables : mise à pied du dernier embauché');
+      f.vacancies = 0;
+      if (day - f.lastDistressLog > 10) {
+        _log('warn', '${f.name} ne peut plus payer ses salaires — mise à pied.');
+        f.lastDistressLog = day;
       }
     }
   }
@@ -2447,7 +2581,8 @@ class Sim {
     final batches = want / t.outputs[g]!;
     final w = batches / t.rate; // employés nécessaires à productivité nominale
     final team = w.ceil().clamp(1, 3).toInt();
-    final wage = marketWage(t.skill);
+    // module jobs : coût moyen d'un employé de l'organigramme, au salaire affiché du marché
+    final wage = modules.jobs ? marketOffer(t.skill) * avgRoleRel(ty) : marketWage(t.skill);
     var inputCost = 0.0;
     for (final e in t.inputs.entries) {
       inputCost += batches * e.value * bestPrice(e.key);
@@ -2474,6 +2609,10 @@ class Sim {
     final f = _newFirm(ty, '${t.label} ${founder.name.split(' ').last}', 0, founder.id, slot[0], slot[1]);
     f.rate = t.rate * _minScale(w, 1); // échelle minimale si la demande n'occupe pas un employé
     f.wage = wage;
+    if (modules.jobs) {
+      f.offer = marketOffer(t.skill);
+      _syncWage(f);
+    }
     final paid = transfer(founder, f, capital);
     _flow('M', f.id.toString(), '\$capital', 1, paid);
     for (final e in f.outputs.entries) {
@@ -2581,6 +2720,8 @@ class Sim {
       wn[s] += f.workers.length;
     }
     final norm = [for (var s = 0; s < 3; s++) wn[s] > 0 ? wsum[s] / wn[s] : p.startWage * classWage[s]];
+    // module jobs : la norme porte sur les salaires affichés (les contrats ne bougent pas avec l'offre)
+    final normOffer = modules.jobs ? [for (var s = 0; s < 3; s++) marketOffer(s)] : norm;
     final tw = wn[0] + wn[1] + wn[2];
     avgWage = tw > 0 ? (wsum[0] + wsum[1] + wsum[2]) / tw : p.startWage;
     final baseMk = p.markup - 1;
@@ -2675,7 +2816,9 @@ class Sim {
       }
 
       // ------- salaires
-      if (!f.lockWage) {
+      if (!f.lockWage && modules.jobs) {
+        _adjustOffer(f, unemp, normOffer);
+      } else if (!f.lockWage) {
         final old = f.wage;
         var w = old;
         // postes vacants depuis 2 jours : on monte le salaire chaque jour, plus vite si des clients repartent les
@@ -3085,7 +3228,19 @@ class Sim {
     if (f == null) return;
     final notes = <String>[];
     if (wage != null && wage.isFinite) {
-      f.wage = math.max(1.0, wage);
+      if (modules.jobs && f.wage > 0) {
+        // l'échelle salariale entière : salaire affiché et contrats dans la même proportion
+        final k = math.max(1.0, wage) / f.wage;
+        f.offer = math.max(1.0, f.offer * k);
+        for (final id in f.workers) {
+          final c = _cmap[id]!;
+          c.wage = math.max(1.0, c.wage * k);
+        }
+        _syncWage(f);
+      } else {
+        f.wage = math.max(1.0, wage);
+        f.offer = f.wage;
+      }
       notes.add('salaire ${fmtMoney0(f.wage)}');
     }
     if (lockWage != null) f.lockWage = lockWage;
@@ -3146,6 +3301,10 @@ class Sim {
       wn += o.workers.length;
     }
     if (wn > 0) f.wage = ws / wn;
+    if (modules.jobs) {
+      f.offer = marketOffer(f.template.skill);
+      _syncWage(f);
+    }
     for (final g in f.outputs.keys) {
       final s = sellersOf(g).where((o) => !identical(o, f)).toList();
       if (s.isNotEmpty) {

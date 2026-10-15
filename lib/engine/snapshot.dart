@@ -37,6 +37,8 @@ List<int> _ril(Object? l) => [for (final x in l as List) x as int];
 Map<String, Map<String, int>> _rimm(Object? m) =>
     {for (final e in (m as Map).entries) e.key as String: _rim(e.value)};
 
+Map<String, Object?> _labourJson(LabourStats l) => {'total': l.total, 'today': l.today, 'premium': _d(l.premium)};
+
 Map<String, Object?> _paramsJson(Params p) => {
       'population': p.population,
       'startWallet': _d(p.startWallet),
@@ -112,6 +114,21 @@ Map<String, Object?> _paramsJson(Params p) => {
       'buyRentRatio': _d(p.buyRentRatio),
       'scenarioPopulation': p.scenarioPopulation,
       'sellerSample': p.sellerSample,
+      'reservationDecay': _d(p.reservationDecay),
+      'reservationFloor': _d(p.reservationFloor),
+      'switchPremium': _d(p.switchPremium),
+      'bargainBase': _d(p.bargainBase),
+      'bargainTrait': _d(p.bargainTrait),
+      'bargainTight': _d(p.bargainTight),
+      'hireRange': _d(p.hireRange),
+      'hireFlexBase': _d(p.hireFlexBase),
+      'hireFlexMax': _d(p.hireFlexMax),
+      'maxInterviews': p.maxInterviews,
+      'reviewDays': p.reviewDays,
+      'reviewCutMax': _d(p.reviewCutMax),
+      'seniorityStep': _d(p.seniorityStep),
+      'seniorityCap': _d(p.seniorityCap),
+      'promotionRaise': _d(p.promotionRaise),
     };
 
 Params _paramsFrom(Map j) => Params()
@@ -188,7 +205,22 @@ Params _paramsFrom(Map j) => Params()
   ..landlordBuildAbove = _rdOr(j['landlordBuildAbove'], 0.96)
   ..buyRentRatio = _rdOr(j['buyRentRatio'], 1.2)
   ..scenarioPopulation = (j['scenarioPopulation'] as int?) ?? 240
-  ..sellerSample = (j['sellerSample'] as int?) ?? 0;
+  ..sellerSample = (j['sellerSample'] as int?) ?? 0
+  ..reservationDecay = _rdOr(j['reservationDecay'], 0.01)
+  ..reservationFloor = _rdOr(j['reservationFloor'], 0)
+  ..switchPremium = _rdOr(j['switchPremium'], 0.08)
+  ..bargainBase = _rdOr(j['bargainBase'], 0.1)
+  ..bargainTrait = _rdOr(j['bargainTrait'], 0.3)
+  ..bargainTight = _rdOr(j['bargainTight'], 0.3)
+  ..hireRange = _rdOr(j['hireRange'], 0.10)
+  ..hireFlexBase = _rdOr(j['hireFlexBase'], 0.05)
+  ..hireFlexMax = _rdOr(j['hireFlexMax'], 0.25)
+  ..maxInterviews = (j['maxInterviews'] as int?) ?? 3
+  ..reviewDays = (j['reviewDays'] as int?) ?? 90
+  ..reviewCutMax = _rdOr(j['reviewCutMax'], 1)
+  ..seniorityStep = _rdOr(j['seniorityStep'], 0.015)
+  ..seniorityCap = _rdOr(j['seniorityCap'], 0.15)
+  ..promotionRaise = _rdOr(j['promotionRaise'], 0.05);
 
 Map<String, Object?> _safeguardsJson(Safeguards s) => {
       for (final k in Safeguards.keys) k: s.get(k),
@@ -237,6 +269,10 @@ Map<String, Object?> _citizenJson(Citizen c) => {
       'schoolSince': c.schoolSince,
       'homeId': c.homeId,
       'wantsToOwn': c.wantsToOwn,
+      'hiredDay': c.hiredDay,
+      'role': c.role,
+      'wage': _d(c.wage),
+      'aplomb': _d(c.aplomb),
     };
 
 Citizen _citizenFrom(Map j) {
@@ -258,7 +294,11 @@ Citizen _citizenFrom(Map j) {
     ..eiBenefit = _rd(j['eiBenefit'])
     ..schoolSince = j['schoolSince'] as int?
     ..homeId = j['homeId'] as int?
-    ..wantsToOwn = (j['wantsToOwn'] as bool?) ?? false;
+    ..wantsToOwn = (j['wantsToOwn'] as bool?) ?? false
+    ..hiredDay = (j['hiredDay'] as int?) ?? 0
+    ..role = (j['role'] as int?) ?? -1
+    ..wage = _rdOr(j['wage'], 0)
+    ..aplomb = _rdOr(j['aplomb'], 0.5);
   c.sat
     ..clear()
     ..addAll(_rdm(j['sat']));
@@ -329,8 +369,16 @@ Map<String, Object?> _firmJson(Firm f) => {
       'creditBanUntil': f.creditBanUntil,
       'carry': _d(f.carry),
       'reinvest': _d(f.reinvest),
+      'offer': _d(f.offer),
+      'talks': [for (final t in f.talks) _talkJson(t)],
       'hist': [for (final p in f.hist) _pointJson(p)],
     };
+
+List<Object?> _talkJson(Talk t) =>
+    [t.day, t.citizen, t.name, t.role, t.kind, _d(t.wage), _d(t.reservation), _d(t.offer), _d(t.cap)];
+
+Talk _talkFrom(List l) => Talk(l[0] as int, l[1] as int, l[2] as String, l[3] as int, l[4] as String, _rd(l[5]),
+    _rd(l[6]), _rd(l[7]), _rd(l[8]));
 
 List<Object?> _pointJson(FirmPoint p) =>
     [_d(p.money), p.workers, _d(p.price), _d(p.sold), _d(p.profit), _d(p.machines), _d(p.debt)];
@@ -393,7 +441,9 @@ Firm _firmFrom(Map j) {
     ..idleDays = j['idleDays'] as int
     ..creditBanUntil = j['creditBanUntil'] as int
     ..carry = _rdOr(j['carry'], 0)
-    ..reinvest = _rdOr(j['reinvest'], 0);
+    ..reinvest = _rdOr(j['reinvest'], 0)
+    ..offer = _rdOr(j['offer'], _rd(j['wage']));
+  f.talks.addAll([for (final t in (j['talks'] as List?) ?? const []) _talkFrom(t as List)]);
   f.workers.addAll(_ril(j['workers']));
   f.inv.addAll(_rdm(j['inv']));
   f.price.addAll(_rdm(j['price']));
@@ -665,6 +715,8 @@ extension SimSnapshot on Sim {
         'schoolQueue': schoolQueue,
         'services': {for (final e in services.entries) e.key: _serviceJson(e.value)},
         'buildings': _buildingsState(),
+        'jobsActive': jobsActive,
+        'labour': _labourJson(labour),
         'nets': _netsJson(nets),
         'monitor': monitor.toJson(),
         'inv': [_d(inv.money), _d(inv.loans), _d(inv.bank), _d(inv.flows)],
@@ -714,6 +766,7 @@ extension SimSnapshot on Sim {
         [for (final e in nets.log) if (e.day == day) [e.day, e.net, e.agent, _d(e.amount), e.reason]],
       ])),
       if (buildings.isNotEmpty || mortgages.isNotEmpty) 'batiments': _fnv(j(_buildingsState())),
+      if (jobsActive) 'travail': _fnv(j(_labourJson(labour))),
       'moniteur': _fnv(j(monitor.toJson())),
       'historique': _fnv(j(history.isEmpty ? null : _histJson(history.last))),
       'journal': _fnv(j([for (final e in events) if (e.day == day) [e.day, e.type, e.text]])),
@@ -879,6 +932,14 @@ extension SimSnapshot on Sim {
       for (final m in mortgages) {
         _mmap[m.id] = m;
       }
+    }
+    jobsActive = (j['jobsActive'] as bool?) ?? false;
+    labour.clear();
+    final lj = j['labour'] as Map?;
+    if (lj != null) {
+      labour.total.addAll(_rim(lj['total']));
+      labour.today.addAll(_rim(lj['today']));
+      labour.premium = _rd(lj['premium']);
     }
     _netsLoad(nets, j['nets'] as Map);
     monitor.loadJson(j['monitor'] as Map);

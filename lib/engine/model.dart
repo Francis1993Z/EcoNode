@@ -232,6 +232,254 @@ const Map<String, Template> templates = {
       capital: 0.5, rnd: 'genie'),
 };
 
+// ------------------------------------------------------------------ rôles en entreprise (module « jobs »)
+
+/// Un rôle dans l'organigramme d'un type d'entreprise. Le salaire offert pour un rôle est le salaire affiché de
+/// l'entreprise (celui de la qualification de son gabarit) × classWage[classe du rôle] ÷ classWage[classe du gabarit]
+/// × [premium] : un rôle de technicien dans un hôpital se paie comme un technicien, pas comme un médecin.
+class Role {
+  final String label;
+  final double minSkill; // qualification minimale (0 à 3) ; sa partie entière, plafonnée à 2, donne la classe du rôle
+  final double premium; // prime du rôle à l'intérieur de sa classe (responsabilités, spécialisation)
+  final double share; // part visée de l'effectif ; les postes se répartissent à la plus forte moyenne (D'Hondt)
+  final int minTenure; // ancienneté minimale dans l'entreprise (jours) : poste pourvu par promotion seulement
+  const Role(this.label, this.minSkill, this.premium, this.share, {this.minTenure = 0});
+
+  int get level => minSkill >= 2 ? 2 : (minSkill >= 1 ? 1 : 0);
+  bool get internal => minTenure > 0;
+}
+
+/// Organigramme de chaque type d'entreprise (choix de jeu). Chaque type a au moins un rôle à la portée de la
+/// qualification de son gabarit : sans le module, ses employés y ont tous droit. Les rôles d'encadrement exigent de
+/// l'ancienneté et ne se pourvoient que par promotion interne (marché interne du travail, Doeringer et Piore 1971).
+const Map<String, List<Role>> roles = {
+  // ---- primaire
+  'ferme': [
+    Role('Aide agricole', 0, 1.0, 0.55),
+    Role('Machiniste agricole', 0.5, 1.08, 0.30),
+    Role('Agronome', 2, 0.9, 0.05),
+    Role('Responsable de la ferme', 1, 1.1, 0.10, minTenure: 365),
+  ],
+  'peche': [
+    Role('Matelot', 0, 1.0, 0.60),
+    Role('Machiniste de bord', 0.6, 1.1, 0.25),
+    Role('Capitaine', 1, 1.1, 0.15, minTenure: 365),
+  ],
+  'puits': [
+    Role('Manœuvre de plancher', 0, 1.1, 0.30),
+    Role('Spécialiste du forage', 1, 1.0, 0.45),
+    Role('Géologue', 2, 1.0, 0.10),
+    Role('Chef de chantier', 1.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'bucheron': [
+    Role('Manœuvre d’abattage', 0, 1.0, 0.60),
+    Role('Machiniste en foresterie', 0.5, 1.1, 0.30),
+    Role('Chef d’équipe', 1, 1.05, 0.10, minTenure: 365),
+  ],
+  'mineFer': _mineRoles,
+  'mineOr': _mineRoles,
+  'mineBauxite': _mineRoles,
+  'mineCuivre': _mineRoles,
+  // ---- secondaire
+  'boucherie': [
+    Role('Aide en boucherie', 0, 1.0, 0.50),
+    Role('Spécialiste de la coupe', 0.5, 1.1, 0.35),
+    Role('Responsable du comptoir', 1, 1.0, 0.15, minTenure: 180),
+  ],
+  'boulangerie': [
+    Role('Aide en boulangerie', 0, 1.0, 0.45),
+    Role('Spécialiste de la cuisson', 0.5, 1.1, 0.35),
+    Role('Commis de comptoir', 0, 0.95, 0.10),
+    Role('Responsable de la boulangerie', 1, 1.0, 0.10, minTenure: 180),
+  ],
+  'raffinerie': [
+    Role('Manœuvre de raffinerie', 0, 1.1, 0.20),
+    Role('Technologue en procédés', 1, 1.0, 0.50),
+    Role('Chimiste', 2, 1.0, 0.15),
+    Role('Chef de quart', 1.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'petrochimie': [
+    Role('Manœuvre d’usine', 0, 1.1, 0.25),
+    Role('Technologue en plasturgie', 1, 1.0, 0.50),
+    Role('Chimiste', 2, 1.0, 0.10),
+    Role('Chef de production', 1.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'fonderie': [
+    Role('Manœuvre de fonderie', 0, 1.0, 0.45),
+    Role('Machiniste de coulée', 0.5, 1.1, 0.30),
+    Role('Métallurgiste', 1, 1.0, 0.15),
+    Role('Chef d’équipe', 1, 1.05, 0.10, minTenure: 365),
+  ],
+  'aluminerie': [
+    Role('Manœuvre de salle de cuves', 0, 1.1, 0.25),
+    Role('Technologue en électrolyse', 1, 1.0, 0.50),
+    Role('Métallurgiste', 2, 0.95, 0.10),
+    Role('Chef de secteur', 1.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'electronique': [
+    Role('Commis d’assemblage', 0, 1.1, 0.30),
+    Role('Technologue en électronique', 1, 1.0, 0.50),
+    Role('Spécialiste du contrôle de qualité', 1.5, 1.05, 0.10),
+    Role('Chef de ligne', 1.5, 1.15, 0.10, minTenure: 365),
+  ],
+  'cpu': [
+    Role('Technologue en salle blanche', 1, 1.0, 0.40),
+    Role('Spécialiste en lithographie', 2, 1.0, 0.40),
+    Role('Scientifique des matériaux', 2.5, 1.1, 0.10),
+    Role('Responsable de l’usine', 2, 1.25, 0.10, minTenure: 365),
+  ],
+  'ordinateurs': [
+    Role('Commis d’assemblage', 0, 1.1, 0.30),
+    Role('Technologue en informatique', 1, 1.0, 0.45),
+    Role('Spécialiste des essais', 1.5, 1.05, 0.15),
+    Role('Chef de production', 1.5, 1.15, 0.10, minTenure: 365),
+  ],
+  'bijouterie': [
+    Role('Commis de boutique', 0, 1.1, 0.30),
+    Role('Spécialiste en joaillerie', 1, 1.0, 0.55),
+    Role('Responsable de l’atelier', 1.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'garage': [
+    Role('Commis aux pièces', 0, 1.1, 0.25),
+    Role('Spécialiste en mécanique', 1, 1.0, 0.60),
+    Role('Chef d’atelier', 1.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'machinerie': [
+    Role('Machiniste', 1, 1.0, 0.40),
+    Role('Spécialiste en conception mécanique', 2, 1.0, 0.45),
+    Role('Responsable de l’usine', 2, 1.25, 0.15, minTenure: 365),
+  ],
+  // ---- tertiaire
+  'ingPetrole': [
+    Role('Technologue en génie', 1, 1.0, 0.25),
+    Role('Spécialiste en génie pétrolier', 2, 1.0, 0.60),
+    Role('Responsable de projets', 2.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'ingCpu': [
+    Role('Technologue en conception', 1, 1.0, 0.25),
+    Role('Architecte de puces', 2, 1.0, 0.60),
+    Role('Responsable de projets', 2.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'marketing': [
+    Role('Commis de bureau', 0, 1.2, 0.15),
+    Role('Graphiste', 1, 1.0, 0.25),
+    Role('Stratège en marketing', 2, 1.0, 0.45),
+    Role('Responsable de la création', 2, 1.25, 0.15, minTenure: 365),
+  ],
+  'comptable': [
+    Role('Commis comptable', 1, 1.0, 0.30),
+    Role('Comptable', 2, 1.0, 0.55),
+    Role('Responsable de mission', 2.5, 1.2, 0.15, minTenure: 365),
+  ],
+  'restaurant': [
+    Role('Commis de cuisine', 0, 1.0, 0.40),
+    Role('Service aux tables', 0, 1.0, 0.35),
+    Role('Chef de partie', 0.5, 1.1, 0.15),
+    Role('Responsable de salle', 1, 1.0, 0.10, minTenure: 180),
+  ],
+  'tele': [
+    Role('Commis de production', 0, 1.1, 0.20),
+    Role('Spécialiste du son et de l’image', 1, 1.0, 0.45),
+    Role('Journaliste', 2, 0.95, 0.20),
+    Role('Responsable de la programmation', 2, 1.15, 0.15, minTenure: 365),
+  ],
+  'hotel': [
+    Role('Commis à l’entretien', 0, 1.0, 0.45),
+    Role('Réceptionniste', 0.5, 1.05, 0.30),
+    Role('Concierge', 1, 0.95, 0.15),
+    Role('Responsable de l’hôtel', 1, 1.2, 0.10, minTenure: 365),
+  ],
+  'tourisme': [
+    Role('Commis de bureau', 0, 1.1, 0.20),
+    Role('Guide touristique', 1, 1.0, 0.50),
+    Role('Spécialiste des voyages', 1, 1.05, 0.20),
+    Role('Responsable de l’agence', 1.5, 1.15, 0.10, minTenure: 365),
+  ],
+  'hopital': [
+    Role('Préposé(e) aux bénéficiaires', 0, 1.0, 0.20),
+    Role('Infirmier(ère)', 1, 1.0, 0.40),
+    Role('Médecin', 2, 1.0, 0.30),
+    Role('Médecin-chef', 2.5, 1.2, 0.10, minTenure: 365),
+  ],
+  'ecole': [
+    Role('Concierge', 0, 1.0, 0.10),
+    Role('Aide pédagogique', 1, 1.0, 0.25),
+    Role('Enseignant(e)', 2, 1.0, 0.55),
+    Role('Direction d’école', 2.5, 1.2, 0.10, minTenure: 365),
+  ],
+  'immobilier': [
+    Role('Concierge', 0, 1.0, 0.50),
+    Role('Commis à l’entretien', 0.3, 1.05, 0.30),
+    Role('Responsable des locations', 1, 0.95, 0.10),
+    Role('Gestionnaire d’immeubles', 1, 1.15, 0.10, minTenure: 365),
+  ],
+  'divertissement': [
+    Role('Commis de bar', 0, 1.0, 0.45),
+    Role('Garde de sécurité', 0, 1.05, 0.20),
+    Role('DJ', 0.5, 1.1, 0.20),
+    Role('Responsable du bar', 1, 1.0, 0.15, minTenure: 180),
+  ],
+  'construction': [
+    Role('Manœuvre de chantier', 0, 1.0, 0.50),
+    Role('Spécialiste en charpente', 0.5, 1.12, 0.35),
+    Role('Chef de chantier', 1, 1.1, 0.15, minTenure: 365),
+  ],
+};
+
+const List<Role> _mineRoles = [
+  Role('Manœuvre de mine', 0, 1.0, 0.50),
+  Role('Machiniste de mine', 0.4, 1.06, 0.20),
+  Role('Boutefeu', 0.6, 1.12, 0.15),
+  Role('Géologue', 2, 0.85, 0.05),
+  Role('Chef de quart', 1, 1.1, 0.10, minTenure: 365),
+];
+
+/// Salaire d'un rôle rapporté au salaire affiché de l'entreprise (celui de la classe de son gabarit).
+double roleRel(String type, int r) {
+  final role = roles[type]![r];
+  return classWage[role.level] * role.premium / classWage[templates[type]!.skill];
+}
+
+/// Salaire moyen par employé d'un type d'entreprise, rapporté à son salaire affiché, quand l'organigramme est complet.
+double avgRoleRel(String type) {
+  final rs = roles[type]!;
+  var s = 0.0, w = 0.0;
+  for (var i = 0; i < rs.length; i++) {
+    s += rs[i].share * roleRel(type, i);
+    w += rs[i].share;
+  }
+  return w > 0 ? s / w : 1.0;
+}
+
+/// Rôle du prochain poste d'une équipe dont les effectifs par rôle sont [counts] : la plus forte moyenne
+/// part ÷ (effectif + 1), à égalité le premier rôle de la liste (méthode D'Hondt). [skip] : rôles exclus.
+int nextSeat(String type, List<int> counts, [Set<int> skip = const {}]) {
+  final rs = roles[type]!;
+  var best = -1;
+  var bestV = -1.0;
+  for (var i = 0; i < rs.length; i++) {
+    if (skip.contains(i)) continue;
+    final v = rs[i].share / (counts[i] + 1);
+    if (v > bestV + 1e-12) {
+      best = i;
+      bestV = v;
+    }
+  }
+  return best;
+}
+
+/// Effectifs par rôle d'une équipe de [n] personnes, dans l'ordre des postes (le k-ième poste va au k-ième rôle).
+List<int> seatOrder(String type, int n) {
+  final counts = List<int>.filled(roles[type]!.length, 0);
+  final out = <int>[];
+  for (var k = 0; k < n; k++) {
+    final r = nextSeat(type, counts);
+    counts[r]++;
+    out.add(r);
+  }
+  return out;
+}
+
 /// Le type d'entreprise qui produit chaque bien.
 final Map<String, String> producerOf = {
   for (final e in templates.entries)
@@ -347,6 +595,51 @@ class Params {
   // Information imparfaite sur les prix (choix de jeu ; mesure au journal, § 8).
   int sellerSample = 0;
 
+  // ---- Rôles, contrats et négociation salariale (module « jobs »). Choix de jeu, sauf mention.
+  // Salaire de réserve d'un sans-emploi : son dernier salaire, qui baisse de reservationDecay par jour de chômage
+  // jusqu'à reservationFloor × ce salaire, et jamais sous ce qu'il faut pour gagner 10 % de plus que sa prestation
+  // (après impôt et cotisation). Le salaire de réserve baisse avec la durée du chômage (Krueger et Mueller 2016, qui
+  // le mesurent beaucoup plus lent : ici, le jeu doit dégager les marchés en quelques semaines). Avec un plancher de
+  // 0,6, les chômeurs de longue durée demandaient toujours 60 % de leur ancien salaire : chômage médian +1,8 pt
+  // (mesuré, 10 graines × 1 000 jours) ; à 0, il ne reste après 100 jours que la prestation comme plancher.
+  double reservationDecay = 0.01;
+  double reservationFloor = 0;
+  // Un employé ne change d'emploi que pour switchPremium de plus que son salaire, plus 1 % par année d'ancienneté
+  // perdue (au plus 10 %). 8 % : la règle de mobilité du modèle sans le module.
+  double switchPremium = 0.08;
+  // Pouvoir de négociation de l'employé (Pissarides 2000) : part du surplus entre le plancher (le plus haut du salaire
+  // offert et de son salaire de réserve) et le plafond de l'employeur qui lui revient. bargainBase + bargainTrait ×
+  // aplomb + bargainTight × θ/(1 + θ), où θ = postes ouverts ÷ candidats admissibles de sa classe ; borné à [0,05 ; 0,7].
+  double bargainBase = 0.1;
+  double bargainTrait = 0.3;
+  double bargainTight = 0.3;
+  // Fourchette salariale : le salaire offert pour un rôle est le milieu d'une fourchette de ± hireRange (une offre
+  // d'emploi « entre X et Y $ »). Le bas est le plancher de la négociation ; le haut, majoré d'une souplesse de
+  // hireFlexBase à hireFlexBase + hireFlexMax selon l'ancienneté des postes vacants (10 jours pour le maximum) et la
+  // demande non servie, est le plafond de l'employeur, jamais au-delà de ce que la valeur ajoutée par employé permet.
+  // Avec l'offre pour plancher, chaque embauche se concluait au-dessus de l'offre (+8 à 10 %) : chômage médian 24 %
+  // au lieu de 21 % (mesuré, 10 graines × 1 000 jours, avant le renouvellement des contrats).
+  double hireRange = 0.10;
+  double hireFlexBase = 0.05;
+  double hireFlexMax = 0.25;
+  // Candidats reçus par poste et par jour avant de renoncer à ce rôle pour la journée.
+  int maxInterviews = 3;
+  // Renouvellement du contrat tous les reviewDays jours depuis l'embauche (contrats échelonnés, Taylor 1980) : le
+  // salaire est renégocié à l'offre du rôle majorée de seniorityStep par année d'ancienneté (au plus seniorityCap).
+  // Hausse gelée si l'entreprise perd de l'argent. Baisse : au plus reviewCutMax du salaire (1 : retour au taux du
+  // marché ; 0 : jamais de baisse, la rigidité à la baisse des salaires nominaux décrite par Bewley 1999). Mesures
+  // (10 graines × 1 000 jours, avec filets ; 9,4 % sans le module) : sans baisse, chômage médian 21 % (les contrats ne
+  // descendent jamais quand le chômage fait baisser les offres, alors que le modèle de base ne retrouve l'emploi qu'en
+  // baissant les salaires, d'environ 40 % par an) ; renouvellement annuel 15 % ; trimestriel 12 %. Trimestriel : choix
+  // de jeu, plus fréquent que les révisions annuelles usuelles, pour suivre la déflation du modèle. Une concession des
+  // entreprises en pertes (5 % par mois au plus) a été essayée et ne changeait rien (rapports/emplois-negociation.md).
+  int reviewDays = 90;
+  double reviewCutMax = 1;
+  double seniorityStep = 0.015;
+  double seniorityCap = 0.15;
+  // Une promotion rapporte au moins cette hausse.
+  double promotionRaise = 0.05;
+
   // ---- Bâtiments et hypothèques (module « buildings »). Le temps du jeu est le temps réel : taux annuels / 365, durées en jours.
   // Un logement = N modules de construction. Le module coûte 1 800 à 3 000 $ selon l'activité du constructeur (un seul
   // employé, mal occupé, renchérit le module), donc un logement 18 000 à 30 000 $, soit 5 à 8 ans du loyer actuel du modèle
@@ -437,6 +730,11 @@ class Modules {
   // crédit (hypothèque de la Caisse), qu'on revend et qui s'usent. Coupé par défaut : le parc suit alors la capacité fixée
   // au départ (comportement historique).
   bool buildings = false;
+  // Rôles, contrats individuels et négociation salariale : chaque employé a un rôle de l'organigramme de son entreprise,
+  // un salaire négocié à l'embauche (salaire de réserve contre plafond de l'employeur), révisé à chaque anniversaire et
+  // relevé par une contre-offre quand un concurrent veut le débaucher ; promotions internes. Coupé par défaut : un seul
+  // salaire par entreprise (comportement historique). L'interface lance ses parties avec le module actif.
+  bool jobs = false;
 
   Modules();
 
@@ -462,7 +760,7 @@ class Modules {
 
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
-    'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation', 'bankruptcy', 'buildings',
+    'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation', 'bankruptcy', 'buildings', 'jobs',
   ];
   static const Map<String, String> labels = {
     'credit': 'Crédit bancaire (Caisse)',
@@ -481,6 +779,7 @@ class Modules {
     'bankRegulation': 'Caisse : règles prudentielles',
     'bankruptcy': 'Faillite ordonnée',
     'buildings': 'Bâtiments, construction et hypothèques',
+    'jobs': 'Rôles, contrats et négociation salariale',
   };
 
   bool get(String k) {
@@ -517,6 +816,8 @@ class Modules {
         return bankruptcy;
       case 'buildings':
         return buildings;
+      case 'jobs':
+        return jobs;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -555,6 +856,8 @@ class Modules {
         bankruptcy = v;
       case 'buildings':
         buildings = v;
+      case 'jobs':
+        jobs = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -873,6 +1176,11 @@ class Citizen extends Account {
   int? schoolSince; // jour d'inscription dans la file de l'école publique
   int? homeId; // bâtiment dont il est propriétaire-occupant (module buildings) ; null : locataire
   bool wantsToOwn = false; // trait : veut devenir propriétaire (module buildings)
+  // emploi (ancienneté tenue dans tous les cas ; rôle, contrat et aplomb ne servent qu'avec le module jobs)
+  int hiredDay = 0; // jour d'embauche chez l'employeur actuel (négatif : avant le début de la partie)
+  int role = -1; // rang du rôle dans roles[type de l'employeur] ; -1 : aucun
+  double wage = 0; // salaire du contrat (brut, par jour) ; après une fin d'emploi, celui du dernier contrat
+  double aplomb = 0.5; // trait : aplomb en négociation, de 0 à 1
   Citizen(this.id, this.name, super.money, this.skill, this.ambition);
 
   /// 0 manœuvre, 1 technicien, 2 professionnel.
@@ -992,15 +1300,73 @@ class Firm extends Account {
   String lastLoss = ''; // raison de la dernière fin d'emploi (mesure des causes de fermeture)
   double carry = 0; // bâtiments : coût quotidien du parc (intérêts hypothécaires + provision d'usure), pour le loyer
   double reinvest = 0; // bâtiments : produit de ventes de logements à garder pour reconstruire (exclu des dividendes)
+  // Module jobs : salaire affiché pour la qualification du gabarit (les rôles s'en déduisent, voir roleRel) ; [wage]
+  // est alors le salaire moyen des contrats de l'équipe (sans employé : l'offre du prochain poste), le coût d'un
+  // employé dans toutes les règles qui comptent en jours de salaires.
+  double offer;
+  final List<Talk> talks = []; // dernières négociations (affichage)
   final List<FirmPoint> hist = [];
 
   Firm(this.id, this.type, this.name, this.inputs, this.outputs, this.rate, this.capacity, double money, this.ownerId,
       this.wage, this.x, this.y)
-      : super(money);
+      : offer = wage,
+        super(money);
 
   /// Premier extrant : celui qui pilote la demande.
   String get g0 => outputs.keys.first;
   Template get template => templates[type]!;
+}
+
+/// Une négociation salariale (module jobs), gardée pour l'affichage.
+class Talk {
+  final int day;
+  final int citizen;
+  final String name;
+  final int role;
+  final String kind; // embauche | refus | contre_offre | depart | promotion | revision | baisse
+  final double wage; // salaire convenu (ou dernier salaire demandé, pour un refus)
+  final double reservation; // salaire de réserve du candidat
+  final double offer; // salaire offert pour le rôle
+  final double cap; // plafond de l'employeur
+  const Talk(this.day, this.citizen, this.name, this.role, this.kind, this.wage, this.reservation, this.offer, this.cap);
+}
+
+/// Compteurs du marché du travail (module jobs), depuis le début et pour le jour.
+class LabourStats {
+  static const List<String> kinds = [
+    'embauche', 'refus', 'contre_offre', 'depart', 'promotion', 'revision', 'baisse',
+  ];
+  static const Map<String, String> labels = {
+    'embauche': 'Embauches négociées',
+    'refus': 'Offres refusées',
+    'contre_offre': 'Contre-offres (employé retenu)',
+    'depart': 'Départs vers un concurrent',
+    'promotion': 'Promotions internes',
+    'revision': 'Renouvellements à la hausse',
+    'baisse': 'Renouvellements à la baisse',
+  };
+  final Map<String, int> total = {for (final k in kinds) k: 0};
+  final Map<String, int> today = {for (final k in kinds) k: 0};
+  double premium = 0; // somme des écarts (salaire convenu ÷ offre − 1) des embauches, pour la moyenne
+
+  void add(String kind) {
+    total[kind] = total[kind]! + 1;
+    today[kind] = today[kind]! + 1;
+  }
+
+  void newDay() {
+    for (final k in kinds) {
+      today[k] = 0;
+    }
+  }
+
+  void clear() {
+    newDay();
+    for (final k in kinds) {
+      total[k] = 0;
+    }
+    premium = 0;
+  }
 }
 
 class HistPoint {

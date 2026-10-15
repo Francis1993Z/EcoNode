@@ -267,6 +267,37 @@ void applyParam(Params p, String k, String v) {
       p.healthWearIfDeprived = b();
     case 'partTime': // variante de test A2 (tâche 4)
       p.partTime = b();
+    // module jobs : rôles, contrats et négociation salariale
+    case 'reservationDecay':
+      p.reservationDecay = double.parse(v);
+    case 'reservationFloor':
+      p.reservationFloor = double.parse(v);
+    case 'switchPremium':
+      p.switchPremium = double.parse(v);
+    case 'bargainBase':
+      p.bargainBase = double.parse(v);
+    case 'bargainTrait':
+      p.bargainTrait = double.parse(v);
+    case 'bargainTight':
+      p.bargainTight = double.parse(v);
+    case 'hireRange':
+      p.hireRange = double.parse(v);
+    case 'hireFlexBase':
+      p.hireFlexBase = double.parse(v);
+    case 'hireFlexMax':
+      p.hireFlexMax = double.parse(v);
+    case 'maxInterviews':
+      p.maxInterviews = int.parse(v);
+    case 'reviewDays':
+      p.reviewDays = int.parse(v);
+    case 'reviewCutMax':
+      p.reviewCutMax = double.parse(v);
+    case 'seniorityStep':
+      p.seniorityStep = double.parse(v);
+    case 'seniorityCap':
+      p.seniorityCap = double.parse(v);
+    case 'promotionRaise':
+      p.promotionRaise = double.parse(v);
     default:
       throw ArgumentError('Paramètre inconnu : $k');
   }

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../engine/model.dart';
 import '../engine/monitor.dart';
+import '../engine/sim.dart';
 import 'charts.dart';
 import 'controller.dart';
 import 'format.dart';
@@ -101,8 +102,12 @@ class _FirmView extends StatelessWidget {
         KV('Caisse', money0(f.money)),
         KV('Profit moyen / jour', '${profit >= 0 ? '+' : ''}${money0(profit)}', color: profit >= 0 ? pal.ok : pal.bad),
         KV('Employés', '${f.workers.length}  (postes ouverts : ${f.vacancies})'),
-        KV('Qualification exigée', classLabels[tpl.skill]),
-        KV('Salaire', money0(f.wage)),
+        KV(sim.modules.jobs ? 'Qualification du gabarit' : 'Qualification exigée', classLabels[tpl.skill]),
+        if (sim.modules.jobs) ...[
+          KV('Salaire moyen des contrats', money0(f.wage)),
+          KV('Salaire affiché (${classLabels[tpl.skill].toLowerCase()})', money0(f.offer)),
+        ] else
+          KV('Salaire', money0(f.wage)),
         KV('Productivité par employé', '${fmtNum(sim.perWorker(f), 2)} lots/j'),
         KV('Capacité', f.capacity == null ? 'illimitée' : '${fmtNum(f.capacity!, 0)} lots/j'),
         if (owner != null)
@@ -121,6 +126,9 @@ class _FirmView extends StatelessWidget {
               child: Text('⚠ Production limitée par manque d’intrants.', style: TextStyle(color: pal.warn, fontSize: 12))),
       ]),
       if (sim.publicService(f)) _publicSection(context, ctrl, f),
+      _StaffSection(ctrl, f),
+      if (sim.modules.jobs) _orgChart(context, ctrl, f),
+      if (sim.modules.jobs && f.talks.isNotEmpty) _talksSection(context, ctrl, f),
       Section('Capital et technologie', [
         KV('Machines', '${fmtNum(f.machines, 1)}  (×${fmtNum(sim.machineMult(f), 2)})'),
         KV('Technologie', 'niveau ${f.techLevel}  (×${fmtNum(sim.techMult(f), 2)})'),
@@ -150,7 +158,7 @@ class _FirmView extends StatelessWidget {
         Row(children: [
           Expanded(
               child: NumField(
-                  label: 'Salaire',
+                  label: sim.modules.jobs ? 'Salaire moyen (toute l’échelle)' : 'Salaire',
                   value: f.wage,
                   suffix: '\$',
                   decimals: 1,
@@ -337,6 +345,205 @@ class _FirmView extends StatelessWidget {
   }
 }
 
+// ------------------------------------------------------------------ employés, organigramme, négociations
+
+/// Ancienneté lisible : jours, puis mois, puis années.
+String tenureLabel(int days) {
+  if (days < 60) return '$days j';
+  if (days < 730) return '${(days / 30.44).floor()} mois';
+  return '${fmtNum(days / 365, 1)} ans';
+}
+
+/// Qualification exigée par un rôle : classe, seuil, et ancienneté pour les postes de promotion.
+String roleRequirement(Role r) {
+  final s = '${classLabels[r.level]} (${fmtNum(r.minSkill, 1)})';
+  return r.internal ? '$s · ${tenureLabel(r.minTenure)} d’ancienneté' : s;
+}
+
+/// Tous les employés d'une entreprise : rôle, qualification, salaire, ancienneté.
+class _StaffSection extends StatelessWidget {
+  final SimController ctrl;
+  final Firm f;
+  const _StaffSection(this.ctrl, this.f);
+
+  static const int _shown = 80;
+
+  @override
+  Widget build(BuildContext context) {
+    final pal = Pal.of(context);
+    final sim = ctrl.sim;
+    final jobs = sim.modules.jobs;
+    final rs = roles[f.type]!;
+    final team = [for (final id in f.workers) sim.citizen(id)].whereType<Citizen>().toList();
+    double pay(Citizen c) => jobs ? c.wage : f.wage;
+    double rel(Citizen c) => jobs && c.role >= 0 ? roleRel(f.type, c.role) : 0;
+    team.sort((a, b) {
+      final r = rel(b).compareTo(rel(a));
+      if (r != 0) return r;
+      final w = pay(b).compareTo(pay(a));
+      return w != 0 ? w : sim.tenure(b).compareTo(sim.tenure(a));
+    });
+    var bill = 0.0, lo = double.infinity, hi = 0.0, ten = 0.0;
+    for (final c in team) {
+      bill += pay(c);
+      lo = math.min(lo, pay(c));
+      hi = math.max(hi, pay(c));
+      ten += sim.tenure(c);
+    }
+    return Section('Employés (${team.length})', [
+      if (!jobs) ...[
+        Text(
+            'Salaire unique : tous les employés reçoivent le salaire de l’entreprise. Le module « rôles, contrats et '
+            'négociation » donne à chacun un rôle de l’organigramme et un salaire négocié.',
+            style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: Text(Modules.labels['jobs']!, style: const TextStyle(fontSize: 13)),
+          subtitle: const Text('Prend effet au prochain jour : chacun garde son salaire et reçoit un rôle.',
+              style: TextStyle(fontSize: 11)),
+          value: false,
+          onChanged: (v) {
+            sim.modules.jobs = v;
+            ctrl.touch();
+          },
+        ),
+      ],
+      if (team.isNotEmpty) ...[
+        KV('Masse salariale / jour', money0(bill)),
+        KV('Salaire le plus bas – le plus haut', '${money0(lo)} – ${money0(hi)}'),
+        KV('Ancienneté moyenne', tenureLabel((ten / team.length).round())),
+        const SizedBox(height: 6),
+        Row(children: [
+          Expanded(child: Text(jobs ? 'Nom · rôle · qualification' : 'Nom · qualification',
+              style: TextStyle(color: pal.ink3, fontSize: 10.5, fontWeight: FontWeight.w700))),
+          Text('salaire · ancienneté', style: TextStyle(color: pal.ink3, fontSize: 10.5, fontWeight: FontWeight.w700)),
+        ]),
+        Divider(height: 8, color: pal.rule2),
+      ] else
+        Text('Aucun employé.', style: TextStyle(color: pal.ink3, fontSize: 12)),
+      for (final c in team.take(_shown))
+        InkWell(
+          onTap: () => ctrl.select(Selection('citizen', c.id)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(c.name, style: TextStyle(color: pal.ink, fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(
+                      [
+                        if (jobs && c.role >= 0 && c.role < rs.length) rs[c.role].label,
+                        '${classLabels[c.level].toLowerCase()} ${fmtNum(c.skill, 2)}',
+                      ].join(' · '),
+                      style: TextStyle(color: pal.ink3, fontSize: 11)),
+                ]),
+              ),
+              const SizedBox(width: 8),
+              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Text(money0(pay(c)), style: mono(pal.ink, 12.5, weight: FontWeight.w600)),
+                Text(tenureLabel(sim.tenure(c)), style: mono(pal.ink3, 11)),
+              ]),
+            ]),
+          ),
+        ),
+      if (team.length > _shown)
+        Text('… et ${team.length - _shown} autres', style: TextStyle(color: pal.ink3, fontSize: 12)),
+    ]);
+  }
+}
+
+/// Organigramme : chaque rôle, sa qualification, ses effectifs (actuels et visés) et le salaire offert aujourd'hui.
+Widget _orgChart(BuildContext context, SimController ctrl, Firm f) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final rs = roles[f.type]!;
+  final counts = sim.roleCounts(f);
+  final target = List<int>.filled(rs.length, 0);
+  for (final r in seatOrder(f.type, f.workers.length + f.vacancies)) {
+    target[r]++;
+  }
+  final next = f.vacancies > 0 ? sim.nextRole(f) : -1;
+  return Section('Organigramme', [
+    Text(
+        'Le salaire offert pour un rôle est le salaire affiché de l’entreprise ajusté à la classe et aux '
+        'responsabilités du rôle. Les postes d’encadrement se pourvoient par promotion interne.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    const SizedBox(height: 6),
+    for (var i = 0; i < rs.length; i++)
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${rs[i].label}${i == next ? '  · poste ouvert' : ''}',
+                  style: TextStyle(color: i == next ? pal.accent : pal.ink, fontSize: 12.5, fontWeight: FontWeight.w600)),
+              Text(roleRequirement(rs[i]), style: TextStyle(color: pal.ink3, fontSize: 11)),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(money0(sim.roleOffer(f, i)), style: mono(pal.ink, 12.5, weight: FontWeight.w600)),
+            Text('${counts[i]} / ${target[i]}',
+                style: mono(counts[i] < target[i] ? pal.warn : pal.ink3, 11)),
+          ]),
+        ]),
+      ),
+  ]);
+}
+
+const Map<String, String> _talkVerbs = {
+  'embauche': 'embauche',
+  'refus': 'refuse',
+  'contre_offre': 'retenu par contre-offre',
+  'depart': 'part chez un concurrent',
+  'promotion': 'promotion',
+  'revision': 'renouvellement à la hausse',
+  'baisse': 'renouvellement à la baisse',
+};
+
+/// Dernières négociations : qui, quel rôle, le salaire convenu, le salaire de réserve et le plafond de l'employeur.
+Widget _talksSection(BuildContext context, SimController ctrl, Firm f) {
+  final pal = Pal.of(context);
+  final rs = roles[f.type]!;
+  return Section('Négociations récentes', [
+    for (final t in f.talks.reversed)
+      InkWell(
+        onTap: ctrl.sim.citizen(t.citizen) == null ? null : () => ctrl.select(Selection('citizen', t.citizen)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('j${t.day} · ${t.name} · ${_talkVerbs[t.kind]}${t.role >= 0 && t.role < rs.length ? ' · ${rs[t.role].label}' : ''}',
+                style: TextStyle(
+                    color: t.kind == 'refus' || t.kind == 'depart' || t.kind == 'baisse' ? pal.warn : pal.ink,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+            Text(_talkDetail(t), style: mono(pal.ink3, 11)),
+          ]),
+        ),
+      ),
+  ]);
+}
+
+String _talkDetail(Talk t) {
+  switch (t.kind) {
+    case 'refus':
+      return 'demande ${money0(t.reservation)} > plafond ${money0(t.cap)} (offre ${money0(t.offer)})';
+    case 'promotion':
+      return 'nouveau salaire ${money0(t.wage)} (offre du rôle ${money0(t.offer)})';
+    case 'revision':
+    case 'baisse':
+      return '${money0(t.reservation)} → ${money0(t.wage)} (offre du rôle ${money0(t.offer)}, ancienneté comprise)';
+    case 'contre_offre':
+      return 'offre concurrente ${money0(t.wage)} égalée (plafond ${money0(t.cap)}, avant ${money0(t.offer)})';
+    case 'depart':
+      return 'offre concurrente ${money0(t.wage)} > ce que l’employeur peut égaler ${money0(t.cap)} '
+          '(salaire ${money0(t.offer)})';
+    default:
+      return '${money0(t.wage)} (réserve ${money0(t.reservation)}, offre ${money0(t.offer)}, plafond ${money0(t.cap)})';
+  }
+}
+
 class _Lock extends StatelessWidget {
   final String label;
   final bool value;
@@ -473,6 +680,7 @@ class _HomesView extends StatelessWidget {
         KV('Gini', fmtNum(sim.gini(), 3)),
         KV('Panier de survie', '${money(sim.needCost)} / jour'),
       ]),
+      if (sim.modules.jobs) _labourSection(context, sim),
       if (last != null)
         Section('Qualifications et désirs', [
           for (var i = 0; i < 3; i++) KV(classLabels[i], '${last.classes[i]}'),
@@ -511,6 +719,49 @@ class _HomesView extends StatelessWidget {
   }
 }
 
+/// Marché du travail du module jobs : négociations du jour et depuis le début, salaires par classe.
+Widget _labourSection(BuildContext context, Sim sim) {
+  final pal = Pal.of(context);
+  final l = sim.labour;
+  final hires = l.total['embauche']!;
+  final byClass = [<double>[], <double>[], <double>[]];
+  final unemployed = [0, 0, 0];
+  for (final c in sim.citizens) {
+    if (c.employer == null) {
+      unemployed[c.level]++;
+    } else {
+      byClass[c.level].add(c.wage);
+    }
+  }
+  String median(List<double> v) {
+    if (v.isEmpty) return '—';
+    v.sort();
+    return money0(v[v.length ~/ 2]);
+  }
+
+  return Section('Marché du travail', [
+    Row(children: [
+      Expanded(child: Text('', style: TextStyle(color: pal.ink3, fontSize: 10.5))),
+      SizedBox(width: 70, child: Text('aujourd’hui', textAlign: TextAlign.right, style: TextStyle(color: pal.ink3, fontSize: 10.5))),
+      SizedBox(width: 70, child: Text('total', textAlign: TextAlign.right, style: TextStyle(color: pal.ink3, fontSize: 10.5))),
+    ]),
+    for (final k in LabourStats.kinds)
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(children: [
+          Expanded(child: Text(LabourStats.labels[k]!, style: TextStyle(color: pal.ink2, fontSize: 12.5))),
+          SizedBox(width: 70, child: Text('${l.today[k]}', textAlign: TextAlign.right, style: mono(pal.ink, 12.5))),
+          SizedBox(width: 70, child: Text('${l.total[k]}', textAlign: TextAlign.right, style: mono(pal.ink2, 12.5))),
+        ]),
+      ),
+    const SizedBox(height: 4),
+    KV('Écart moyen du salaire convenu sur l’offre', hires > 0 ? pct(l.premium / hires) : '—'),
+    const SizedBox(height: 4),
+    for (var i = 0; i < 3; i++)
+      KV('${classLabels[i]} : salaire médian · sans emploi', '${median(byClass[i])} · ${unemployed[i]}'),
+  ]);
+}
+
 class _CitizenView extends StatefulWidget {
   final SimController ctrl;
   final Citizen c;
@@ -528,6 +779,7 @@ class _CitizenViewState extends State<_CitizenView> {
     final c = widget.c;
     final sim = widget.ctrl.sim;
     final job = c.employer != null ? sim.firm(c.employer!) : null;
+    final role = sim.roleOf(c);
     final owned = sim.firms.where((f) => f.ownerId == c.id).toList();
     final aids = (sim.nets.byAgent['famine']?[c.name] ?? 0) + (sim.nets.byAgent['shelter']?[c.name] ?? 0);
     return ListView(padding: const EdgeInsets.all(12), children: [
@@ -550,8 +802,23 @@ class _CitizenViewState extends State<_CitizenView> {
             Expanded(child: Text('Employeur', style: TextStyle(color: pal.ink2, fontSize: 12.5))),
             TextButton(
                 onPressed: () => widget.ctrl.select(Selection('firm', job.id)),
-                child: Text('${job.name} · ${money0(job.wage)}')),
+                child: Text('${job.name} · ${money0(sim.modules.jobs ? c.wage : job.wage)}')),
           ]),
+        if (job != null && role != null) ...[
+          KV('Rôle', role.label),
+          KV('Qualification du rôle', roleRequirement(role)),
+          KV('Salaire du contrat', '${money0(c.wage)} / jour'),
+          KV('Offre actuelle pour ce rôle', money0(sim.roleOffer(job, c.role))),
+        ],
+        if (job != null) KV('Ancienneté', tenureLabel(sim.tenure(c))),
+        if (job != null && sim.modules.jobs && sim.params.reviewDays > 0)
+          KV('Prochaine révision salariale',
+              'dans ${sim.params.reviewDays - sim.tenure(c) % sim.params.reviewDays} j'),
+        if (sim.modules.jobs) ...[
+          KV(job == null ? 'Salaire de réserve' : 'Salaire pour changer d’emploi', money0(sim.reservationWage(c))),
+          if (job == null && c.wage > 0) KV('Dernier salaire', money0(c.wage)),
+          KV('Aplomb en négociation', pct(c.aplomb)),
+        ],
         for (final f in owned)
           Row(children: [
             Expanded(child: Text('Propriétaire de', style: TextStyle(color: pal.ink2, fontSize: 12.5))),

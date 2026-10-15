@@ -8,7 +8,8 @@ modèle a changé. C'est ce document qu'on donne à un nouveau lecteur, humain o
 Conventions :
 
 - **Renvois** : `fichier:fonction` (par exemple `sim.dart:_laborMarket`). Les fichiers sont dans `lib/engine/`.
-  `model.dart` contient les données et les paramètres, `sim.dart` le moteur, `monitor.dart` les détecteurs.
+  `model.dart` contient les données et les paramètres, `sim.dart` le moteur, `monitor.dart` les détecteurs ;
+  `buildings.dart` et `jobs.dart` sont les modules bâtiments et rôles (parties de `sim.dart`).
 - **Justification** : chaque règle en a une. La source est citée quand le code en donne une. Sinon, c'est écrit
   « choix de jeu » : une valeur raisonnable, ni calibrée ni tirée d'une source.
 - **Paramètres** : leur nom de code et leur valeur par défaut sont donnés entre parenthèses, par exemple
@@ -117,6 +118,10 @@ chantier forestier n'est pas créé : son plan de départ ne lui trouve aucune d
 - **Revenus :** `income` (du jour), `incomeEma` (lissé), `spend`, `happiness`.
 - **Chômage et assurance-emploi :** `daysUnemployed`, `lastWage`, `insuredDays`, `eiDaysLeft`, `eiBenefit`.
 - **Files des services publics :** `careSince`, `schoolSince`.
+- **Emploi :** `hiredDay`, le jour d'embauche chez l'employeur actuel (l'ancienneté, tenue dans tous les cas ; négatif
+  pour les employés du départ). Avec le module `jobs` (§ 6.16) : `role`, le rang du rôle dans l'organigramme de
+  l'employeur ; `wage`, le salaire du contrat (gardé après une fin d'emploi : base du salaire de réserve) ; `aplomb`,
+  de 0 à 1, un trait de négociation tiré à la naissance.
 
 ### Entreprise (`model.dart:Firm`)
 
@@ -133,6 +138,8 @@ chantier forestier n'est pas créé : son plan de départ ne lui trouve aucune d
 - **Dette :** `debt`, `workingDebt`, `missedPayments`, `creditBanUntil`.
 - **Cycle de vie :** `idleDays` (jours sans employé).
 - **Verrous du god mode :** `lockPrice`, `lockWage`.
+- **Salaires (module `jobs`, § 6.16) :** `offer`, le salaire affiché pour la qualification du gabarit ; `wage` est alors
+  le salaire moyen des contrats de l'équipe ; `talks`, les dernières négociations (affichage).
 
 ### État (`model.dart:StateAccount`)
 
@@ -162,6 +169,9 @@ ristournes, refus. Identité de bilan : réserves + prêts = dépôts + fonds pr
     éducation publique, entrée et sortie d'entreprises ;
   - institutions I1 à I5 : test de solvabilité, enveloppe des services publics, assurance-emploi, règles prudentielles,
     faillite ordonnée.
+- **Modules coupés par défaut :** bâtiments et hypothèques (`buildings`) ; rôles, contrats et négociation salariale
+  (`jobs`, § 6.16), que l'interface active pour ses parties (`ui/controller.dart`) mais que le protocole et les tests
+  laissent coupé sauf mention.
 - **Filets** (`model.dart:Safeguards`), actifs par défaut dans le jeu : anti-famine, renflouement, plancher de logement,
   plafond de dérive, anti-crédit-fou. Ce sont des instruments de diagnostic : chaque déclenchement est compté et
   journalisé.
@@ -173,19 +183,19 @@ ristournes, refus. Identité de bilan : réserves + prêts = dépôts + fonds pr
 
 | # | Étape | Fonction | Condition |
 |---|---|---|---|
-| 0 | Jour + 1 ; remise à zéro des compteurs du jour (ventes, production, recettes, coûts, flux, demande non servie) ; `incomeEma` ← 0,9 × `incomeEma` + 0,1 × revenu de la veille | `step` | toujours |
+| 0 | Jour + 1 ; remise à zéro des compteurs du jour (ventes, production, recettes, coûts, flux, demande non servie) ; `incomeEma` ← 0,9 × `incomeEma` + 0,1 × revenu de la veille ; module `jobs` activé ou coupé depuis la veille : contrats créés ou mis de côté | `step`, `_jobsSwitch` | toujours |
 | 0 bis | Revenu de base du god mode (création monétaire) | `step`, `_godIn` | `ubi` > 0 |
-| 1 | Marché du travail : embauches, mobilité, jours de chômage, prestations | `_laborMarket`, `_insurance` | toujours |
+| 1 | Marché du travail : embauches, mobilité, jours de chômage, prestations. Module `jobs` : salaire minimum, promotions, entrevues et négociation, contre-offres, renouvellements des contrats (§ 6.16) | `_laborMarket`, `_insurance`, `jobs.dart:_jobMarket` | toujours |
 | 2 | Enveloppes des établissements publics | `_publicBudget` | I2 |
 | 3 | Production | `_produce` | toujours |
-| 4 | Paie : salaires, impôt, cotisations ; mise à pied si la paie est impossible | `_payWages` | toujours |
+| 4 | Paie : salaires, impôt, cotisations ; mise à pied si la paie est impossible. Module `jobs` : le salaire de chaque contrat | `_payWages`, `_payContracts` | toujours |
 | 5 | Achats des entreprises (ordre `achats`) : intrants, puis services | `_buyInputs`, `_buyServices` | toujours |
 | 6 | Ménages (ordre `consommation`) : usure des désirs, manger, se loger, santé, ordinateur, études, loisirs, bonheur ; puis files des services publics | `_consume`, `_serveQueues` | files : I2 |
 | 7 | Filets anti-famine et plancher de logement | `_safetyNets` | filets actifs |
 | 8 | Exportations | `_export` | `trade` |
 | 9 | Péremption des biens périssables | `_expire` | toujours |
 | 10 | Capital (ordre `capital`) : usure, service de la dette, investissement ; ristourne de la Caisse | `_capital`, `_invest` | toujours |
-| 11 | Décisions des entreprises : prix, plan d'embauche, salaires, profits, dividendes ; flux lissés pour l'affichage | `_decide` | toujours |
+| 11 | Décisions des entreprises : prix, plan d'embauche, salaires (module `jobs` : le salaire affiché seulement), profits, dividendes ; flux lissés pour l'affichage | `_decide`, `jobs.dart:_adjustOffer` | toujours |
 | 12 | Renflouement (filet) ; redistribution du surplus de l'État | `_finance` | renflouement : filet actif |
 | 13 | `unmetEma` ← 0,9 × `unmetEma` + 0,1 × demande non servie du jour | `step` | toujours |
 | 14 | Sorties puis entrées d'entreprises | `_entryExit` | module entrée |
@@ -225,11 +235,11 @@ Les agents sont rangés selon `orderKey` = `hash32(clé du jour, identifiant)`, 
 Retirer un agent ne change pas l'ordre relatif des autres. Avant, un mélange de Fisher-Yates consommait un nombre
 variable de tirages et décalait toute la suite de la partie.
 
-### Les 18 flux
+### Les 19 flux
 
 | Code | Flux | Usage | Fonction |
 |---|---|---|---|
-| 1 | `traits` | traits d'un citoyen à sa naissance : qualification, argent, ambition, ordinateur, nom | `_newCitizen` |
+| 1 | `traits` | traits d'un citoyen à sa naissance : qualification, argent, ambition, ordinateur, nom, aplomb en négociation (sous-tirage 7) | `_newCitizen` |
 | 2 | `classes` | répartition des qualifications au départ | `reset` |
 | 3 | `recrutement` | ordre du premier recrutement | `reset` |
 | 4 | `proprietaire` | propriétaire d'une entreprise | `reset`, `addFirm` |
@@ -247,6 +257,7 @@ variable de tirages et décalait toute la suite de la partie.
 | 16 | `divin` | actions du god mode (épidémie) | `godEpidemic` |
 | 17 | `logement` | bâtiments : état à la naissance, déménagement, regard sur le marché (module `buildings`) | `buildings.dart` |
 | 18 | `vendeurs` | recherche limitée : vendeurs examinés par un achat de ménage (`sellerSample` > 0) | `_AllOffers.sampled` |
+| 19 | `anciennete` | ancienneté des employés du départ (0 à 4 ans ; l'encadrement, au moins celle qu'il exige) | `reset` |
 
 La création d'entreprise ne tire rien : le fondateur est le citoyen le plus riche.
 
@@ -283,7 +294,8 @@ graine ne compte plus. Il sert aux cas extrêmes (`test/extremes_test.dart`) et 
    - manœuvres : le reste.
 
    Les rangs sont attribués selon le flux `classes`. La marge de 10 à 15 % laisse des candidats aux postes qualifiés
-   (choix de jeu).
+   (choix de jeu). Avec le module `jobs`, le besoin d'une classe compte les postes de l'organigramme de chaque équipe
+   qui l'exigent (méthode D'Hondt, § 6.16), pas la qualification du gabarit.
 5. **Citoyens** (`sim.dart:_newCitizen`, flux `traits`, tirages t₁ à t₅) :
    - qualification = niveau + 0,9 t₁ ;
    - argent = `startWallet` × (0,6 + 0,8 t₂) × [1 ; 1,3 ; 1,8] selon le niveau ;
@@ -299,7 +311,9 @@ graine ne compte plus. Il sert aux cas extrêmes (`test/extremes_test.dart`) et 
      petite production est moins productive : c'est l'« échelle minimale ».
 7. **Premier recrutement.** Les postes les plus qualifiés sont pourvus d'abord, chacun par le candidat admissible le
    moins surqualifié (`_pickWorker`), dans l'ordre du flux `recrutement`. On garde ainsi les plus qualifiés pour les
-   postes qui les exigent.
+   postes qui les exigent. Avec le module `jobs`, ce sont les postes de l'organigramme de chaque équipe, les plus
+   exigeants d'abord, chacun à l'offre de son rôle. Ancienneté de départ (flux `anciennete`) : de 0 à 4 ans, et pour
+   un poste d'encadrement au moins l'ancienneté qu'il exige ; elle ne change aucun calcul sans le module.
 8. **Stocks et comptes de départ :**
    - parc de l'immobilier = ⌈1,06 × population / nombre d'entreprises du type⌉ nuitées par jour (choix de jeu : 6 % de
      logements libres) ;
@@ -382,6 +396,15 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `eiQualifyingDays` | 84 | I3 : jours d'emploi assurable pour être admissible | minimum de 420 heures = 12 semaines à 35 h |
 | `healthWearIfDeprived` | non | variante de test A1 (§ 6.15) | jamais active par défaut |
 | `partTime` | non | variante de test A2 (§ 6.15) | jamais active par défaut |
+| `reservationDecay`, `reservationFloor` | 0,01/j, 0 | module `jobs` : le salaire demandé par un chômeur baisse de 1 % de son dernier salaire par jour, jusqu'à la prestation | Krueger et Mueller 2016 (le salaire de réserve baisse avec la durée du chômage, beaucoup plus lentement) ; plancher à 0 mesuré (§ 6.16) |
+| `switchPremium` | 0,08 | `jobs` : hausse exigée pour changer d'emploi, plus 1 % par année d'ancienneté (au plus 10 %) | règle de mobilité sans le module (8 %) |
+| `bargainBase`, `bargainTrait`, `bargainTight` | 0,1, 0,3, 0,3 | `jobs` : pouvoir de négociation β = base + trait × aplomb + tension × θ/(1+θ), borné à [0,05 ; 0,7] | Pissarides 2000 (partage du surplus) ; valeurs : choix de jeu |
+| `hireRange` | 0,10 | `jobs` : fourchette salariale ± 10 % autour de l'offre du rôle | choix de jeu ; mesuré (§ 6.16) |
+| `hireFlexBase`, `hireFlexMax` | 0,05, 0,25 | `jobs` : souplesse du plafond de l'employeur, selon les postes vacants et la demande non servie | choix de jeu |
+| `maxInterviews` | 3 | `jobs` : candidats reçus par poste et par jour | choix de jeu |
+| `reviewDays`, `reviewCutMax` | 90 j, 1 | `jobs` : renouvellement du contrat tous les 90 jours depuis l'embauche ; baisse permise jusqu'au taux du marché | contrats échelonnés (Taylor 1980) ; 90 jours : choix de jeu mesuré (§ 6.16) ; `reviewCutMax` = 0 : rigidité à la baisse (Bewley 1999) |
+| `seniorityStep`, `seniorityCap` | 1,5 %/an, 15 % | `jobs` : majoration d'ancienneté au renouvellement | choix de jeu |
+| `promotionRaise` | 0,05 | `jobs` : hausse minimale d'une promotion | choix de jeu |
 
 Seuils des filets (`model.dart:Safeguards`) :
 
@@ -522,6 +545,10 @@ règle au § 6.
 - **Paie :**
   - salaire brut ; l'impôt (`taxRate`) et la cotisation d'assurance-emploi sont prélevés ;
   - si la caisse ne suffit pas, tous sont payés au prorata et le dernier embauché est mis à pied.
+
+Avec le module `jobs`, l'embauche, la mobilité, les salaires et la paie suivent le § 6.16 ; le plan d'embauche, les
+mises à pied et toutes les règles comptées en jours de salaires restent celles-ci, avec pour salaire le salaire moyen
+des contrats.
 
 ### 6.6 Ménages : consommation et désirs (`sim.dart:_consume`, `_choose`, `leisureBudget`, `_leisure`)
 
@@ -725,6 +752,71 @@ Choix de jeu : c'est le débouché de la filière informatique.
 Les résultats de ces variantes sont au journal (tâche 4). Les règles prudentielles fondées sur le salaire contractuel
 (embauche, réserve des dividendes, mise à pied sous 2 jours de salaires) ne sont pas modifiées par A2.
 
+### 6.16 Rôles, contrats et négociation salariale (module `jobs`, `jobs.dart`)
+
+Coupé par défaut dans le moteur (empreinte de parité identique au bit près quand il est coupé) ; l'interface l'active
+pour ses parties. Mesures et choix : [`rapports/emplois-negociation.md`](rapports/emplois-negociation.md).
+
+- **Organigrammes** (`model.dart:roles`). Chaque type d'entreprise a 3 à 5 rôles. Un rôle a une qualification minimale
+  (0 à 3 ; sa partie entière, plafonnée à 2, donne sa classe), une prime à l'intérieur de sa classe, une part visée de
+  l'effectif et, pour l'encadrement, une ancienneté minimale (6 mois ou 1 an) : ces postes ne se pourvoient que par
+  promotion interne (marché interne du travail, Doeringer et Piore 1971). Chaque type a un rôle d'entrée à la portée
+  de la qualification de son gabarit. Choix de jeu.
+- **Postes** (`model.dart:nextSeat`, `seatOrder`). Le k-ième poste d'une équipe va au rôle de plus forte moyenne
+  part ÷ (effectif + 1) (méthode D'Hondt) ; à égalité, le premier rôle de la liste.
+- **Salaire offert.** L'entreprise affiche un salaire pour la qualification de son gabarit (`offer`). L'offre d'un
+  rôle = `offer` × classWage[classe du rôle] ÷ classWage[classe du gabarit] × prime (`roleRel`), jamais sous le
+  salaire minimum : un technicien d'hôpital se paie comme un technicien. `offer` s'ajuste comme le salaire unique sans
+  le module (§ 6.5 : postes vacants, chômage, rappel vers la norme des salaires affichés de la même classe, bornes) ;
+  les contrats en cours n'en dépendent pas. Le salaire de l'entreprise (`wage`) devient la moyenne des contrats.
+- **Salaire de réserve** (`reservationWage`). En emploi : le salaire du contrat × (1 + `switchPremium` + 1 % par année
+  d'ancienneté, au plus 10 %). Sans emploi : le dernier salaire × max(`reservationFloor` ; 1 − `reservationDecay` ×
+  jours de chômage), et au moins de quoi toucher, après impôt et cotisation, 1,1 × la prestation du jour
+  (assurance-emploi, aide sociale ou forfait), et au moins le salaire minimum.
+- **Plafond de l'employeur** (`wageCap`). Offre × (1 + `hireRange`) × (1 + souplesse) × (1 + 0,05 × surqualification
+  du candidat, au plus 3), où souplesse = `hireFlexBase` + `hireFlexMax` × (0,6 × min(1 ; jours de postes vacants ÷
+  10) + 0,4 × min(1 ; part de demande non servie)) ; jamais plus que l'offre × valeur ajoutée par employé ÷ salaire
+  moyen (`valueAddedPerWorker` : production aux prix affichés moins intrants, sauf pour un établissement public),
+  jamais moins que le bas de la fourchette. Salaire verrouillé : l'offre, sans négociation.
+- **Négociation** (`bargain`). Plancher = max(offre × (1 − `hireRange`) ; salaire de réserve). Si le plancher dépasse
+  le plafond, le candidat refuse. Sinon, salaire = plancher + β × (plafond − plancher), β = `bargainBase` +
+  `bargainTrait` × aplomb + `bargainTight` × θ/(1 + θ), borné à [0,05 ; 0,7], où θ = postes ouverts de la classe du
+  rôle ÷ chômeurs admissibles (partage du surplus, Pissarides 2000).
+- **Marché du travail** (`_jobMarket`, étape 1) :
+  1. le salaire minimum relève les contrats qui sont dessous ;
+  2. tension θ par classe ;
+  3. rondes d'embauche : à chaque ronde, chaque entreprise qui a des postes ouverts pourvoit le prochain poste de son
+     organigramme, la mieux payante d'abord. Promotion interne d'abord (`_promote`, au plus 3 par jour) : l'employé
+     le plus ancien d'un rôle moins payé qui a la qualification et l'ancienneté voulues ; il obtient max(+`promotionRaise`
+     ; l'offre du rôle) et le poste qu'il libère se pourvoit à la ronde suivante. Sinon, entrevues (`_interview`) :
+     les chômeurs admissibles, le moins surqualifié d'abord, dans l'ordre du flux `embauche`, au plus `maxInterviews`.
+     Un rôle sans preneur est laissé pour la journée ; un rôle d'encadrement sans candidat interne aussi ;
+  4. mobilité : un employé qui regarde ailleurs (flux `depart`, chance `jobSwitch`) reçoit la meilleure offre négociée
+     d'un concurrent qui a un poste ouvert à sa portée (hors encadrement). Son employeur, s'il est rentable et a encore
+     besoin de lui, égale l'offre tant qu'elle reste sous son propre plafond (contre-offre, enchères successives de
+     Postel-Vinay et Robin 2002) ; sinon l'employé part ;
+  5. renouvellement tous les `reviewDays` jours depuis l'embauche (contrats échelonnés, Taylor 1980) : le salaire est
+     renégocié à l'offre du rôle × (1 + `seniorityStep` par année, au plus `seniorityCap`). Hausse gelée si
+     l'entreprise perd de l'argent ; baisse d'au plus `reviewCutMax` du salaire (1 : retour au taux du marché).
+- **Paie** (`_payContracts`, étape 4) : chacun reçoit le salaire de son contrat ; si la caisse ne suffit pas, tous sont
+  payés dans la même proportion et le dernier embauché est mis à pied.
+- **Mises à pied** : inchangées (dernier embauché, premier parti : l'ancienneté protège).
+- **Rendement** (`efficiency`) : la surqualification se mesure par rapport au rôle tenu.
+- **Création d'entreprise** (`_found`) : salaire affiché = la norme des salaires affichés de la classe ; coût d'un employé
+  = cette norme × le rapport moyen de l'organigramme (`avgRoleRel`). Plan de départ : même correction du coût du travail.
+- **Activation en cours de partie** (`_jobsSwitch`) : chacun garde son salaire et reçoit le rôle le plus exigeant à sa
+  portée parmi les postes de l'organigramme de son équipe (qualification et ancienneté comprises) ; le salaire affiché
+  est fixé pour que l'offre moyenne de l'organigramme égale le salaire actuel. Coupure : le salaire moyen devient le
+  salaire unique.
+- **Aucun argent n'est créé** : la paie reste le seul transfert du module ; les invariants tiennent au bit près.
+
+Justification des choix mesurés (10 graines × 1 000 jours, avec filets ; chômage médian 9,4 % sans le module) :
+avec l'offre pour plancher de la négociation au lieu du bas d'une fourchette, chaque embauche se concluait au-dessus
+de l'offre (24 %) ; sans renouvellement à la baisse, les contrats ne descendent jamais quand le chômage fait baisser
+les offres, alors que le modèle de base ne retrouve l'emploi qu'en baissant tous les salaires, d'environ 40 % par an
+(21 %) ; renouvellement annuel, 15 % ; trimestriel, 12 %. Résultat de décision (30 graines × 1 500 jours, avec
+filets) : chômage médian 10,2 % contre 7,0 % sans le module ; sans filets, 10,8 % contre 8,0 %.
+
 ---
 
 ## 7. Vérification
@@ -735,7 +827,10 @@ Les résultats de ces variantes sont au journal (tâche 4). Les règles prudenti
   - `protocole_test.dart` : statistiques du protocole ;
   - `instantane_test.dart` : reprise exacte depuis un instantané ;
   - `proprietes_test.dart` : propriétés sur des parties tirées au hasard ;
-  - `extremes_test.dart` : cas extrêmes au résultat connu d'avance.
+  - `extremes_test.dart` : cas extrêmes au résultat connu d'avance ;
+  - `batiments_test.dart` : module bâtiments et hypothèques ;
+  - `emplois_test.dart` : module rôles et négociation (organigrammes, contrats cohérents chaque jour, bornes de la
+    négociation, renouvellements, salaire minimum, activation en cours de partie, instantanés).
 - **Protocole** (`tool/stabilite.dart`) : 30 graines × 1 500 jours, sans puis avec filets, chocs standard, comparaisons
   appariées avec intervalles bootstrap.
 - **Parité** (`tool/parite.dart`) : empreinte identique sur la VM et en JavaScript.

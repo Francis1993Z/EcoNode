@@ -153,7 +153,8 @@ void play(Case c, int days, Watch w) {
     }
     s.step();
 
-    // P2 : prix et salaire du jour dans ±priceMaxDaily / ±wageMaxDaily de la veille
+    // P2 : prix et salaire du jour dans ±priceMaxDaily / ±wageMaxDaily de la veille. Module jobs : le salaire affiché
+    // (le salaire de l'entreprise y est la moyenne des contrats, qui change à chaque embauche ; voir emplois_test.dart)
     for (final f in s.firms) {
       final old = prices[f.id];
       if (old != null) {
@@ -169,7 +170,7 @@ void play(Case c, int days, Watch w) {
       final ow = wages[f.id];
       if (ow != null) {
         w.wageChecks++;
-        final b = f.wage;
+        final b = s.modules.jobs ? f.offer : f.wage;
         final floor = b == (p.minWage > 1 ? p.minWage : 1.0);
         if (!floor && (b > ow * (1 + p.wageMaxDaily) * (1 + 1e-12) || b < ow * (1 - p.wageMaxDaily) * (1 - 1e-12))) {
           w.fail('jour $d, ${f.name}, salaire : $ow → $b');
@@ -177,7 +178,7 @@ void play(Case c, int days, Watch w) {
       }
     }
     prices = {for (final f in s.firms) f.id: Map.of(f.price)};
-    wages = {for (final f in s.firms) f.id: f.wage};
+    wages = {for (final f in s.firms) f.id: s.modules.jobs ? f.offer : f.wage};
 
     // P3 : postes pourvus ≤ population ; un citoyen a au plus un employeur, et les deux registres concordent
     final seen = <int, int>{};
