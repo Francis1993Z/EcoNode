@@ -19,10 +19,31 @@ class Mulberry32 {
   int _a;
   Mulberry32(int seed) : _a = seed & 0xFFFFFFFF;
 
-  static int _imul(int a, int b) {
+  /// Vrai en JavaScript, où 1 et 1.0 sont le même nombre (les entiers y sont des doubles de 53 bits).
+  static const bool _web = identical(1, 1.0);
+
+  /// Produit de deux entiers de 32 bits, modulo 2³². Sur la VM, les entiers font 64 bits et le produit de deux entiers de
+  /// 32 bits y est exact modulo 2⁶⁴ : un seul produit suffit. En JavaScript, il dépasserait 2⁵³ : on le fait par moitiés
+  /// de 16 bits. Les deux voies donnent le même résultat (test hash_test.dart).
+  static int _imul(int a, int b) => _web ? imulHalves(a, b) : (a * b) & 0xFFFFFFFF;
+
+  /// Le produit par moitiés de 16 bits (la voie JavaScript), public pour que les tests le comparent à l'autre.
+  static int imulHalves(int a, int b) {
     final ah = (a >>> 16) & 0xFFFF, al = a & 0xFFFF;
     final bh = (b >>> 16) & 0xFFFF, bl = b & 0xFFFF;
     return (al * bl + (((ah * bl + al * bh) & 0xFFFF) << 16)) & 0xFFFFFFFF;
+  }
+
+  /// Le produit exact modulo 2³² sur la VM (entiers de 64 bits).
+  static int imulWide(int a, int b) => (a * b) & 0xFFFFFFFF;
+
+  /// Le premier tirage d'un générateur de graine [seed] : `Mulberry32(seed).next()` sans créer d'objet.
+  static double first(int seed) {
+    final a = ((seed & 0xFFFFFFFF) + 0x6D2B79F5) & 0xFFFFFFFF;
+    var t = a;
+    t = _imul(t ^ (t >>> 15), 1 | t);
+    t = ((t + _imul(t ^ (t >>> 7), 61 | t)) & 0xFFFFFFFF) ^ t;
+    return ((t ^ (t >>> 14)) & 0xFFFFFFFF) / 4294967296.0;
   }
 
   double next() {
@@ -123,6 +144,7 @@ class _BestOffers {
   late final List<double> prices = [for (final f in sellers) f.price[good]!];
   List<double>? _pulls;
   final List<Firm> byPrice;
+  late final List<double> sortedPrices = [for (final f in byPrice) f.price[good]!]; // les prix ne changent pas ici
   final double imported; // prix d'importation, ou l'infini
   final double fallback; // plus bas prix affiché, sinon le prix mondial
   int _next = 0; // premier vendeur qui peut encore avoir une unité en stock
@@ -145,7 +167,7 @@ class _BestOffers {
     while (_next < byPrice.length && (byPrice[_next].inv[good] ?? 0) < 1 - eps) {
       _next++;
     }
-    final best = _next < byPrice.length ? byPrice[_next].price[good]! : double.infinity;
+    final best = _next < byPrice.length ? sortedPrices[_next] : double.infinity;
     return math.min(best, imported);
   }
 
@@ -200,12 +222,12 @@ class _AllOffers {
       }
     }
     for (final f in chosen) {
-      offers.add(_Offer(f, f.price[good]!, s.sansHasard ? 0.5 : Mulberry32(hash32(base, f.id)).next(), 1 / (1 + s.brandPull(f))));
+      offers.add(_Offer(f, f.price[good]!, s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, f.id)), 1 / (1 + s.brandPull(f))));
     }
     final p = s.params;
     if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
       offers.add(
-          _Offer(null, s.worldPrice[good]! * p.importMarkup, s.sansHasard ? 0.5 : Mulberry32(hash32(base, 0)).next(), 1));
+          _Offer(null, s.worldPrice[good]! * p.importMarkup, s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), 1));
     }
     keys = [for (final o in offers) o.p * (1 + 0.03 * o.r) * o.pull];
     used = List<bool>.filled(offers.length, false);
@@ -218,14 +240,14 @@ class _AllOffers {
       for (var i = 0; i < sellers.length; i++) {
         final f = sellers[i];
         if ((f.inv[good] ?? 0) > eps) {
-          offers.add(_Offer(f, prices[i], s.sansHasard ? 0.5 : Mulberry32(hash32(base, f.id)).next(), pulls[i]));
+          offers.add(_Offer(f, prices[i], s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, f.id)), pulls[i]));
         }
       }
     } else {
       for (final f in s.sellersOf(good)) {
         if (identical(f, buyer)) continue;
         if ((f.inv[good] ?? 0) > eps) {
-          offers.add(_Offer(f, f.price[good]!, s.sansHasard ? 0.5 : Mulberry32(hash32(base, f.id)).next(),
+          offers.add(_Offer(f, f.price[good]!, s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, f.id)),
               household ? 1 / (1 + s.brandPull(f)) : 1));
         }
       }
@@ -233,7 +255,7 @@ class _AllOffers {
     final p = s.params;
     if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
       offers.add(
-          _Offer(null, s.worldPrice[good]! * p.importMarkup, s.sansHasard ? 0.5 : Mulberry32(hash32(base, 0)).next(), 1));
+          _Offer(null, s.worldPrice[good]! * p.importMarkup, s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), 1));
     }
     keys = [for (final o in offers) o.p * (1 + 0.03 * o.r) * o.pull];
     used = List<bool>.filled(offers.length, false);
@@ -447,7 +469,7 @@ class Sim {
     if (sansHasard) return 0.5;
     var h = hash32(_dayKey(flux), id);
     if (sub != 0) h = hash32(h, sub);
-    return Mulberry32(h).next();
+    return Mulberry32.first(h);
   }
 
   /// Clé d'ordre du jour d'un agent dans un flux.
@@ -890,7 +912,9 @@ class Sim {
         l.add(f);
       }
     }
-    _rebuildAvail();
+    // la liste des vendeurs disponibles se refait à la demande (_availFor) ou chaque matin : à chaque fermeture, une
+    // reconstruction complète coûtait autant que le reste de la journée à très grande échelle
+    _availValid = false;
   }
 
   /// Diagnostic de performance (non sérialisé) : achats des ménages pendant la phase de consommation, et temps passé
@@ -959,7 +983,8 @@ class Sim {
   /// (et les places sont cohérentes). Retourne les écarts (vide si tout va bien).
   List<String> availMismatches() {
     final out = <String>[];
-    if (!_availValid) return out;
+    if (params.sellerSample <= 0) return out;
+    if (!_availValid) _rebuildAvail(); // refaite à la demande après un changement du parc : on la vérifie quand même
     for (final e in _sellers.entries) {
       final a = _avail[e.key];
       final want = <int>{for (final f in e.value) if (_sellable(f, e.key)) f.id};
@@ -1192,7 +1217,8 @@ class Sim {
   double _quoteAll(String good) {
     var best = double.infinity;
     for (final f in sellersOf(good)) {
-      if ((f.inv[good] ?? 0) >= 1 - eps && f.price[good]! < best) best = f.price[good]!;
+      final pr = f.price[good]!; // le prix d'abord : il écarte la plupart des vendeurs sans lire leur stock
+      if (pr < best && (f.inv[good] ?? 0) >= 1 - eps) best = pr;
     }
     if (params.trade && !goods[good]!.perish && goods[good]!.tradable) {
       best = math.min(best, worldPrice[good]! * params.importMarkup);
@@ -1419,7 +1445,10 @@ class Sim {
     for (final g in goods.keys) {
       unmetEma[g] = 0.9 * (unmetEma[g] ?? 0) + 0.1 * (unmet[g] ?? 0);
     }
-    if (modules.entry) _entryExit();
+    if (modules.entry) {
+      _entryExit();
+      _purgeFlows();
+    }
     _record();
     _netSummary();
     _checkInvariants();
@@ -1960,6 +1989,9 @@ class Sim {
   }
 
   void _buyInputs() {
+    // prix et stocks des vendeurs, relevés une fois par bien : pendant cette phase les prix ne changent pas et les stocks
+    // des vendeurs ne font que baisser (un acheteur ne vend pas ce qu'il achète), comme pendant la consommation
+    _quoteCache = {};
     for (final f in _ordered(firms, Flux.achats, (f) => f.id)) {
       if (f.inputs.isNotEmpty) {
         // on n'achète pas plus de matière que l'équipe peut transformer
@@ -1988,6 +2020,7 @@ class Sim {
       }
       _buyServices(f);
     }
+    _quoteCache = null;
   }
 
   /// Services aux entreprises : comptabilité, entretien, publicité, recherche et développement.
@@ -2067,6 +2100,7 @@ class Sim {
       }
     }
     adsBoost = 1 + p.adsEffect * totalBrand / (totalBrand + 0.3 * math.max(1, citizens.length));
+    _prepareLeisure();
     final floor = _stateFloor();
 
     for (final c in _ordered(citizens, Flux.consommation, (c) => c.id)) {
@@ -2118,12 +2152,12 @@ class Sim {
       final h = hype[g] ?? 0;
       final n = (counts?[g] ?? 0) / (dailyNorm[g] ?? 1);
       final appeal = u.taste[lvl] * pts * (1 + 0.4 * h / (h + 10)) / (1 + n * n);
-      final s0 = appeal / math.max(0.01, bestPrice(g));
+      final q = quote(g);
+      final s0 = appeal / math.max(0.01, q.isFinite ? q : bestPrice(g)); // bestPrice(g) = q quand q est fini
       if (s0 > topScore) {
         topScore = s0;
         top = g;
       }
-      final q = quote(g);
       if (!q.isFinite || q > budget) continue;
       final s = appeal / math.max(0.01, q);
       if (s > bestScore) {
@@ -2238,27 +2272,99 @@ class Sim {
 
   /// Dépenses discrétionnaires : le budget du jour, réparti entre divertissement et luxe selon la classe,
   /// puis dépensé bien par bien (le plus de satisfaction par dollar, lassitude comprise).
+  // ---- choix des loisirs (performance) : ce qui ne change pas pendant la consommation est calculé une fois par jour,
+  // et les achats du jour d'un citoyen sont comptés dans un petit tableau plutôt que dans une table par nom de bien.
+  static const List<String> _lzDesires = ['divertissement', 'luxe'];
+  static const List<String> _lzGoods = ['tele', 'loisirs', 'repas', 'hotel', 'voyage', 'bijoux']; // les 6 biens des deux listes
+  late final List<List<int>> _lzSlot = [
+    for (final d in _lzDesires) [for (final g in desireGoods[d]!) _lzGoods.indexOf(g)]
+  ]; // case du compteur de chaque bien de chaque liste (un bien présent dans les deux listes partage sa case)
+  late final List<double> _lzNorm = [for (final g in _lzGoods) dailyNorm[g] ?? 1];
+  List<List<List<double>>> _lzBase = const []; // [désir][niveau][bien] : attrait avant la lassitude (NaN : bien sans ce désir)
+  List<List<_BestOffers>> _lzOffers = const []; // [désir][bien]
+  final List<int> _lzCounts = List<int>.filled(6, 0);
+
+  /// Début de la consommation : l'attrait de base de chaque bien de loisir (selon le niveau du citoyen) ne dépend que de
+  /// la pression publicitaire du jour ; les meilleures offres de chaque bien sont relevées une fois.
+  void _prepareLeisure() {
+    final cache = _quoteCache!;
+    _lzBase = [
+      for (final d in _lzDesires)
+        [
+          for (var lvl = 0; lvl < 3; lvl++)
+            [
+              for (final g in desireGoods[d]!)
+                () {
+                  final u = uses[g]!;
+                  final pts = u.pts[d] ?? 0;
+                  if (pts <= 0) return double.nan;
+                  final h = hype[g] ?? 0;
+                  return u.taste[lvl] * pts * (1 + 0.4 * h / (h + 10));
+                }()
+            ]
+        ]
+    ];
+    _lzOffers = [
+      for (final d in _lzDesires) [for (final g in desireGoods[d]!) cache[g] ??= _BestOffers(this, g)]
+    ];
+  }
+
+  /// Le bien de la liste [di] (index) qui apporte le plus de satisfaction par dollar, comme `_choose` : même formules, mêmes
+  /// comparaisons, dans le même ordre ; rend -1 s'il n'y en a pas d'abordable.
+  int _chooseLeisure(Citizen c, int di, double budget, {bool signal = false}) {
+    final list = desireGoods[_lzDesires[di]]!;
+    final base = _lzBase[di][c.level];
+    final slot = _lzSlot[di];
+    final offers = _lzOffers[di];
+    var best = -1, top = -1;
+    var bestScore = 0.0, topScore = 0.0;
+    for (var j = 0; j < list.length; j++) {
+      final b = base[j];
+      if (b.isNaN) continue;
+      final n = _lzCounts[slot[j]] / _lzNorm[slot[j]];
+      final appeal = b / (1 + n * n);
+      final q = verifyFastPaths ? quote(list[j]) : offers[j].quote();
+      final s0 = appeal / math.max(0.01, q.isFinite ? q : bestPrice(list[j])); // bestPrice(g) = q quand q est fini
+      if (s0 > topScore) {
+        topScore = s0;
+        top = j;
+      }
+      if (!q.isFinite || q > budget) continue;
+      final s = appeal / math.max(0.01, q);
+      if (s > bestScore) {
+        bestScore = s;
+        best = j;
+      }
+    }
+    if (signal && top >= 0 && top != best && !quote(list[top]).isFinite) {
+      unmet[list[top]] = (unmet[list[top]] ?? 0) + 1;
+    }
+    return best;
+  }
+
   void _leisure(Citizen c) {
     final budget = math.min(leisureBudget(c), c.money);
     if (budget <= eps) return;
     final lvl = c.level;
     final wDiv = desireWeight['divertissement']![lvl] * (0.25 + math.max(0.0, 1 - c.sat['divertissement']!));
     final wLux = desireWeight['luxe']![lvl] * (0.25 + math.max(0.0, 1 - c.sat['luxe']!));
-    final counts = <String, int>{};
+    _lzCounts.fillRange(0, _lzCounts.length, 0);
     for (var di = 0; di < 2; di++) {
-      final d = const ['divertissement', 'luxe'][di];
+      final d = _lzDesires[di];
+      final list = desireGoods[d]!;
       var share = budget * (d == 'luxe' ? wLux : wDiv) / (wDiv + wLux);
       for (var k = 0; k < 60 && share > eps; k++) {
-        var g = _choose(c, desireGoods[d]!, d, share, counts, signal: k == 0);
-        if (g == null) {
+        var j = _chooseLeisure(c, di, share, signal: k == 0);
+        if (j < 0) {
           // rien d'abordable avec ce budget : on s'offre le favori de temps en temps (en moyenne, le budget)
-          g = _choose(c, desireGoods[d]!, d, double.infinity, counts);
-          if (g == null || draw(Flux.loisirs, c.id, di * 64 + k) >= share / quote(g)) break;
+          j = _chooseLeisure(c, di, double.infinity);
+          if (j < 0 || draw(Flux.loisirs, c.id, di * 64 + k) >= share / quote(list[j])) break;
         }
+        final g = list[j];
         final r = buy(c, 'M', g, 1, c.money, true);
         if (r.qty < 1) break;
         _enjoy(c, g);
-        counts[g] = (counts[g] ?? 0) + 1;
+        _lzCounts[_lzSlot[di][j]]++;
         share -= r.spent;
       }
     }
@@ -2785,6 +2891,16 @@ class Sim {
     return 'autre';
   }
 
+  /// Flux lissés à retirer : ceux des entreprises fermées pendant _entryExit. Une seule passe sur les flux, au lieu d'une
+  /// par fermeture (à très grande échelle, chaque fermeture parcourait tous les flux : le quart d'une journée).
+  final Set<String> _flowPurge = {};
+
+  void _purgeFlows() {
+    if (_flowPurge.isEmpty) return;
+    flowsEma.removeWhere((k, v) => _flowPurge.contains(v.from) || _flowPurge.contains(v.to));
+    _flowPurge.clear();
+  }
+
   void _close(Firm f) {
     final cause = closeCause(f);
     entryFunnel['fermeture_$cause'] = (entryFunnel['fermeture_$cause'] ?? 0) + 1;
@@ -2807,8 +2923,7 @@ class Sim {
     firms.remove(f);
     _fmap.remove(f.id);
     _rebuildSellers();
-    final key = f.id.toString();
-    flowsEma.removeWhere((k, v) => v.from == key || v.to == key);
+    _flowPurge.add(f.id.toString()); // ses flux lissés sont retirés en une passe à la fin de _entryExit (_purgeFlows)
     firmsClosed++;
     _log('info', '${f.name} ferme ses portes : aucun employé depuis ${params.exitIdleDays} jours'
         '${left > 0 ? ' (${fmtMoney0(left)} rendus à ${owner?.name ?? 'l’État'})' : ''}.');
