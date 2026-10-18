@@ -318,6 +318,7 @@ class _ModelTabState extends State<ModelTab> {
       _entrepreneurSection(context, ctrl, upd),
       _productsSection(context, ctrl, upd),
       _creditSection(context, ctrl, upd),
+      _banksSection(context, ctrl, upd),
       Section('Nouvelle partie', [
         Row(children: [
           Expanded(
@@ -639,5 +640,99 @@ Widget _creditSection(BuildContext context, SimController ctrl, void Function(vo
     KV('Citoyens en retard de paiement', '$late', color: late > 0 ? pal.warn : null),
     KV('Prêté aux citoyens · radié (total)', '${money0(sim.consumerLent)} · ${money0(sim.consumerWrittenOff)}'),
     KV('Faillites personnelles (total)', '${sim.consumerBankruptcies}', color: sim.consumerBankruptcies > 0 ? pal.warn : null),
+  ]);
+}
+
+
+/// Banques : réglages, liste (capital, ratio, prêts, dépôts, taux, profit, clients, état) et nombre de banques dans le temps.
+Widget _banksSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final p = sim.params;
+  String rate(double v) => '${fmtNum(v * 100, 1)} %';
+  return Section('Banques', [
+    Text(
+        'À partir de deux banques, chaque compte appartient à une banque. Elles visent le profit : intérêts reçus moins '
+        'intérêts des dépôts, pertes et coûts (employés, local). Les paiements entre banques se règlent en réserves ; '
+        'une banque à court emprunte aux autres au taux directeur. Les clients changent rarement de banque.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    ParamSlider(
+        label: 'Banques de départ (nouvelle partie)',
+        value: p.nBanks.toDouble(),
+        min: 1,
+        max: 8,
+        format: (v) => '${v.round()}',
+        hint: '1 : la Caisse populaire seule, sans concurrence. Pris en compte à la prochaine partie.',
+        onChanged: (v) => upd(() => p.nBanks = v.round())),
+    ParamSlider(
+        label: 'Dotation par citoyen (nouvelle partie)',
+        value: p.reservePerCitizen,
+        min: 0,
+        max: 200000,
+        format: money0,
+        hint: 'Réserves de chaque banque de départ, par citoyen ; contrepartie : capital d’un actionnaire institutionnel, '
+            'jamais distribué, dont les dividendes vont aux citoyens.',
+        onChanged: (v) => upd(() => p.reservePerCitizen = (v / 1000).round() * 1000.0)),
+    ParamSlider(
+        label: 'Taux directeur',
+        value: p.policyRate,
+        min: 0,
+        max: 0.12,
+        format: rate,
+        hint: 'Taux du marché interbancaire, et plafond des taux de dépôt.',
+        onChanged: (v) => upd(() => p.policyRate = (v * 400).round() / 400)),
+    ParamSlider(
+        label: 'Coût fixe : employés par banque',
+        value: p.bankStaff.toDouble(),
+        min: 0,
+        max: 20,
+        format: (v) => '${v.round()}',
+        hint: 'Chaque banque achète chaque jour le travail de ce nombre d’employés de services comptables (embauchés sur le '
+            'marché du travail par les cabinets).',
+        onChanged: (v) => upd(() => p.bankStaff = v.round())),
+    ParamSlider(
+        label: 'Coût fixe : loyer quotidien',
+        value: p.bankRentDaily,
+        min: 0,
+        max: 1000,
+        format: money0,
+        hint: 'Loyer du local, versé chaque jour à un bailleur.',
+        onChanged: (v) => upd(() => p.bankRentDaily = (v / 10).round() * 10.0)),
+    const SizedBox(height: 6),
+    if (sim.banks.isEmpty)
+      Text(sim.modules.banking ? 'La Caisse populaire seule (une banque).' : 'Module coupé.',
+          style: TextStyle(color: pal.ink3, fontSize: 12))
+    else ...[
+      for (final b in sim.banks)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(
+                  child: Text('${b.name}${b.ownerId != null ? ' (fondée par ${sim.citizen(b.ownerId!)?.name ?? 'un citoyen parti'})' : ''}',
+                      style: TextStyle(color: b.alive ? pal.ink : pal.ink3, fontSize: 12.5, fontWeight: FontWeight.w600))),
+              Text(b.alive ? b.state : 'fermée j${b.closed}',
+                  style: TextStyle(
+                      color: !b.alive ? pal.ink3 : (b.state == 'saine' ? pal.ok : pal.warn), fontSize: 11.5)),
+            ]),
+            if (b.alive) ...[
+              KV('Capital · ratio de capital',
+                  '${kmoney(b.equityNow)} · ${b.capitalRatio.isFinite ? pct(b.capitalRatio) : '—'}'),
+              KV('Prêts · dépôts · réserves', '${kmoney(b.loans)} · ${kmoney(b.deposits)} · ${kmoney(b.reserves)}'),
+              KV('Taux : dépôts · prêts · carte',
+                  '${rate(b.depositRate)} · ${rate(p.interestRate + b.loanSpread)} · ${rate(p.cardRate + b.cardSpread)}'),
+              KV('Profit lissé · clients', '${money0(b.profitEma)}/j · ${b.clients}',
+                  color: b.profitEma < 0 ? pal.warn : null),
+              if (b.interbank != 0)
+                KV(b.interbank > 0 ? 'Prêté aux autres banques' : 'Emprunté aux autres banques', kmoney(b.interbank.abs())),
+            ],
+          ]),
+        ),
+      if (sim.bankCountHist.length > 1)
+        ChartCard(
+            title: 'Nombre de banques',
+            minY: 0,
+            series: [Series('banques', pal.money, downsample([for (final n in sim.bankCountHist) n.toDouble()]))]),
+    ],
   ]);
 }

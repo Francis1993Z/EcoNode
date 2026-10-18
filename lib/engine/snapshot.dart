@@ -172,6 +172,15 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.bkDebtIncome != d.bkDebtIncome) 'bkDebtIncome': _d(p.bkDebtIncome),
     if (p.bkBanDays != d.bkBanDays) 'bkBanDays': p.bkBanDays,
     if (p.bankTightLoss != d.bankTightLoss) 'bankTightLoss': _d(p.bankTightLoss),
+    if (p.nBanks != d.nBanks) 'nBanks': p.nBanks,
+    if (p.reservePerCitizen != d.reservePerCitizen) 'reservePerCitizen': _d(p.reservePerCitizen),
+    if (p.policyRate != d.policyRate) 'policyRate': _d(p.policyRate),
+    if (p.reserveRatio != d.reserveRatio) 'reserveRatio': _d(p.reserveRatio),
+    if (p.bankStaff != d.bankStaff) 'bankStaff': p.bankStaff,
+    if (p.bankRentDaily != d.bankRentDaily) 'bankRentDaily': _d(p.bankRentDaily),
+    if (p.bankLookChance != d.bankLookChance) 'bankLookChance': _d(p.bankLookChance),
+    if (p.bankSwitchGain != d.bankSwitchGain) 'bankSwitchGain': _d(p.bankSwitchGain),
+    if (p.bankLossDays != d.bankLossDays) 'bankLossDays': p.bankLossDays,
   };
 }
 
@@ -300,7 +309,40 @@ Params _paramsFrom(Map j) => Params()
   ..bkArrearsDays = (j['bkArrearsDays'] as int?) ?? 90
   ..bkDebtIncome = _rdOr(j['bkDebtIncome'], 2.0)
   ..bkBanDays = (j['bkBanDays'] as int?) ?? 730
-  ..bankTightLoss = _rdOr(j['bankTightLoss'], 0.03);
+  ..bankTightLoss = _rdOr(j['bankTightLoss'], 0.03)
+  ..nBanks = (j['nBanks'] as int?) ?? 3
+  ..reservePerCitizen = _rdOr(j['reservePerCitizen'], 100000)
+  ..policyRate = _rdOr(j['policyRate'], 0.03)
+  ..reserveRatio = _rdOr(j['reserveRatio'], 0.02)
+  ..bankStaff = (j['bankStaff'] as int?) ?? 3
+  ..bankRentDaily = _rdOr(j['bankRentDaily'], 100)
+  ..bankLookChance = _rdOr(j['bankLookChance'], 0.005)
+  ..bankSwitchGain = _rdOr(j['bankSwitchGain'], 0.005)
+  ..bankLossDays = (j['bankLossDays'] as int?) ?? 365;
+
+List<Object?> _bankObjJson(Bank b) => [
+      b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
+      _d(b.depositRate), b.founded, b.alive, b.closed, b.state, b.lossDays, _d(b.profitEma), _d(b.lossEma),
+      _d(b.incomeEma), _d(b.costEma),
+    ];
+
+Bank _bankObjFrom(List l) => Bank(l[0] as int, l[1] as String)
+  ..ownerId = l[2] as int?
+  ..equity = _rd(l[3])
+  ..capital = _rd(l[4])
+  ..interbank = _rd(l[5])
+  ..loanSpread = _rd(l[6])
+  ..cardSpread = _rd(l[7])
+  ..depositRate = _rd(l[8])
+  ..founded = l[9] as int
+  ..alive = l[10] as bool
+  ..closed = l[11] as int?
+  ..state = l[12] as String
+  ..lossDays = l[13] as int
+  ..profitEma = _rd(l[14])
+  ..lossEma = _rd(l[15])
+  ..incomeEma = _rd(l[16])
+  ..costEma = _rd(l[17]);
 
 /// Crédit d'un citoyen (module banking) : écrit seulement s'il diffère de l'état initial.
 bool _hasCredit(Citizen c) =>
@@ -693,6 +735,8 @@ Map<String, Object?> _dayFlowsJson(DayFlows f) => {
       'imports': _d(f.imports),
       'capitalized': _d(f.capitalized),
       'writtenOff': _d(f.writtenOff),
+      if (f.bankIn != 0) 'bankIn': _d(f.bankIn),
+      if (f.bankOut != 0) 'bankOut': _d(f.bankOut),
     };
 
 void _dayFlowsLoad(DayFlows f, Map j) {
@@ -706,7 +750,9 @@ void _dayFlowsLoad(DayFlows f, Map j) {
     ..exports = _rd(j['exports'])
     ..imports = _rd(j['imports'])
     ..capitalized = _rd(j['capitalized'])
-    ..writtenOff = _rd(j['writtenOff']);
+    ..writtenOff = _rd(j['writtenOff'])
+    ..bankIn = _rdOr(j['bankIn'], 0)
+    ..bankOut = _rdOr(j['bankOut'], 0);
 }
 
 Map<String, Object?> _serviceJson(ServiceStats s) => {
@@ -868,6 +914,8 @@ extension SimSnapshot on Sim {
         if (products.isNotEmpty) 'products': [for (final p in products.values) _productJson(p)],
         if (poorEma.isNotEmpty) 'poorEma': _dm(poorEma),
         if (bankingActive) 'bankingActive': true,
+        if (banks.isNotEmpty) 'banks': [for (final b in banks) _bankObjJson(b)],
+        if (bankCountHist.isNotEmpty) 'bankCountHist': bankCountHist,
         if (consumerLent > 0 || consumerBankruptcies > 0)
           'consumerCredit': [
             _d(consumerLent), _d(consumerWrittenOff), consumerBankruptcies, _d(consumerLossEma), _d(consumerLossToday)
@@ -999,6 +1047,12 @@ extension SimSnapshot on Sim {
       ..addAll({for (final e in ((j['foundedByYear'] as Map?) ?? const {}).entries) int.parse(e.key as String): e.value as int});
     productsActive = (j['productsActive'] as bool?) ?? false;
     bankingActive = (j['bankingActive'] as bool?) ?? false;
+    banks
+      ..clear()
+      ..addAll([for (final l in (j['banks'] as List?) ?? const []) _bankObjFrom(l as List)]);
+    bankCountHist
+      ..clear()
+      ..addAll(_ril(j['bankCountHist'] ?? const []));
     final cc = (j['consumerCredit'] as List?) ?? const [0, 0, 0, 0, 0];
     consumerLent = _rd(cc[0]);
     consumerWrittenOff = _rd(cc[1]);

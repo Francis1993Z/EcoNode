@@ -615,6 +615,7 @@ class Sim {
   double _creditToday = 0;
   double _debtBase = 0;
   final List<double> tightToday = [];
+  final List<int> bankCountHist = []; // banques vivantes, chaque jour (module banking, plusieurs banques)
   int tightDay = -1;
   double householdSpend = 0;
   // positions des nodes spéciaux (ménages, État, Caisse, extérieur) ; l'interface les dispose
@@ -771,6 +772,7 @@ class Sim {
     _debtBase = 0;
     tightToday.clear();
     tightDay = -1;
+    bankCountHist.clear();
     householdSpend = 0;
     hype = {};
     adsBoost = 1;
@@ -938,6 +940,7 @@ class Sim {
     jobsActive = this.modules.jobs;
     if (this.modules.products) _productsSwitch(); // les entreprises du départ reçoivent leur variété
     bankingActive = this.modules.banking;
+    if (bankingActive) _bankingSwitch(atReset: true); // banques de départ et leur dotation (avant m0)
     if (this.modules.buildings) _seedBuildings();
     m0 = totalMoney();
     bank.reserves = m0; // toute la monnaie de départ est « extérieure »
@@ -1124,6 +1127,7 @@ class Sim {
     if (t(4) < const [0.2, 0.6, 0.7][c.level]) c.computerDays = (t(5) * params.computerLife).floor();
     c.wantsToOwn = modules.buildings && t(6) < params.ownerShare;
     c.aplomb = t(7);
+    if (banks.isNotEmpty) c.bankId = _pickBank(c.id); // module banking : sa banque
     citizens.add(c);
     _cmap[c.id] = c;
     return c;
@@ -1148,6 +1152,7 @@ class Sim {
     _fmap[f.id] = f;
     _rebuildSellers();
     if (productsActive) _launchProduct(f); // module products : sa variété et un nom généré
+    if (banks.isNotEmpty) f.bankId = _pickBank(f.id); // module banking : sa banque
     return f;
   }
 
@@ -1468,10 +1473,11 @@ class Sim {
   /// mesuré par rapport à la valeur de ses machines (garantie maximale : 80 %).
   double loanRate(Firm f, [double? machinePrice]) {
     final p = params;
-    if (f.debt <= 0) return p.interestRate;
+    if (f.debt <= 0) return banks.isEmpty ? p.interestRate : p.interestRate + bankLoanSpread(f.bankId);
     final pm = machinePrice ?? bestPrice('machines');
     final lev = pm > 0 ? (f.debt / (math.max(f.machines, 1.0) * pm)).clamp(0.0, 1.0) : 0.0;
-    return p.interestRate + p.riskSpread * lev;
+    final r = p.interestRate + p.riskSpread * lev;
+    return banks.isEmpty ? r : r + bankLoanSpread(f.bankId); // module banking : la marge de sa banque
   }
 
   /// Services de R-D à accumuler pour passer au niveau technologique suivant.
@@ -1751,7 +1757,7 @@ class Sim {
     // module jobs activé ou coupé depuis la veille (onglet Diagnostic) : contrats créés ou mis de côté
     if (modules.jobs != jobsActive) _jobsSwitch();
     if (modules.products != productsActive) _productsSwitch();
-    if (modules.banking != bankingActive) bankingActive = modules.banking;
+    if (modules.banking != bankingActive) _bankingSwitch();
 
     // 0. Revenu de base divin (création monétaire)
     if (p.ubi > 0) {
@@ -1786,6 +1792,7 @@ class Sim {
     }
     if (productsActive) _productsEndOfDay();
     if (bankingActive || consumerLent > 0) _creditEndOfDay();
+    if (banks.isNotEmpty) _banksDay();
     if (modules.entry) {
       _entryExit();
       _purgeFlows();
@@ -2863,6 +2870,7 @@ class Sim {
           final paid = transfer(f, bank, interest);
           bank.interest += paid;
           bank.equity += paid;
+          if (banks.isNotEmpty) _attrib(f.bankId, paid, income: paid); // module banking
           dayFlows.interest += paid;
           f.costs += paid;
           f.interestToday = paid;
@@ -2892,6 +2900,7 @@ class Sim {
           f.debt += interest; // intérêts impayés ajoutés à la dette
           bank.capitalized += interest;
           bank.equity += interest;
+          if (banks.isNotEmpty) _attrib(f.bankId, interest, income: interest); // module banking
           dayFlows.capitalized += interest;
           f.missedPayments++;
           if (trace != null) {
@@ -2909,7 +2918,10 @@ class Sim {
     }
     // la Caisse ristourne son surplus à ses membres (tous les citoyens), une fois ses fonds propres au-dessus
     // de la cible (part des prêts) et de son capital de départ
-    final surplus = math.min(bank.money, bank.equity - math.max(bank.capital, p.bankTargetRatio * totalDebt()));
+    // module banking, plusieurs banques : la ristourne de la Caisse devient le dividende de chaque banque (_banksDay)
+    final surplus = banks.isNotEmpty
+        ? 0.0
+        : math.min(bank.money, bank.equity - math.max(bank.capital, p.bankTargetRatio * totalDebt()));
     if (surplus > eps && citizens.isNotEmpty && p.bankRebate > 0) {
       final each = surplus * p.bankRebate / citizens.length;
       var total = 0.0;
@@ -2953,6 +2965,7 @@ class Sim {
     if (trace != null) _t('credit', 'radiation', f.name, f.id, 'radiation de créance', why, f.debt);
     bank.writtenOff += f.debt;
     bank.equity -= f.debt;
+    if (banks.isNotEmpty) _attrib(f.bankId, -f.debt, loss: f.debt); // module banking
     dayFlows.writtenOff += f.debt;
     f.debt = 0;
     f.missedPayments = 0;
@@ -3036,8 +3049,10 @@ class Sim {
           '${fmtMoney0(pay)}/j pour ${fmtMoney0(added)}/j de valeur ajoutée');
       return false;
     }
-    final loans = totalDebt() + need;
-    if (bank.equity < sg.minCapitalRatio * loans) {
+    // module banking, plusieurs banques : les fonds propres et les prêts de la banque de l'entreprise
+    final lender = banks.isEmpty ? null : banks[f.bankId < banks.length ? f.bankId : 0];
+    final loans = (lender == null ? totalDebt() : lender.riskLoans) + need;
+    if ((lender == null ? bank.equity : lender.equityNow) < sg.minCapitalRatio * loans) {
       _refuse(f, need, 'fonds propres de la Caisse insuffisants',
           '${fmtMoney0(bank.equity)} pour ${fmtMoney0(loans)} de prêts (minimum ${fmtPct(sg.minCapitalRatio)})');
       return false;

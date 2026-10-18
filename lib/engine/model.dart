@@ -778,6 +778,16 @@ class Params {
   double bkDebtIncome = 2.0; // … ou, sans emploi, dette au-delà de ce nombre d'années de revenu
   int bkBanDays = 730; // après une faillite : crédit fermé pendant ce nombre de jours, cote abaissée ensuite
   double bankTightLoss = 0.03; // pertes annualisées sur les prêts aux particuliers à partir desquelles la banque resserre
+  // Plusieurs banques (à partir de deux) : dotation, coûts, marché interbancaire, choix des clients, faillite.
+  int nBanks = 3; // banques de départ (1 : la Caisse seule, comme sans concurrence)
+  double reservePerCitizen = 100000; // dotation de chaque banque de départ, par citoyen : réserves, contrepartie fonds propres
+  double policyRate = 0.03; // taux directeur : taux annuel du marché interbancaire (plafond des taux de dépôt)
+  double reserveRatio = 0.02; // réserves minimales d'une banque, en part de ses dépôts
+  int bankStaff = 3; // employés réels d'une banque : elle achète chaque jour leur travail de services (comptabilité)
+  double bankRentDaily = 100; // local : loyer quotidien versé à un bailleur
+  double bankLookChance = 0.005; // chance quotidienne qu'un client compare sa banque à une autre
+  double bankSwitchGain = 0.005; // avantage annuel minimal pour changer de banque (coût de changer)
+  int bankLossDays = 365; // faillite : profit lissé négatif depuis ce nombre de jours (ou capital sous le minimum)
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
@@ -1203,12 +1213,16 @@ class TraceEvent {
 class DayFlows {
   double loans = 0, repaid = 0, interest = 0, rebates = 0, godPublic = 0, godBank = 0, exports = 0, imports = 0;
   double capitalized = 0, writtenOff = 0;
+  // module banking : argent du public versé aux fonds propres d'une banque (capital d'un fondateur), et argent des banques
+  // versé au public (intérêts des dépôts, coûts de fonctionnement)
+  double bankIn = 0, bankOut = 0;
   void reset() {
     loans = repaid = interest = rebates = godPublic = godBank = exports = imports = capitalized = writtenOff = 0;
+    bankIn = bankOut = 0;
   }
 
   /// Variation des dépôts expliquée par les flux.
-  double get explained => loans - repaid - interest + rebates + godPublic + exports - imports;
+  double get explained => loans - repaid - interest + rebates + godPublic + exports - imports + bankOut - bankIn;
 }
 
 /// Écarts des invariants comptables (exactement 0 si tout est cohérent).
@@ -1370,6 +1384,7 @@ class Bank {
   double profitEma = 0;
   double lossEma = 0; // radiations lissées (~100 jours), par jour
   double incomeToday = 0, lossToday = 0, costToday = 0;
+  double incomeEma = 0, costEma = 0; // intérêts reçus et coûts (intérêts des dépôts, fonctionnement), lissés, par jour
   // chiffres du jour, pour les règles et l'interface (non sérialisés : ils se recalculent)
   double equityNow = 0, deposits = 0, reserves = 0, firmLoans = 0, consumerLoans = 0, riskLoans = 0;
   int clients = 0;

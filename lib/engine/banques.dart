@@ -418,3 +418,351 @@ class BankStats {
   final double equity, loans, riskLoans, lossEma, capitalRatio;
   const BankStats(this.equity, this.loans, this.riskLoans, this.lossEma, this.capitalRatio);
 }
+
+// ==================================================================== phase B : plusieurs banques en concurrence
+//
+// Comptabilité : toute la monnaie passe par le compte consolidé du système bancaire (`Sim.bank`), comme avant ; les
+// invariants consolidés (masse, prêts, bilan, flux) restent donc exacts. Chaque banque en est une répartition : ses fonds
+// propres (la Caisse, banque 0, a le reste du bilan consolidé), ses prêts (les dettes de ses clients), ses dépôts (l'argent de
+// ses clients ; l'État est client de la Caisse) et sa position interbancaire. Ses réserves sont le solde de son bilan :
+// réserves = dépôts + fonds propres − prêts − prêté aux autres banques. Les paiements entre clients de banques différentes se
+// règlent ainsi en réserves à la fin de la journée (règlement net). Une banque sous ses réserves minimales emprunte aux autres
+// au taux directeur ; elle rembourse quand elle en a de trop.
+//
+// Dotation initiale : chaque banque de départ reçoit reservePerCitizen × population en réserves, en monnaie extérieure (comme
+// une injection du god mode à la Caisse : réserves et fonds propres augmentent ensemble). La contrepartie est son capital
+// propre, détenu par un actionnaire institutionnel : il n'est jamais distribué (capital plancher) ; les dividendes, prélevés
+// sur les profits au-delà de ce plancher, sont redistribués à parts égales aux citoyens (pour la Caisse, c'est sa ristourne).
+
+extension SimBanks on Sim {
+  int _pickBank(int id) {
+    final alive = [for (final b in banks) if (b.alive) b.id];
+    if (alive.isEmpty) return 0;
+    return alive[(draw(Flux.banques, id) * alive.length).floor().clamp(0, alive.length - 1)];
+  }
+
+  /// Activation du module : avec nBanks ≥ 2, les banques de départ, leur dotation et la répartition des clients.
+  void _bankingSwitch({bool atReset = false}) {
+    bankingActive = modules.banking;
+    final p = params;
+    if (!bankingActive || banks.isNotEmpty || p.nBanks < 2) return;
+    final dot = quantize(p.reservePerCitizen * math.max(1, citizens.length));
+    for (var i = 0; i < p.nBanks; i++) {
+      final b = Bank(i, i == 0 ? 'Caisse populaire' : 'Banque ${_brand(2000000 + i, 1)}');
+      usedNames.add(b.name);
+      // marges de départ un peu différentes d'une banque à l'autre (même règle pour toutes)
+      b.loanSpread = 0.005 + 0.01 * draw(Flux.banques, 900000 + i, 1);
+      b.cardSpread = 0.02 * draw(Flux.banques, 900000 + i, 2);
+      b.depositRate = 0.5 * p.policyRate * draw(Flux.banques, 900000 + i, 3);
+      b.founded = day;
+      if (i > 0) {
+        b.equity = dot;
+        b.capital = dot;
+      }
+      banks.add(b);
+    }
+    final a = transfer(null, bank, dot * p.nBanks);
+    bank.capital += dot; // la dotation de la Caisse n'est jamais ristournée
+    if (!atReset) {
+      // en cours de partie : monnaie extérieure, comme une injection du god mode à la Caisse
+      ledgerGod += a;
+      bank.reserves += a;
+      bank.equity += a;
+      dayFlows.godBank += a;
+    }
+    for (final c in citizens) {
+      c.bankId = _pickBank(c.id);
+    }
+    for (final f in firms) {
+      f.bankId = _pickBank(f.id);
+    }
+    var payroll = 0.0;
+    for (final f in firms) {
+      payroll += f.wage * f.workers.length;
+    }
+    _log('info', 'Banques : ${p.nBanks} banques de départ, dotation de ${fmtMoney0(dot)} chacune '
+        '(${fmtMoney0(p.reservePerCitizen)} par citoyen) ; la dotation totale vaut '
+        '${payroll > 0 ? fmtNum1(a / (365 * payroll)) : '—'} fois la masse salariale annuelle (${fmtMoney0(365 * payroll)}).');
+    _banksMeasure();
+  }
+
+  /// Chiffres du jour de chaque banque : dépôts, prêts, fonds propres, réserves, clients.
+  void _banksMeasure() {
+    for (final b in banks) {
+      b.deposits = 0;
+      b.firmLoans = 0;
+      b.consumerLoans = 0;
+      b.riskLoans = 0;
+      b.clients = 0;
+    }
+    Bank of(int id) => banks[id < banks.length ? id : 0];
+    for (final c in citizens) {
+      final b = of(c.bankId);
+      b.deposits += c.money;
+      b.clients++;
+      if (c.card > 0) {
+        b.consumerLoans += c.card;
+        b.riskLoans += c.card;
+      }
+      for (final l in c.loans) {
+        final lb = of(l.bankId);
+        lb.consumerLoans += l.balance;
+        lb.riskLoans += l.balance;
+      }
+    }
+    for (final f in firms) {
+      final b = of(f.bankId);
+      b.deposits += f.money;
+      b.clients++;
+      b.firmLoans += f.debt;
+      b.riskLoans += f.debt;
+    }
+    final b0 = banks[0];
+    b0.deposits += state.money; // l'État est client de la Caisse
+    if (mortgages.isNotEmpty) {
+      final m = mortgageDebt(); // hypothèques (module bâtiments) : la Caisse
+      b0.firmLoans += m;
+      b0.riskLoans += params.mortgageRiskWeight * m;
+    }
+    var others = 0.0;
+    for (final b in banks) {
+      if (b.id != 0) others += b.equity;
+    }
+    b0.equity = bank.equity - others;
+    for (final b in banks) {
+      b.equityNow = b.equity;
+      b.reserves = b.deposits + b.equityNow - b.loans - b.interbank;
+    }
+  }
+
+  /// La journée des banques : intérêts des dépôts, coûts, marché interbancaire, dividendes, taux, clients, faillites.
+  void _banksDay() {
+    final p = params;
+    _banksMeasure();
+    // 1. intérêts des dépôts (argent du système bancaire versé aux clients)
+    final rates = [for (final b in banks) b.alive ? b.depositRate / 365 : 0.0];
+    final paid = List<double>.filled(banks.length, 0);
+    void payDeposit(Account a, int bankId) {
+      final r = rates[bankId < rates.length ? bankId : 0];
+      if (r <= 0 || a.money <= 0) return;
+      final x = transfer(bank, a, math.min(a.money * r, bank.money));
+      if (x > 0) {
+        paid[bankId < paid.length ? bankId : 0] += x;
+        if (a is Citizen) a.income += x;
+      }
+    }
+
+    for (final c in citizens) {
+      payDeposit(c, c.bankId);
+    }
+    for (final f in firms) {
+      payDeposit(f, f.bankId);
+    }
+    // 2. coûts de fonctionnement : le travail de bankStaff employés (services comptables achetés au marché) et le loyer
+    final staffUnits = p.bankStaff * (templates['comptable']!.rate * templates['comptable']!.outputs['compta']!);
+    final landlord = sellersOf('logement').where((f) => f.workers.isNotEmpty).firstOrNull;
+    for (final b in banks) {
+      if (!b.alive) continue;
+      var cost = 0.0;
+      if (staffUnits > 0) cost += buy(bank, 'B', 'compta', staffUnits, bank.money, false).spent;
+      final rent = math.min(p.bankRentDaily, bank.money);
+      if (rent > 0) {
+        final x = transfer(bank, landlord ?? state, rent);
+        if (landlord != null) landlord.revenue += x;
+        cost += x;
+      }
+      b.costToday = cost + paid[b.id];
+    }
+    var out = 0.0;
+    for (final b in banks) {
+      out += b.costToday;
+      bank.equity -= b.costToday;
+      if (b.id != 0) b.equity -= b.costToday;
+    }
+    dayFlows.bankOut += out;
+    if (out > 0) _flow('B', 'M', '\$intérêts des dépôts et frais', 1, out);
+    _banksMeasure();
+    // 3. marché interbancaire : réserves minimales, emprunts au taux directeur, remboursements
+    for (final b in banks) {
+      if (!b.alive) continue;
+      final need = p.reserveRatio * b.deposits - b.reserves;
+      if (need > 0) {
+        final lenders = [for (final o in banks) if (o.alive && !identical(o, b)) o]
+          ..sort((x, y) => (y.reserves - p.reserveRatio * y.deposits).compareTo(x.reserves - p.reserveRatio * x.deposits));
+        var left = need;
+        for (final o in lenders) {
+          final room = o.reserves - p.reserveRatio * o.deposits;
+          if (room <= 0 || left <= 0) break;
+          final x = math.min(room, left);
+          o.interbank += x;
+          o.reserves -= x;
+          b.interbank -= x;
+          b.reserves += x;
+          left -= x;
+        }
+      } else if (b.interbank < 0) {
+        // rembourse ses emprunts avec ses réserves de trop ; les prêteurs sont remboursés au prorata
+        final x = math.min(-need, -b.interbank);
+        var lent = 0.0;
+        for (final o in banks) {
+          if (o.interbank > 0) lent += o.interbank;
+        }
+        if (x > 0 && lent > 0) {
+          for (final o in banks) {
+            if (o.interbank > 0) {
+              final y = x * o.interbank / lent;
+              o.interbank -= y;
+              o.reserves += y;
+            }
+          }
+          b.interbank += x;
+          b.reserves -= x;
+        }
+      }
+    }
+    // intérêts interbancaires : une répartition entre banques (le total est nul)
+    for (final b in banks) {
+      final i = b.interbank * p.policyRate / 365;
+      if (b.id != 0) b.equity += i;
+      b.incomeToday += i;
+    }
+    // 4. dividendes : au-delà du capital plancher et de la cible de fonds propres
+    _banksMeasure();
+    for (final b in banks) {
+      if (!b.alive || p.bankRebate <= 0) continue;
+      final surplus = math.min(bank.money, b.equityNow - math.max(b.capital, p.bankTargetRatio * b.riskLoans));
+      if (surplus <= eps || b.profitEma <= 0) continue;
+      final owner = b.ownerId != null ? _cmap[b.ownerId!] : null;
+      final total0 = surplus * p.bankRebate;
+      var total = 0.0;
+      if (owner != null) {
+        total = transfer(bank, owner, total0);
+        owner.income += total;
+      } else if (citizens.isNotEmpty) {
+        for (final c in citizens) {
+          final a = transfer(bank, c, total0 / citizens.length);
+          c.income += a;
+          total += a;
+        }
+      }
+      bank.rebates += total;
+      bank.equity -= total;
+      if (b.id != 0) b.equity -= total;
+      dayFlows.rebates += total;
+      if (total > 0) _flow('B', 'M', '\$dividendes des banques', 1, total);
+    }
+    // 5. profit, pertes, état ; taux revus tous les 30 jours ; clients ; faillites
+    for (final b in banks) {
+      if (!b.alive) continue;
+      final profit = b.incomeToday - b.costToday - b.lossToday;
+      b.profitEma = 0.98 * b.profitEma + 0.02 * profit;
+      b.incomeEma = 0.98 * b.incomeEma + 0.02 * b.incomeToday;
+      b.costEma = 0.98 * b.costEma + 0.02 * b.costToday;
+      b.lossEma = 0.99 * b.lossEma + 0.01 * b.lossToday;
+      b.incomeToday = b.lossToday = b.costToday = 0;
+      b.lossDays = b.profitEma < 0 ? b.lossDays + 1 : 0;
+    }
+    _banksMeasure();
+    for (final b in List<Bank>.of(banks)) {
+      if (!b.alive) continue;
+      final weak = b.capitalRatio < 2 * safeguards.minCapitalRatio || b.lossDays > 90;
+      if (weak && b.state == 'saine') {
+        b.state = 'en difficulté';
+        _log('warn', 'Banque en difficulté : ${b.name} (ratio de capital ${b.capitalRatio.isFinite ? fmtPct(b.capitalRatio) : '—'}, '
+            'profit lissé ${fmtMoney0(b.profitEma)}/j depuis ${b.lossDays} j).');
+      } else if (!weak && b.state != 'saine') {
+        b.state = 'saine';
+      }
+      if (day % 30 == 0) _adjustRates(b);
+      final failing = b.equityNow < 0 ||
+          (b.riskLoans > 0 && b.capitalRatio < safeguards.minCapitalRatio) ||
+          b.lossDays >= p.bankLossDays;
+      if (failing && b.id != 0) _resolveBank(b);
+    }
+    _switchBanks();
+    bankCountHist.add(banks.where((b) => b.alive).length);
+  }
+
+  /// Règle simple des taux : capital bas ou défauts en hausse → marges plus hautes ; réserves inactives → marges plus basses
+  /// et dépôts mieux payés pour gagner des clients ; des réserves sous le minimum → dépôts mieux payés.
+  void _adjustRates(Bank b) {
+    final p = params;
+    final lossRate = b.loans > 0 ? b.lossEma * 365 / b.loans : 0.0;
+    final stressed = b.capitalRatio < 2 * safeguards.minCapitalRatio || lossRate > p.bankTightLoss;
+    final idle = b.reserves > 0.5 * b.deposits;
+    if (stressed) {
+      b.loanSpread = math.min(0.10, b.loanSpread + 0.005);
+      b.cardSpread = math.min(0.15, b.cardSpread + 0.01);
+    } else if (idle) {
+      b.loanSpread = math.max(0.0, b.loanSpread - 0.0025);
+      b.cardSpread = math.max(0.0, b.cardSpread - 0.005);
+    }
+    if (b.reserves < p.reserveRatio * b.deposits || idle) {
+      b.depositRate = math.min(p.policyRate, b.depositRate + 0.0025);
+    } else if (stressed) {
+      b.depositRate = math.max(0.0, b.depositRate - 0.0025);
+    }
+  }
+
+  /// Valeur d'une banque pour un client : ce qu'elle paie sur les dépôts moins ce qu'elle prend en plus sur le crédit.
+  double bankAppeal(Bank b) => b.depositRate - 0.5 * b.loanSpread - 0.25 * b.cardSpread;
+
+  /// Information limitée et inertie : chaque jour, quelques clients sans dette comparent leur banque à une autre tirée au
+  /// hasard, et changent si elle vaut mieux d'au moins bankSwitchGain.
+  void _switchBanks() {
+    final p = params;
+    final alive = [for (final b in banks) if (b.alive) b];
+    if (alive.length < 2) return;
+    Bank? other(int id, Bank cur) {
+      final o = alive[(draw(Flux.banques, id, 5) * alive.length).floor().clamp(0, alive.length - 1)];
+      return identical(o, cur) ? null : o;
+    }
+
+    for (final c in citizens) {
+      if (draw(Flux.banques, c.id, 4) >= p.bankLookChance || c.card > 0 || c.loans.isNotEmpty) continue;
+      final cur = banks[c.bankId < banks.length ? c.bankId : 0];
+      final o = other(c.id, cur);
+      if (o != null && (!cur.alive || bankAppeal(o) - bankAppeal(cur) > p.bankSwitchGain)) c.bankId = o.id;
+    }
+    for (final f in firms) {
+      if (draw(Flux.banques, f.id, 4) >= p.bankLookChance || f.debt > 0) continue;
+      final cur = banks[f.bankId < banks.length ? f.bankId : 0];
+      final o = other(f.id, cur);
+      if (o != null && (!cur.alive || bankAppeal(o) - bankAppeal(cur) > p.bankSwitchGain)) f.bankId = o.id;
+    }
+  }
+
+  /// Résolution ordonnée d'une banque en faillite : ses comptes et ses prêts passent à la banque la plus solide, qui reprend
+  /// aussi ses fonds propres (négatifs : elle absorbe le trou) et sa position interbancaire ; les actionnaires perdent tout,
+  /// les déposants rien (leurs comptes ne bougent pas).
+  void _resolveBank(Bank b) {
+    Bank? acq;
+    for (final o in banks) {
+      if (!o.alive || identical(o, b)) continue;
+      if (acq == null || o.equityNow > acq.equityNow) acq = o;
+    }
+    if (acq == null) return;
+    for (final c in citizens) {
+      if (c.bankId == b.id) c.bankId = acq.id;
+      for (var k = 0; k < c.loans.length; k++) {
+        final l = c.loans[k];
+        if (l.bankId == b.id) c.loans[k] = PersonalLoan(acq.id, l.balance, l.rate, l.months, l.payment, l.start, l.reason);
+      }
+    }
+    for (final f in firms) {
+      if (f.bankId == b.id) f.bankId = acq.id;
+    }
+    if (acq.id != 0) acq.equity += b.equity;
+    acq.interbank += b.interbank;
+    final lost = b.equity;
+    b
+      ..equity = 0
+      ..interbank = 0
+      ..alive = false
+      ..closed = day
+      ..state = 'fermée';
+    _log('warn', 'Banque fermée : ${b.name} — reprise par ${acq.name} (fonds propres ${fmtMoney0(lost)} : les actionnaires '
+        'perdent leur mise, les déposants ne perdent rien).');
+    _banksMeasure();
+  }
+}
