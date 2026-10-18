@@ -1,8 +1,9 @@
 # Serveur de calcul : mise en service, parité et débit
 
-Branche `tests/serveur-calcul`, 17–18 octobre 2026, révision du moteur `e723f5c` (main). Serveur `econodes-calc`
-(SSH par Tailscale). Moteur non modifié ; ajouts : `tool/envoyer_serveur.sh`, `tool/lot_serveur.sh`,
-`tool/mesure_debit.sh`, `tool/parite_plateformes.sh`, `tool/parite_serveur.sh`, `tool/parite_comparer.dart`.
+Branches `tests/serveur-calcul` (fusionnée dans main) puis `tests/serveur-revisions` (un dossier par révision,
+§ 5.1), 17–18 octobre 2026, révision du moteur `e723f5c`. Serveur `econodes-calc` (SSH par Tailscale). Moteur non
+modifié ; ajouts : `tool/envoyer_serveur.sh`, `tool/lot_serveur.sh`, `tool/mesure_debit.sh`, `tool/etat_serveur.sh`,
+`tool/parite_plateformes.sh`, `tool/parite_serveur.sh`, `tool/parite_comparer.dart`.
 
 ## En bref
 
@@ -38,11 +39,11 @@ Branche `tests/serveur-calcul`, 17–18 octobre 2026, révision du moteur `e723f
 - **Aucun secret sur le serveur** : `~/.ssh` ne contient que `authorized_keys` (une clé), pas de `~/.aws`, pas de clé
   GitHub. Le code y va par `git archive` (fichiers suivis seulement, sans `.git`) ; les résultats reviennent par
   `ssh … tar` ou `scp`. Tailscale y était déjà installé et connecté (pas de jeton ajouté).
-- **Compilation** : `bash tool/compiler.sh`, 11 s, 5 exécutables natifs dans `~/econodes/build/outils/`, aucune erreur
-  de compilation (deux problèmes d'environnement réglés, § 6).
+- **Compilation** : `bash tool/compiler.sh`, 11 s, 5 exécutables natifs (6 depuis `tool/fusion_syntheses.dart`) dans
+  `build/outils/`, aucune erreur de compilation (deux problèmes d'environnement réglés, § 6).
 - **Envoi d'une nouvelle révision** : `bash tool/envoyer_serveur.sh` depuis le PC (archive en LF, configuration des
-  paquets, compilation, révision notée dans `~/econodes/.revision`). Testé deux fois (`e723f5c`, puis `772e874`) ; la
-  parité des exécutables recompilés a été revérifiée.
+  paquets, compilation). Chaque révision a son dossier, `~/econodes/<révision>/` (§ 5.1). Testé à `e723f5c`, `772e874`
+  et `19ae708` ; la parité des exécutables recompilés a été revérifiée à chaque fois.
 
 ## 2. Parité PC ↔ serveur
 
@@ -185,14 +186,58 @@ d'instance, une décision qui t'appartient.
 
 ## 5. Outillage
 
-- **`tool/lot_serveur.sh`** (sur le serveur) : `bash tool/lot_serveur.sh [-j 8] [--eteindre-a-la-fin] taches.txt`.
+### 5.1 Plusieurs branches sur le serveur : un dossier par révision
+
+Chaque LLM travaille sur sa branche, et deux branches peuvent avoir des moteurs différents. Au départ, le serveur
+n'avait qu'un emplacement, `~/econodes`, remplacé à chaque envoi. Un envoi depuis une branche changeait donc en silence
+le moteur que jouait le `stabilite.exe` suivant d'une autre branche. Depuis la branche `tests/serveur-revisions` :
+
+- **Un dossier par révision** : `tool/envoyer_serveur.sh` installe le dernier commit dans
+  `~/econodes/<12 premiers caractères de la révision>/`. Ce dossier contient le code, les exécutables, `.revision`
+  (empreinte complète), `.branche` et `.envoi` (date). Un envoi ne touche jamais aux autres révisions. Une révision
+  déjà installée n'est ni renvoyée ni recompilée (`--force` pour la réinstaller). L'installation se fait dans un
+  dossier provisoire, mis en place d'un coup quand la compilation a réussi. L'ancienne disposition (un seul
+  `~/econodes`) est rangée automatiquement dans le dossier de sa révision au premier envoi.
+- **On joue la révision du dossier d'où l'on lance** : `bash ~/econodes/<révision>/tool/lot_serveur.sh …` et
+  `mesure_debit.sh` jouent les exécutables de ce dossier (`lot_serveur.sh --revision R` en choisit une autre).
+  `tool/parite_serveur.sh` (PC) compare la révision HEAD du PC à son dossier sur le serveur, et refuse si elle n'y est
+  pas installée.
+- **Un lot ne change jamais de révision** : son dossier, `~/resultats/<date>-<tâches>-<révision>/`, garde la révision,
+  la branche et une copie figée de `partie.exe`. Reprendre ce lot avec une autre révision est refusé.
+- **Un seul lot à la fois** : `lot_serveur.sh` et `mesure_debit.sh` refusent de partir si des parties tournent déjà
+  (`--force` pour passer outre). Deux lots se partageraient les 8 vCPU, iraient chacun moins vite et fausseraient
+  leurs durées. Les parties sont reconnues par leur exécutable (`/proc/<pid>/exe`), car Dart renomme ses processus
+  (« dart:partie.exe ») et les coquilles qui les lancent ont le même chemin dans leur ligne de commande.
+- **Journal des lancements** : `~/resultats/JOURNAL`, une ligne par événement (date, événement, révision, branche,
+  détail) pour chaque envoi, parité (avec son verdict), début et fin de lot, mesure et suppression.
+- **`tool/etat_serveur.sh`** (PC) : révisions installées (branche, date d'envoi, taille, parties lancées depuis
+  chaque dossier, celle de HEAD marquée), parties et sessions tmux en cours, fin du journal. `--supprimer <révision>`
+  retire un dossier, sauf si une partie en utilise les exécutables. Les lots n'en dépendent pas, puisqu'ils gardent
+  leur copie. Une révision occupe 41 à 48 Mo.
+- **Testé** sur le serveur :
+  - rangement de l'ancienne disposition (`772e87459809`), installation de `19ae708722d0` à côté, second envoi sauté,
+    réinstallation par `--force` ;
+  - lot et mesure refusés pendant qu'une partie tourne, avec la liste des seules vraies parties ;
+  - lot forcé (`--force`) joué, son dossier portant la révision et la branche ; reprise par une autre révision
+    refusée ; `--revision` inconnue refusée ;
+  - suppression refusée pour une révision en cours d'usage, acceptée pour une révision inutilisée ;
+  - parité refaite en une commande sur le dossier de `19ae708722d0` (`main` à cette date) : **identique**.
+
+Ce travail a aussi corrigé un défaut de `parite_serveur.sh`. Il envoyait au serveur la copie de
+`parite_plateformes.sh` du PC, en CRLF dans tout dépôt extrait avec `core.autocrlf=true`, et bash la refusait sous
+Linux. La copie part maintenant sans retours chariot.
+
+### 5.2 Les scripts
+
+- **`tool/lot_serveur.sh`** (sur le serveur) :
+  `bash ~/econodes/<révision>/tool/lot_serveur.sh [-j 8] [--eteindre-a-la-fin] taches.txt`.
   - Une tâche par ligne : `graine niveau population jours [options de partie.exe]`. Le lot part dans une session tmux,
     qui survit à la fermeture du SSH.
   - Il joue N parties à la fois, 8 par défaut (le nombre de vCPU), et écrit un journal par partie dans
-    `~/resultats/<date>-<nom du fichier de tâches>/`. Chaque journal contient la commande, la sortie, le code de
-    sortie, la durée et la mémoire. Le lot écrit aussi `resume.csv` et `vmstat.log`.
-  - L'exécutable est copié dans le dossier du lot : un nouvel envoi du code ne change ni le lot en cours ni sa
-    reprise.
+    `~/resultats/<date>-<nom du fichier de tâches>-<révision>/`. Chaque journal contient la commande, la sortie, le
+    code de sortie, la durée et la mémoire. Le lot écrit aussi `resume.csv` et `vmstat.log`.
+  - L'exécutable est copié dans le dossier du lot : ni un nouvel envoi du code ni la suppression de la révision ne
+    changent le lot en cours ou sa reprise.
   - **Reprise** : relancer la même commande. Les parties finies (marque `.fini`) sont sautées ; une partie
     interrompue ou échouée est rejouée depuis le jour 1. Un verrou empêche deux lots de tourner sur le même dossier.
   - **`--eteindre-a-la-fin`** (désactivé par défaut) : `sudo shutdown -h +5` une fois toutes les parties jouées,
@@ -207,22 +252,24 @@ d'instance, une décision qui t'appartient.
     que la graine, la durée et la population, déjà données sur la ligne ; la colonne sert donc d'étiquette (nom des
     journaux). Les filets et les modules passent par les options (`--filets 0`, `--modules …`).
 - **`tool/mesure_debit.sh`** (sur le serveur) : les paliers du § 3, à refaire tels quels sur une autre instance.
-- **`tool/envoyer_serveur.sh`** (sur le PC) : envoie la révision HEAD et compile (§ 1).
+- **`tool/envoyer_serveur.sh`** (sur le PC) : installe la révision HEAD dans son dossier et la compile (§ 1, § 5.1).
 - **`tool/parite_serveur.sh`** (sur le PC) : la parité du § 2 en une commande, environ 3 minutes ; s'appuie sur
   `tool/parite_plateformes.sh` et `tool/parite_comparer.dart`.
+- **`tool/etat_serveur.sh`** (sur le PC) : ce qui est installé et ce qui tourne (§ 5.1).
 
-Exemple, le protocole de stabilité à 10 000 habitants par `lot_serveur.sh` :
+Exemple, le protocole de stabilité à 10 000 habitants par `lot_serveur.sh`, sur la révision `19ae708722d0` :
 
 ```bash
 for g in $(seq 1 30); do for f in 0 1; do echo "$g 1 10000 1500 --filets $f"; done; done > stabilite10k.txt
-bash ~/econodes/tool/lot_serveur.sh -j 8 --eteindre-a-la-fin stabilite10k.txt
+bash ~/econodes/19ae708722d0/tool/lot_serveur.sh -j 8 --eteindre-a-la-fin stabilite10k.txt
 ```
 
 Le même protocole, avec le rapport habituel (pas de reprise possible : une coupure fait tout recommencer ; retirer
-`; sudo shutdown -h +5` pour garder la machine allumée) :
+`; sudo shutdown -h +5` pour garder la machine allumée). Ce lancement direct ne passe ni par le refus « un seul lot à
+la fois » ni par le journal : regarder d'abord `tool/etat_serveur.sh`, et garder la révision dans le nom des fichiers.
 
 ```bash
-tmux new -d -s stab "cd ~/econodes && build/outils/stabilite.exe --population 10000 --graines 30 --days 1500 --phases base,nets --isolats 8 --save ~/resultats/stab10k.json --out ~/resultats/stab10k.md 2> ~/resultats/stab10k.log; sudo shutdown -h +5"
+tmux new -d -s stab "R=19ae708722d0; ~/econodes/\$R/build/outils/stabilite.exe --population 10000 --graines 30 --days 1500 --phases base,nets --isolats 8 --save ~/resultats/stab10k-\$R.json --out ~/resultats/stab10k-\$R.md 2> ~/resultats/stab10k-\$R.log; sudo shutdown -h +5"
 ```
 
 ## 6. Problèmes rencontrés
@@ -265,8 +312,8 @@ tmux new -d -s stab "cd ~/econodes && build/outils/stabilite.exe --population 10
 - **Premier lot proposé, à valider** : le protocole de stabilité à 10 000 habitants (60 parties), par
   `stabilite.exe --isolats 8` dans tmux, suivi de l'arrêt de la machine. Environ 7 h et 2,5 $. Un arrêt de l'instance
   pendant ces 7 h ferait tout perdre (§ 6, point 5) : si une limite de dépenses ou un arrêt programmé peut tomber
-  pendant la nuit, vérifier la marge avant de lancer. Avant chaque lot qui suit un changement du moteur :
-  `bash tool/envoyer_serveur.sh`, puis `bash tool/parite_serveur.sh` (3 min).
+  pendant la nuit, vérifier la marge avant de lancer. Avant chaque lot : `bash tool/etat_serveur.sh` (rien ne tourne ?),
+  puis, si le moteur a changé, `bash tool/envoyer_serveur.sh` et `bash tool/parite_serveur.sh` (3 min).
 - **Pistes** :
   - un outil de fusion des synthèses de `stabilite` (une graine par processus) : −13 % sur la durée du protocole et
     une reprise après coupure. Écrit depuis dans une autre session (`tool/fusion_syntheses.dart`, branche

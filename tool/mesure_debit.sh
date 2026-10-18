@@ -4,20 +4,26 @@
 # st : temps volé par l'hyperviseur) et empreinte SHA-256 de l'état complet au dernier jour (instantané), qui ne doit
 # pas dépendre de la charge.
 #
-#   bash tool/mesure_debit.sh [--paliers 1,2,4,6,8] [--population 10000] [--jours 100] [--sortie dossier]
-#                             [--graines 1|n] [-- options de partie.exe]
+#   bash ~/econodes/<révision>/tool/mesure_debit.sh [--paliers 1,2,4,6,8] [--population 10000] [--jours 100]
+#                             [--sortie dossier] [--graines 1|n] [--force] [-- options de partie.exe]
 #
 #   --graines n   (défaut) la partie k du palier joue la graine k ; --graines 1 : toutes jouent la graine 1
+#   --force       mesurer même si d'autres parties tournent (sans --force : refus, la mesure serait faussée)
 #
+# Joue la révision du dossier d'où le script est lancé (~/econodes/<révision>/, installé par tool/envoyer_serveur.sh).
 # Sortie : <sortie>/n<N>/ (journaux, vmstat.log), <sortie>/parties.tsv (une ligne par partie) et
-# <sortie>/paliers.tsv (une ligne par palier), aussi affichés.
+# <sortie>/paliers.tsv (une ligne par palier), aussi affichés. La mesure est notée dans ~/resultats/JOURNAL.
 set -euo pipefail
+racine=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
+exe=$racine/build/outils/partie.exe
+[[ -x $exe && -f $racine/.revision ]] || { echo "Aucune révision compilée dans $racine (tool/envoyer_serveur.sh)." >&2; exit 2; }
+rev=$(cat "$racine/.revision")
 paliers=1,2,4,6,8
 pop=10000
 jours=100
 graines=n
-sortie=~/resultats/debit-$(date +%F-%H%M)
-exe=~/econodes/build/outils/partie.exe
+force=0
+sortie=~/resultats/debit-$(date +%F-%H%M)-${rev:0:12}
 extra=()
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -26,13 +32,29 @@ while [[ $# -gt 0 ]]; do
     --jours) jours=$2; shift 2 ;;
     --sortie) sortie=$2; shift 2 ;;
     --graines) graines=$2; shift 2 ;;
+    --force) force=1; shift ;;
     --) shift; extra=("$@"); break ;;
     *) echo "Option inconnue : $1" >&2; exit 2 ;;
   esac
 done
-mkdir -p "$sortie"
+# parties en cours : processus dont l'exécutable est partie, stabilite ou perf (Dart renomme ses processus, et les
+# coquilles qui les lancent ont le même chemin dans leur ligne de commande)
+autres=$(for p in $(pgrep -f '(partie|stabilite|perf)\.exe'); do
+  if [[ $(readlink "/proc/$p/exe" 2> /dev/null) =~ /(partie|stabilite|perf)\.exe( \(deleted\))?$ ]]; then
+    echo "$p $(tr '\0' ' ' < "/proc/$p/cmdline" 2> /dev/null)"
+  fi
+done)
+if [[ -n $autres && $force == 0 ]]; then
+  echo "D'autres parties tournent déjà ; la mesure serait faussée :" >&2
+  echo "$autres" | cut -c1-160 | sed 's/^/  /' >&2
+  echo "Attendre, ou relancer avec --force." >&2
+  exit 1
+fi
+mkdir -p "$sortie" ~/resultats
+printf '%s\tmesure\t%s\t%s\t%s\n' "$(date -Is)" "${rev:0:12}" "$(cat "$racine/.branche" 2> /dev/null || echo inconnue)" \
+  "$sortie : paliers $paliers, $pop habitants, $jours jours" >> ~/resultats/JOURNAL
 {
-  echo "# $(date -Is) $(hostname), révision $(cat ~/econodes/.revision 2> /dev/null || echo ?)"
+  echo "# $(date -Is) $(hostname), révision $rev"
   echo "# $(lscpu | sed -n 's/^Model name: *//p'), $(nproc) vCPU, $(free -g | awk '/^Mem/ { print $2 }') Gio"
   echo "# population $pop, $jours jours, graines $graines, options : ${extra[*]:-aucune}"
 } | tee "$sortie/contexte.txt"
