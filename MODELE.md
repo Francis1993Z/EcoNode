@@ -9,7 +9,7 @@ Conventions :
 
 - **Renvois** : `fichier:fonction` (par exemple `sim.dart:_laborMarket`). Les fichiers sont dans `lib/engine/`.
   `model.dart` contient les données et les paramètres, `sim.dart` le moteur, `monitor.dart` les détecteurs ;
-  `buildings.dart` et `jobs.dart` sont les modules bâtiments et rôles (parties de `sim.dart`).
+  `buildings.dart`, `jobs.dart` et `entrepreneuriat.dart` sont les modules bâtiments, rôles et entrepreneuriat (parties de `sim.dart`).
 - **Justification** : chaque règle en a une. La source est citée quand le code en donne une. Sinon, c'est écrit
   « choix de jeu » : une valeur raisonnable, ni calibrée ni tirée d'une source.
 - **Paramètres** : leur nom de code et leur valeur par défaut sont donnés entre parenthèses, par exemple
@@ -258,6 +258,7 @@ variable de tirages et décalait toute la suite de la partie.
 | 17 | `logement` | bâtiments : état à la naissance, déménagement, regard sur le marché (module `buildings`) | `buildings.dart` |
 | 18 | `vendeurs` | recherche limitée : tirage des vendeurs examinés par un achat de ménage dans la liste des vendeurs avec stock (`sellerSample` > 0) | `_AllOffers.sampled` |
 | 19 | `anciennete` | ancienneté des employés du départ (0 à 4 ans ; l'encadrement, au moins celle qu'il exige) | `reset` |
+| 20 | `entrepreneuriat` | un citoyen examine-t-il aujourd'hui la possibilité de fonder (module `entrepreneurship`, § 6.17) | `entrepreneuriat.dart:_entrepreneurship` |
 
 La création d'entreprise ne tire rien : le fondateur est le citoyen le plus riche.
 
@@ -827,6 +828,27 @@ de l'offre (24 %) ; sans renouvellement à la baisse, les contrats ne descendent
 les offres, alors que le modèle de base ne retrouve l'emploi qu'en baissant tous les salaires, d'environ 40 % par an
 (21 %) ; renouvellement annuel, 15 % ; trimestriel, 12 %. Résultat de décision (30 graines × 1 500 jours, avec
 filets) : chômage médian 10,2 % contre 7,0 % sans le module ; sans filets, 10,8 % contre 8,0 %.
+
+### 6.17 Entrepreneuriat des citoyens (module `entrepreneurship`, `entrepreneuriat.dart`)
+
+Coupé par défaut (le moteur, le protocole et `reference.sh` ne changent pas ; l'interface le lance actif). Avec le module,
+`_entryExit` ne crée plus de « clone » mécanique (`_found`) : les fermetures restent celles de l'inactivité (I5 inchangée),
+la fondation devient une décision de citoyen. Il suppose le module `entry`.
+- **Candidat** : pas déjà propriétaire, veut posséder (trait `wantsToOwn` avec les bâtiments, sinon même tirage de part `ownerShare`),
+  ambition ≥ `entMinAmbition` (0,3), tolérance au risque ≥ `entMinTolerance` (0,25), épargne au-delà du coussin. La tolérance
+  = `entRiskMean` ± `entRiskSpread` × (2u − 1), u tiré à la naissance. Traits tirés dans `Flux.traits`, sous-indices 70 (risque)
+  et 71 (posséder), **au jour 0** : pure fonction de (graine, id), rien à sérialiser (`traitDraw`).
+- **Décision** : chaque jour, tirage `Flux.entrepreneuriat` sous `entConsiderRate × entFoundRate` (0,1 %/j × 1). Alors le
+  candidat évalue chaque secteur où la demande non servie (`unmetEma`) occuperait une équipe (même dimensionnement et même test
+  de viabilité que `_found`) et prend celui qui maximise : p·(salaire + profit net d'impôt) + (1 − p)·prestation − aversion·(1 − p)·mise/365 − revenu
+  actuel (salaire ou prestation), avec p = `entSurviveBase` + `entSurviveKnowledge` × connaissance du secteur, aversion = 2(1 − tolérance).
+  Connaissance = 1 − exp(−jours travaillés dans ce type / `entKnowledgeDays`) ; compteur `Citizen.sectorDays`, tenu avec le module.
+- **Capital** = `entCapitalMult` × (10 j de salaires + 5 j d'intrants). Le fondateur met son épargne au-delà du coussin (au moins
+  `entMinOwnShare` = 30 %) ; le reste est un prêt de la Caisse soumis aux règles I4 (paiements ≤ 35 % de la valeur ajoutée, fonds propres ≥ 11,5 %)
+  appliquées par `_loanRefusal` ; tout passe par `transfer()` et `_lend()`. Le fondateur quitte son emploi, est le **premier employé** (jamais débauché)
+  et le propriétaire (dividendes I1). À la fermeture : I5 inchangée, il perd sa mise, la Caisse radie le solde (pas de dette personnelle).
+- Valeurs : ordres de grandeur a priori, **non ajustées** sur le repère canadien (≈ 10 % d'entrées, 9 % de sorties par an). Limites : une seule
+  fondation par citoyen à la fois, au plus une par type et par `entryCooldown` ; la qualité du produit viendra avec le module Produits (compteur de secteur).
 
 ---
 
