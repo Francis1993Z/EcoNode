@@ -10,6 +10,7 @@
 
 import 'dart:typed_data';
 
+import 'package:econodes/engine/model.dart';
 import 'package:econodes/engine/sim.dart';
 
 String bits(double v) {
@@ -39,5 +40,19 @@ void main() {
       h = hash32(hash32(h, x.hungry), x.homeless);
       if (d % 100 == 0) print('graine $seed, jour $d : empreinte $h, total ${bits(x.total)}, indice ${bits(x.cpi)}');
     }
+  }
+  // recherche limitée des vendeurs (sellerSample = 5) : liste des vendeurs disponibles, 1 000 citoyens
+  final s = Sim(seed: 7, params: Params()
+    ..population = 1000
+    ..sellerSample = 5);
+  var h = 0;
+  for (var d = 1; d <= 100; d++) {
+    s.step();
+    final x = s.history.last;
+    for (final v in [x.total, x.unemp, x.cpi, x.gini, x.gdp]) {
+      h = fold(h, v);
+    }
+    h = hash32(hash32(h, x.hungry), x.homeless);
+    if (d % 50 == 0) print('vendeurs k = 5, jour $d : empreinte $h, indice ${bits(x.cpi)}');
   }
 }

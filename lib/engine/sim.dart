@@ -166,32 +166,40 @@ class _AllOffers {
   late final List<bool> used;
   List<int>? rest;
 
-  /// Recherche limitée (Params.sellerSample = k) : seuls k vendeurs tirés parmi ceux qui ont du stock, plus le vendeur
-  /// du dernier achat (habitude), sont examinés. Les tirages se font par place dans la liste des vendeurs (au plus 4k
-  /// essais) : le coût est en O(k), pas en nombre de vendeurs. Flux « vendeurs », sous-tirage (bien, n-ième achat,
-  /// essai). Les offres retenues gardent l'ordre des vendeurs, pour départager les égalités comme d'habitude.
+  /// Recherche limitée (Params.sellerSample = k) : seuls k vendeurs tirés dans la liste des vendeurs qui ont du stock
+  /// vendable (`Sim._avail`), plus le vendeur du dernier achat (habitude) s'il en a encore, sont examinés. Le coût est
+  /// en O(k), pas en nombre de vendeurs. Une liste vide veut dire qu'aucune offre n'existe : seulement alors l'achat
+  /// échoue pour cause de « pas d'offre ». Flux « vendeurs », sous-tirage (bien, n-ième achat, essai). Les offres gardent
+  /// l'ordre du tirage ; à égalité exacte de clé, la première tirée l'emporte (le hasard des clés rend l'égalité rare).
   _AllOffers.sampled(Sim s, Account buyer, String good, int base, int k, int who, int gi, int n) {
-    final sellers = s.sellersOf(good);
-    final index = s._sellerIndex[good] ?? const <int, int>{};
-    final chosen = <int>{};
-    bool open(int i) => !identical(sellers[i], buyer) && (sellers[i].inv[good] ?? 0) > eps;
-    final habit = s.lastSeller[who * 64 + gi];
-    final hi = habit == null ? null : index[habit];
-    if (hi != null && open(hi)) chosen.add(hi);
+    final a = s._availFor(good);
+    final list = a.list;
+    final chosen = <Firm>[]; // au plus k + 1 vendeurs : une recherche linéaire suffit pour écarter les doublons
+    final habit = Sim.sellerHabit ? s.lastSeller[who * 64 + gi] : null;
+    final hi = habit == null ? null : a.pos[habit];
+    if (hi != null && !identical(list[hi], buyer)) chosen.add(list[hi]);
     final want = chosen.length + k;
-    if (sellers.length <= want) {
-      for (var i = 0; i < sellers.length; i++) {
-        if (open(i)) chosen.add(i);
+    if (list.length <= want) {
+      for (final f in list) {
+        if (!identical(f, buyer) && !chosen.contains(f)) chosen.add(f);
       }
     } else {
       final sub0 = hash32(gi, n);
-      for (var a = 1; a <= 4 * k && chosen.length < want; a++) {
-        final i = (s.draw(Flux.vendeurs, who, hash32(sub0, a)) * sellers.length).floor();
-        if (open(i)) chosen.add(i);
+      for (var t = 1; t <= 4 * k && chosen.length < want; t++) {
+        final f = list[(s.draw(Flux.vendeurs, who, hash32(sub0, t)) * list.length).floor()];
+        if (!identical(f, buyer) && !chosen.contains(f)) chosen.add(f);
+      }
+      if (chosen.isEmpty) {
+        // le tirage n'a trouvé que l'acheteur lui-même (cas dégénéré) : le premier autre vendeur de la liste
+        for (final f in list) {
+          if (!identical(f, buyer)) {
+            chosen.add(f);
+            break;
+          }
+        }
       }
     }
-    for (final i in chosen.toList()..sort()) {
-      final f = sellers[i];
+    for (final f in chosen) {
       offers.add(_Offer(f, f.price[good]!, s.sansHasard ? 0.5 : Mulberry32(hash32(base, f.id)).next(), 1 / (1 + s.brandPull(f))));
     }
     final p = s.params;
@@ -249,6 +257,27 @@ class _AllOffers {
       });
     }
     return offers[rest![k - 4]];
+  }
+}
+
+/// Vendeurs d'un bien qui ont du stock vendable : tableau, et place de chacun par identifiant (retrait O(1)).
+class _Avail {
+  final List<Firm> list = [];
+  final Map<int, int> pos = {};
+
+  void add(Firm f) {
+    pos[f.id] = list.length;
+    list.add(f);
+  }
+
+  /// Retrait par échange avec le dernier élément.
+  void remove(Firm f) {
+    final i = pos.remove(f.id)!;
+    final last = list.removeLast();
+    if (i < list.length) {
+      list[i] = last;
+      pos[last.id] = i;
+    }
   }
 }
 
@@ -620,7 +649,7 @@ class Sim {
       for (final e in f.outputs.entries) {
         final d = batches * e.value;
         f.demandEma[e.key] = d;
-        f.inv[e.key] = goods[e.key]!.perish ? 0 : d * p.invTargetDays;
+        _setStock(f, e.key, goods[e.key]!.perish ? 0 : d * p.invTargetDays);
         revenue += d * f.price[e.key]!;
       }
       var inputCost = 0.0;
@@ -855,21 +884,103 @@ class Sim {
 
   void _rebuildSellers() {
     _sellers.clear();
-    _sellerIndex.clear();
     for (final f in firms) {
       for (final g in f.outputs.keys) {
         final l = _sellers[g] ??= [];
-        (_sellerIndex[g] ??= {})[f.id] = l.length;
         l.add(f);
+      }
+    }
+    _rebuildAvail();
+  }
+
+  /// Diagnostic de performance (non sérialisé) : achats des ménages pendant la phase de consommation, et temps passé
+  /// dans cette phase (tool/perf.dart).
+  int consumeBuys = 0;
+  final Stopwatch consumeClock = Stopwatch();
+
+  /// Recherche limitée (Params.sellerSample) : dernier vendeur de chaque ménage, par (acheteur × 64 + bien).
+  final Map<int, int> lastSeller = {};
+
+  // ------------------------------------------------- liste des vendeurs disponibles (Params.sellerSample > 0)
+  /// Par bien, les entreprises qui ont du stock vendable à l'unité (`availThreshold`), avec la place de chacune dans
+  /// la liste. Un retrait se fait par échange avec le dernier élément : O(1). Elle est reconstruite chaque matin et à
+  /// chaque changement du parc, en ordre d'identifiant croissant ; ensuite chaque changement de stock la met à jour
+  /// (`_setStock`). Elle n'est pas sérialisée : elle se déduit de l'état du matin.
+  final Map<String, _Avail> _avail = {};
+  bool _availValid = false;
+
+  /// Stock minimal qui compte comme « vendable » : les ménages achètent des unités entières (une unité moins une
+  /// tolérance d'arrondi, voir `buy`). Drapeau de test : `eps` donne la définition « stock > 0 » (voir le rapport).
+  static double availThreshold = 1 - 1e-7;
+
+  /// Drapeau de test : faux supprime l'habitude (le dernier vendeur n'est plus examiné d'office) pour mesurer son effet.
+  static bool sellerHabit = true;
+
+  bool _sellable(Firm f, String g) => (f.inv[g] ?? 0) >= availThreshold;
+
+  _Avail _availFor(String good) {
+    if (!_availValid) _rebuildAvail();
+    return _avail[good] ?? _Avail();
+  }
+
+  void _rebuildAvail() {
+    _avail.clear();
+    _availValid = params.sellerSample > 0;
+    if (!_availValid) return;
+    for (final e in _sellers.entries) {
+      final a = _avail[e.key] = _Avail();
+      for (final f in e.value) {
+        if (_sellable(f, e.key)) a.add(f);
+      }
+      a.list.sort((x, y) => x.id.compareTo(y.id));
+      for (var i = 0; i < a.list.length; i++) {
+        a.pos[a.list[i].id] = i;
       }
     }
   }
 
-  /// Place de chaque vendeur dans sellersOf(bien), par identifiant (recherche limitée des vendeurs).
-  final Map<String, Map<int, int>> _sellerIndex = {};
+  /// Le seul endroit où le stock d'un bien produit par une entreprise change (avec les créations d'entreprises, qui
+  /// passent par `_rebuildSellers`) : met à jour la liste des vendeurs disponibles.
+  void _setStock(Firm f, String g, double v) {
+    f.inv[g] = v;
+    if (!_availValid) return;
+    final a = _avail[g];
+    if (a == null) return;
+    final has = v >= availThreshold;
+    final listed = a.pos.containsKey(f.id);
+    if (has) {
+      if (!listed && f.outputs.containsKey(g)) a.add(f); // un intrant n'est pas un bien vendu
+    } else if (listed) {
+      a.remove(f);
+    }
+  }
 
-  /// Recherche limitée (Params.sellerSample) : dernier vendeur de chaque ménage, par (acheteur × 64 + bien).
-  final Map<int, int> lastSeller = {};
+  /// Détecteur : la liste de chaque bien est exactement l'ensemble des entreprises actives dont le stock est vendable
+  /// (et les places sont cohérentes). Retourne les écarts (vide si tout va bien).
+  List<String> availMismatches() {
+    final out = <String>[];
+    if (!_availValid) return out;
+    for (final e in _sellers.entries) {
+      final a = _avail[e.key];
+      final want = <int>{for (final f in e.value) if (_sellable(f, e.key)) f.id};
+      final got = <int>{for (final f in a?.list ?? const <Firm>[]) f.id};
+      if (a == null || got.length != a.list.length || a.pos.length != a.list.length) {
+        out.add('${e.key} : liste incohérente');
+        continue;
+      }
+      for (var i = 0; i < a.list.length; i++) {
+        if (a.pos[a.list[i].id] != i) {
+          out.add('${e.key} : place fausse de ${a.list[i].name}');
+          break;
+        }
+      }
+      if (want.length != got.length || !want.containsAll(got)) {
+        final missing = want.difference(got).length, extra = got.difference(want).length;
+        out.add('${e.key} : $missing absents, $extra en trop');
+      }
+    }
+    return out;
+  }
 
   /// Identifiant stable d'une entreprise : 100 000 + 10 000 × (rang du type) + rang de création dans ce type. Créer
   /// une entreprise d'un type ne décale pas les identifiants (donc les tirages) des entreprises des autres types.
@@ -1153,9 +1264,14 @@ class Sim {
     final base = hash32(hash32(_dayKey(Flux.offres), who), hash32(gi, n));
     // pendant la consommation, prix et attrait des vendeurs sont lus une fois par bien et par jour (ils ne changent pas)
     final qc = _quoteCache;
+    if (qc != null && household) consumeBuys++;
     final cached = household && buyer is! Firm && qc != null ? (qc[good] ??= _BestOffers(this, good)) : null;
     final k = params.sellerSample;
-    final pick = (k > 0 && household
+    if (verifyFastPaths && k > 0) {
+      final bad = availMismatches();
+      if (bad.isNotEmpty) throw StateError('Liste des vendeurs disponibles fausse au jour $day : ${bad.first}');
+    }
+    final pick = (k > 0 && household && integer
             ? _AllOffers.sampled(this, buyer, good, base, k, who, gi, n)
             : _AllOffers(this, buyer, good, base, household, cached))
         .pick;
@@ -1183,10 +1299,10 @@ class Sim {
       } else {
         final s = o.firm!;
         paid = transfer(buyer, s, cost);
-        s.inv[good] = (s.inv[good] ?? 0) - q;
+        _setStock(s, good, (s.inv[good] ?? 0) - q);
         s.sold[good] = (s.sold[good] ?? 0) + q;
         s.revenue += paid;
-        if (k > 0 && household) lastSeller[who * 64 + gi] = s.id; // habitude
+        if (k > 0 && household && sellerHabit) lastSeller[who * 64 + gi] = s.id; // habitude
       }
       _flow(o.firm == null ? 'X' : o.firm!.id.toString(), buyerKey, good, q, paid);
       final ms = marketStats[good]!;
@@ -1196,7 +1312,17 @@ class Sim {
       spent += paid;
       if (broke) break;
     }
-    if (remaining > eps && !broke) unmet[good] = (unmet[good] ?? 0) + remaining;
+    if (remaining > eps && !broke) {
+      if (verifyFastPaths && k > 0 && household && integer && qty <= 1 + eps) {
+        // propriété : l'achat d'une unité n'échoue pour « pas d'offre » que si aucun autre vendeur n'a une unité en stock
+        for (final f in sellersOf(good)) {
+          if (!identical(f, buyer) && _sellable(f, good)) {
+            throw StateError('Fausse pénurie au jour $day : ${f.name} a ${f.inv[good]} de $good, achat sans offre');
+          }
+        }
+      }
+      unmet[good] = (unmet[good] ?? 0) + remaining;
+    }
     return BuyResult(qty - remaining, spent);
   }
 
@@ -1275,6 +1401,7 @@ class Sim {
       }
     }
 
+    if (params.sellerSample > 0 || _availValid) _rebuildAvail(); // liste des vendeurs : reconstruite chaque matin
     if (modules.buildings) _buildingsMorning();
     _laborMarket();
     if (modules.publicBudget) _publicBudget();
@@ -1496,11 +1623,11 @@ class Sim {
       f.effWorkers = eff;
       for (final e in f.inputs.entries) {
         final stock = f.inv[e.key] ?? 0;
-        f.inv[e.key] = stock - math.min(stock, batches * e.value); // un intrant secondaire manquant n'est pas consommé
+        _setStock(f, e.key, stock - math.min(stock, batches * e.value)); // un intrant secondaire manquant n'est pas consommé
       }
       for (final e in f.outputs.entries) {
         final q = batches * e.value;
-        f.inv[e.key] = (f.inv[e.key] ?? 0) + q;
+        _setStock(f, e.key, (f.inv[e.key] ?? 0) + q);
         f.produced[e.key] = q;
       }
     }
@@ -1720,7 +1847,7 @@ class Sim {
       if (!publicService(f)) continue;
       final q = f.inv[g] ?? 0;
       if (q >= 1 - eps) {
-        f.inv[g] = q - 1;
+        _setStock(f, g, q - 1);
         f.sold[g] = (f.sold[g] ?? 0) + 1;
         _flow(f.id.toString(), 'M', g, 1, 0);
         return true;
@@ -1853,7 +1980,7 @@ class Sim {
           for (final e in want.entries) {
             final share = budget * (e.value * bestPrice(e.key)) / wantValue;
             final r = buy(f, f.id.toString(), e.key, e.value, math.min(share, f.money), false);
-            f.inv[e.key] = (f.inv[e.key] ?? 0) + r.qty;
+            _setStock(f, e.key, (f.inv[e.key] ?? 0) + r.qty);
             f.costs += r.spent;
             f.inputSpend += r.spent;
           }
@@ -1924,6 +2051,7 @@ class Sim {
 
   void _consume() {
     final p = params;
+    consumeClock.start();
     _quoteCache = {};
     needCost = _needCost();
     // pression publicitaire : notoriété des vendeurs de chaque bien
@@ -1973,6 +2101,7 @@ class Sim {
     }
     if (modules.publicBudget) _serveQueues();
     _quoteCache = null;
+    consumeClock.stop();
   }
 
   /// Le bien qui apporte le plus de satisfaction par dollar, parmi ceux en stock et abordables.
@@ -2244,7 +2373,7 @@ class Sim {
         final excess = (f.inv[g] ?? 0) - 8 * math.max(f.demandEma[g] ?? 0, 0.5);
         if (excess <= eps) continue;
         final value = transfer(null, f, excess * worldPrice[g]! * params.exportDiscount);
-        f.inv[g] = (f.inv[g] ?? 0) - excess;
+        _setStock(f, g, (f.inv[g] ?? 0) - excess);
         f.revenue += value;
         ledgerExports += value;
         bank.reserves += value;
@@ -2258,7 +2387,7 @@ class Sim {
   void _expire() {
     for (final f in firms) {
       for (final g in f.outputs.keys) {
-        if (goods[g]!.perish) f.inv[g] = 0;
+        if (goods[g]!.perish) _setStock(f, g, 0);
       }
     }
   }
@@ -3137,7 +3266,7 @@ class Sim {
     final f = firm(firmId);
     if (f == null) return 0;
     final before = f.inv[good] ?? 0;
-    f.inv[good] = math.max(0.0, before + qty);
+    _setStock(f, good, math.max(0.0, before + qty));
     final d = f.inv[good]! - before;
     _log('god',
         '${d >= 0 ? 'Ajout de ' : 'Retrait de '}${round1(d.abs())} ${goods[good]!.unit} de ${goods[good]!.label.toLowerCase()} chez ${f.name}.');
@@ -3150,7 +3279,7 @@ class Sim {
       final cur = f.inv[good] ?? 0;
       if (cur > 0) {
         final q = cur * pct;
-        f.inv[good] = cur - q;
+        _setStock(f, good, cur - q);
         lost += q;
       }
     }
@@ -3361,7 +3490,7 @@ class Sim {
     final lost = f.money;
     _godIn(-transfer(f, null, f.money));
     for (final g in f.inv.keys.toList()) {
-      f.inv[g] = 0;
+      _setStock(f, g, 0);
     }
     final debt = f.debt;
     _writeOff(f, 'faillite (god mode)');

@@ -162,6 +162,9 @@ flutter build web
   `bash tool/compiler.sh` : exécutables natifs des outils dans `build/outils/`.
 - `tool/fusion_syntheses.dart` : fusionne les synthèses `--save` de lancements séparés (une graine et une étape par
   processus) en celle d'un lancement unique.
+- `tool/vendeurs_controle.dart A.json B.json` : comparaison appariée de deux synthèses (k = 0 contre k > 0) avec
+  intervalles ; `tool/vendeurs_cout.dart` : coût d'un achat selon le nombre de vendeurs ; `tool/vendeurs_verif.dart` :
+  liste des vendeurs disponibles vérifiée à grande échelle (rapport : `rapports/vendeurs-correction.md`).
 - `tool/partie.dart` : une partie en ligne de commande, avec ses journaux complets, ses instantanés et `--diff` ;
   `--sans-hasard` joue une partie où tous les tirages valent 0,5, lisible à la main.
 - `tool/detresse.dart` : ce qui distingue les citoyens en détresse des autres (à partir d'`agents_fin.csv`).
