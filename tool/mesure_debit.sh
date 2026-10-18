@@ -5,8 +5,10 @@
 # pas dépendre de la charge.
 #
 #   bash ~/econodes/<révision>/tool/mesure_debit.sh [--paliers 1,2,4,6,8] [--population 10000] [--jours 100]
-#                             [--sortie dossier] [--graines 1|n] [--force] [-- options de partie.exe]
+#                             [--echantillon 5] [--sortie dossier] [--graines 1|n] [--force] [-- options de partie.exe]
 #
+#   --echantillon k  recherche limitée des vendeurs (Params.sellerSample) des parties mesurées, écrite dans la commande
+#                 (défaut 5, la valeur du jeu ; 0 compare tous les vendeurs, plus lent). Filets de sécurité actifs.
 #   --graines n   (défaut) la partie k du palier joue la graine k ; --graines 1 : toutes jouent la graine 1
 #   --force       mesurer même si d'autres parties tournent (sans --force : refus, la mesure serait faussée)
 #
@@ -22,6 +24,7 @@ paliers=1,2,4,6,8
 pop=10000
 jours=100
 graines=n
+echantillon=5
 force=0
 sortie=~/resultats/debit-$(date +%F-%H%M)-${rev:0:12}
 extra=()
@@ -32,6 +35,7 @@ while [[ $# -gt 0 ]]; do
     --jours) jours=$2; shift 2 ;;
     --sortie) sortie=$2; shift 2 ;;
     --graines) graines=$2; shift 2 ;;
+    --echantillon) echantillon=$2; shift 2 ;;
     --force) force=1; shift ;;
     --) shift; extra=("$@"); break ;;
     *) echo "Option inconnue : $1" >&2; exit 2 ;;
@@ -56,7 +60,7 @@ printf '%s\tmesure\t%s\t%s\t%s\n' "$(date -Is)" "${rev:0:12}" "$(cat "$racine/.b
 {
   echo "# $(date -Is) $(hostname), révision $rev"
   echo "# $(lscpu | sed -n 's/^Model name: *//p'), $(nproc) vCPU, $(free -g | awk '/^Mem/ { print $2 }') Gio"
-  echo "# population $pop, $jours jours, graines $graines, options : ${extra[*]:-aucune}"
+  echo "# population $pop, $jours jours, graines $graines, k = $echantillon, filets actifs, options : ${extra[*]:-aucune}"
 } | tee "$sortie/contexte.txt"
 printf 'N\tgraine\tsecondes\tms_par_jour\trss_mo\tsha256_jour_%s\n' "$jours" > "$sortie/parties.tsv"
 printf 'N\tmur_s\tms_jour_moyen\tms_jour_pire\trss_total_mo\tjours_par_heure\tst_moyen\tst_max\tus_moyen\n' > "$sortie/paliers.tsv"
@@ -71,7 +75,8 @@ for n in ${paliers//,/ }; do
   for k in $(seq 1 "$n"); do
     g=$k
     [[ $graines == 1 ]] && g=1
-    /usr/bin/time -v -o "$d/p$k.time" "$exe" --graine "$g" --population "$pop" --jours "$jours" "${extra[@]}" \
+    /usr/bin/time -v -o "$d/p$k.time" "$exe" --graine "$g" --population "$pop" --jours "$jours" \
+      --param "sellerSample=$echantillon" --filets 1 "${extra[@]}" \
       --snapshot-at "$jours" --snapshot-dir "$d/p$k" > "$d/p$k.log" 2>&1 &
     pids+=($!)
   done

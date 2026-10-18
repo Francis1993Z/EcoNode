@@ -19,14 +19,20 @@
 #   --force                  partir même si d'autres parties tournent déjà sur la machine. Sans --force, le lot refuse :
 #                            deux lots se partageraient les vCPU, iraient chacun moins vite et fausseraient leurs durées
 #
-# Fichier de tâches : une partie par ligne, « graine niveau population jours [options de partie.exe] ». Lignes vides et
-# commentaires (#) ignorés. Exemple, le protocole de stabilité à 10 000 habitants (30 graines, sans et avec filets) :
+# Fichier de tâches : une partie par ligne, « graine étiquette population jours k filets [options de partie.exe] ».
+# Lignes vides et commentaires (#) ignorés. Aucune valeur par défaut cachée : k et les filets sont écrits sur chaque
+# ligne. Exemple, le protocole de stabilité à 10 000 habitants (30 graines, k = 5, sans et avec filets) :
 #
-#   for g in $(seq 1 30); do for f in 0 1; do echo "$g 1 10000 1500 --filets $f"; done; done > stabilite10k.txt
+#   for g in $(seq 1 30); do for f in 0 1; do echo "$g stab10k 10000 1500 5 $f"; done; done > stabilite10k.txt
 #
-# - niveau : niveau du protocole (0, 1, 2, ou « - »). partie.exe n'a pas de niveau : pour une partie seule, un niveau ne
-#   fixe que la graine, la durée et la population, données ici. La colonne sert d'étiquette (nom des journaux, résumé).
-# - options : passées telles quelles à partie.exe (--filets 0, --modules credit=0, --param x=1, --trace {dossier}…).
+# - étiquette : un nom (lettres, chiffres, « _ » et « . »), pour les journaux et le résumé. partie.exe n'a pas de
+#   niveau de protocole : la graine, la durée et la population sont données ici.
+# - k : recherche limitée des vendeurs (Params.sellerSample), un entier ≥ 0 ; 0 compare tous les vendeurs. Passé à
+#   partie.exe par « --param sellerSample=k ». C'est une règle de marché (information imparfaite des ménages), pas une
+#   optimisation : voir MODELE.md, § 6.2.
+# - filets : 1 (filets de sécurité actifs) ou 0 (coupés). Passé à partie.exe par « --filets f ».
+# - options : passées telles quelles à partie.exe (--modules credit=0, --param x=1, --trace {dossier}…), sauf
+#   --filets et sellerSample, qui viennent des colonnes (leur présence ici est une erreur).
 #   {dossier} est remplacé par le dossier propre à la partie, où elle tourne : ses instantanés et journaux y vont.
 #
 # Dans le dossier du lot :
@@ -57,15 +63,16 @@ if [[ ${1:-} == --une-tache ]]; then
   nom=$(sed -n "${k}p" "$dossier/noms.txt")
   [[ -e $dossier/$nom.fini ]] && exit 0
   set -f
-  read -r graine niveau population jours reste <<< "$(sed -n "${k}p" "$dossier/taches.txt")"
+  read -r graine etiquette population jours echantillon filets reste <<< "$(sed -n "${k}p" "$dossier/taches.txt")"
   travail="$dossier/$nom"
   rm -rf "$travail" && mkdir -p "$travail"
   options=()
   for o in ${reste:-}; do options+=("${o//\{dossier\}/$travail}"); done
   set +f
-  cmd=("$dossier/bin/partie.exe" --graine "$graine" --population "$population" --jours "$jours" "${options[@]}")
+  cmd=("$dossier/bin/partie.exe" --graine "$graine" --population "$population" --jours "$jours"
+    --param "sellerSample=$echantillon" --filets "$filets" "${options[@]}")
   {
-    echo "# partie $nom (tâche $k, niveau $niveau)"
+    echo "# partie $nom (tâche $k, étiquette $etiquette, k = $echantillon, filets $filets)"
     echo "# début $(date -Is) sur $(hostname), révision $(cat "$dossier/revision")"
     echo "# commande : ${cmd[*]}"
   } > "$dossier/$nom.log"
@@ -167,15 +174,21 @@ normal=$(sed -e 's/#.*//' -e 's/[[:space:]]\+/ /g' -e 's/^ //' -e 's/ $//' "$tac
 [[ -n $normal ]] || { echo "Aucune tâche dans $taches." >&2; exit 2; }
 k=0
 noms=
-while read -r graine niveau population jours reste; do
+while read -r graine etiquette population jours echantillon filets reste; do
   k=$((k + 1))
-  [[ $graine =~ ^[0-9]+$ && ${population:-} =~ ^[0-9]+$ && ${jours:-} =~ ^[0-9]+$ && ${niveau:-} =~ ^([0-2]|-)$ ]] || {
-    echo "Tâche $k mal formée : « graine niveau population jours [options] » attendu (niveau : 0, 1, 2 ou -)." >&2
+  [[ $graine =~ ^[0-9]+$ && ${population:-} =~ ^[0-9]+$ && ${jours:-} =~ ^[0-9]+$ && ${echantillon:-} =~ ^[0-9]+$ &&
+    ${filets:-} =~ ^[01]$ && ${etiquette:-} =~ ^[A-Za-z0-9_.]+$ ]] || {
+    echo "Tâche $k mal formée : « graine étiquette population jours k filets [options] » attendu" \
+      "(k : entier ≥ 0 ; filets : 0 ou 1 ; étiquette : lettres, chiffres, _ et .)." >&2
     exit 2
   }
-  # nom : g<graine>-n<niveau>-p<population>-j<jours>, puis les options réduites à lettres, chiffres, « = , . _ »
+  if [[ " ${reste:-} " == *" --filets"* || ${reste:-} == *sellerSample* ]]; then
+    echo "Tâche $k : --filets et sellerSample ne vont pas dans les options, ils viennent des colonnes k et filets." >&2
+    exit 2
+  fi
+  # nom : g<graine>-<étiquette>-p<population>-j<jours>-k<k>-f<filets>, puis les options réduites à lettres, chiffres, « = , . _ »
   suffixe=$(printf '%s' "${reste:-}" | tr -c 'A-Za-z0-9=,.' '_' | sed -e 's/__*/_/g' -e 's/^_//' -e 's/_$//')
-  noms+="g$graine-n${niveau/-/x}-p$population-j$jours${suffixe:+-$suffixe}"$'\n'
+  noms+="g$graine-$etiquette-p$population-j$jours-k$echantillon-f$filets${suffixe:+-$suffixe}"$'\n'
 done <<< "$normal"
 doublon=$(printf '%s' "$noms" | sort | uniq -d | head -1)
 [[ -z $doublon ]] || { echo "Deux tâches identiques : $doublon" >&2; exit 2; }

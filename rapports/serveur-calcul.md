@@ -231,8 +231,10 @@ Linux. La copie part maintenant sans retours chariot.
 
 - **`tool/lot_serveur.sh`** (sur le serveur) :
   `bash ~/econodes/<révision>/tool/lot_serveur.sh [-j 8] [--eteindre-a-la-fin] taches.txt`.
-  - Une tâche par ligne : `graine niveau population jours [options de partie.exe]`. Le lot part dans une session tmux,
-    qui survit à la fermeture du SSH.
+  - Une tâche par ligne : `graine étiquette population jours k filets [options de partie.exe]`. **k** (recherche
+    limitée des vendeurs, `Params.sellerSample`) et les **filets** (1 ou 0) sont écrits sur chaque ligne : aucune valeur
+    par défaut cachée, et le script refuse une ligne qui les met aussi dans les options. Le lot part dans une session
+    tmux, qui survit à la fermeture du SSH.
   - Il joue N parties à la fois, 8 par défaut (le nombre de vCPU), et écrit un journal par partie dans
     `~/resultats/<date>-<nom du fichier de tâches>-<révision>/`. Chaque journal contient la commande, la sortie, le
     code de sortie, la durée et la mémoire. Le lot écrit aussi `resume.csv` et `vmstat.log`.
@@ -248,9 +250,9 @@ Linux. La copie part maintenant sans retours chariot.
     - lot de 5 parties coupé au milieu (`tmux kill-session`, ce qui arrête aussi les parties en cours), puis relancé :
       les 2 parties finies sont sautées, les 3 autres jouées, 5 / 5 à la fin ;
     - `{dossier}` remplacé par le dossier propre à la partie, pour `--trace`.
-  - **La colonne `niveau`** : `partie.exe` n'a pas de niveau. Pour une partie seule, un niveau du protocole ne fixe
-    que la graine, la durée et la population, déjà données sur la ligne ; la colonne sert donc d'étiquette (nom des
-    journaux). Les filets et les modules passent par les options (`--filets 0`, `--modules …`).
+  - **La colonne `étiquette`** (ex-« niveau ») : `partie.exe` n'a pas de niveau de protocole ; la colonne est un nom libre
+    (lettres, chiffres, `_`, `.`) qui sert aux journaux. Les modules passent par les options (`--modules …`).
+    Le nom d'une partie est `g<graine>-<étiquette>-p<population>-j<jours>-k<k>-f<filets>`.
 - **`tool/mesure_debit.sh`** (sur le serveur) : les paliers du § 3, à refaire tels quels sur une autre instance.
 - **`tool/envoyer_serveur.sh`** (sur le PC) : installe la révision HEAD dans son dossier et la compile (§ 1, § 5.1).
 - **`tool/parite_serveur.sh`** (sur le PC) : la parité du § 2 en une commande, environ 3 minutes ; s'appuie sur
@@ -260,7 +262,7 @@ Linux. La copie part maintenant sans retours chariot.
 Exemple, le protocole de stabilité à 10 000 habitants par `lot_serveur.sh`, sur la révision `19ae708722d0` :
 
 ```bash
-for g in $(seq 1 30); do for f in 0 1; do echo "$g 1 10000 1500 --filets $f"; done; done > stabilite10k.txt
+for g in $(seq 1 30); do for f in 0 1; do echo "$g stab10k 10000 1500 5 $f"; done; done > stabilite10k.txt
 bash ~/econodes/19ae708722d0/tool/lot_serveur.sh -j 8 --eteindre-a-la-fin stabilite10k.txt
 ```
 
