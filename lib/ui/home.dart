@@ -13,6 +13,7 @@ import 'housing.dart';
 import 'inspector.dart';
 import 'palette.dart';
 import 'start_params.dart';
+import 'widgets.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -53,17 +54,19 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             width: 380,
             child: SingleChildScrollView(
                 child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Population : ${pop.round()} citoyens', style: const TextStyle(fontWeight: FontWeight.w600)),
-              Slider(
+              NumField(
+                label: 'Population (40 à 50 000 citoyens)',
                 value: pop,
-                min: 40,
-                max: 1000,
-                divisions: 96,
-                label: '${pop.round()}',
-                onChanged: (v) => set(() => pop = v),
+                decimals: 0,
+                onSubmit: (v) => set(() => pop = v.clamp(40, 50000).toDouble()),
               ),
-              const Text('Les entreprises et leurs effectifs sont dimensionnés pour cette population. '
-                  'Au-delà de 500 citoyens, la simulation ralentit.', style: TextStyle(fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(
+                  pop > 10000
+                      ? '⚠ Au-delà de 10 000 citoyens, la simulation ralentit nettement ; au-delà de 500, elle ralentit déjà.'
+                      : 'Les entreprises et leurs effectifs sont dimensionnés pour cette population. '
+                          'Au-delà de 500 citoyens, la simulation ralentit.',
+                  style: TextStyle(fontSize: 12, color: pop > 10000 ? Colors.orange.shade800 : null)),
               const SizedBox(height: 4),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,

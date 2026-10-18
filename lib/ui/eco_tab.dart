@@ -330,8 +330,15 @@ class _ModelTabState extends State<ModelTab> {
                   label: 'Population',
                   value: pop,
                   decimals: 0,
-                  onSubmit: (v) => setState(() => pop = v.abs().clamp(40, 1000).toDouble()))),
+                  onSubmit: (v) => setState(() => pop = v.abs().clamp(40, 50000).toDouble()))),
         ]),
+        if (pop > 10000)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+                '⚠ Au-delà de 10 000 citoyens, la simulation ralentit nettement ; au-delà de 500, elle ralentit déjà.',
+                style: TextStyle(fontSize: 12, color: Colors.orange.shade800)),
+          ),
         ExpansionTile(
           tilePadding: EdgeInsets.zero,
           childrenPadding: const EdgeInsets.only(bottom: 8),
