@@ -6,6 +6,7 @@
 
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'model.dart';
 import 'monitor.dart';
@@ -163,6 +164,14 @@ class _BestOffers {
     return _BestOffers._(good, sellers, list, imported, fallback);
   }
 
+  List<int>? _priceIdx;
+
+  /// Pour chaque vendeur de `byPrice`, sa place dans `sellers` (l'ordre qui départage les égalités de clé).
+  List<int> get priceIdx => _priceIdx ??= () {
+        final pos = {for (var i = 0; i < sellers.length; i++) sellers[i].id: i};
+        return [for (final f in byPrice) pos[f.id]!];
+      }();
+
   double quote() {
     while (_next < byPrice.length && (byPrice[_next].inv[good] ?? 0) < 1 - eps) {
       _next++;
@@ -279,6 +288,182 @@ class _AllOffers {
       });
     }
     return offers[rest![k - 4]];
+  }
+}
+
+/// Les offres d'un achat d'entreprise (attrait 1), dans l'ordre exact de `_AllOffers` (clé croissante, à égalité l'ordre des
+/// vendeurs) mais sans construire toutes les offres. La clé d'un vendeur de prix p est dans [p, 1,03 p] : on prend les
+/// vendeurs par prix croissant (`_BestOffers.byPrice`) et on ne tire le hasard (r) que de ceux qui peuvent encore passer
+/// avant un vendeur non examiné. À très grande échelle (des centaines de vendeurs par bien), c'était le quart d'une
+/// journée. Servi seulement pendant les achats d'intrants (prix constants, stocks qui ne font que baisser).
+class _LazyOffers {
+  final Sim s;
+  final _BestOffers bo;
+  final Account buyer;
+  final String good;
+  final int base;
+  final List<int> idx;
+  int _front = 0;
+  bool _import;
+  final double _importPrice;
+  // tas binaire des offres examinées : clé, place ; offers[i] est l'offre
+  final List<double> _keys = [];
+  final List<int> _place = [];
+  final List<_Offer> _offers = [];
+
+  _LazyOffers(this.s, this.bo, this.buyer, this.good, this.base)
+      : idx = bo.priceIdx,
+        _import = s.params.trade && !goods[good]!.perish && goods[good]!.tradable,
+        _importPrice = s.params.trade && !goods[good]!.perish && goods[good]!.tradable
+            ? s.worldPrice[good]! * s.params.importMarkup
+            : double.infinity;
+
+  bool _less(int a, int b) => _keys[a] < _keys[b] || (_keys[a] == _keys[b] && _place[a] < _place[b]);
+
+  void _swap(int a, int b) {
+    final k = _keys[a], pl = _place[a], o = _offers[a];
+    _keys[a] = _keys[b];
+    _place[a] = _place[b];
+    _offers[a] = _offers[b];
+    _keys[b] = k;
+    _place[b] = pl;
+    _offers[b] = o;
+  }
+
+  void _push(double key, int place, _Offer o) {
+    _keys.add(key);
+    _place.add(place);
+    _offers.add(o);
+    var i = _keys.length - 1;
+    while (i > 0) {
+      final up = (i - 1) >> 1;
+      if (!_less(i, up)) break;
+      _swap(i, up);
+      i = up;
+    }
+  }
+
+  _Offer _pop() {
+    final top = _offers[0];
+    final last = _keys.length - 1;
+    _swap(0, last);
+    _keys.removeLast();
+    _place.removeLast();
+    _offers.removeLast();
+    var i = 0;
+    for (;;) {
+      final l = 2 * i + 1, r = l + 1;
+      var m = i;
+      if (l < _keys.length && _less(l, m)) m = l;
+      if (r < _keys.length && _less(r, m)) m = r;
+      if (m == i) break;
+      _swap(i, m);
+      i = m;
+    }
+    return top;
+  }
+
+  /// L'offre suivante dans l'ordre, ou null quand il n'y en a plus.
+  _Offer? next() {
+    for (;;) {
+      // plus petit prix parmi les vendeurs pas encore examinés (leur clé ne peut pas être plus basse)
+      final nextSeller = _front < bo.byPrice.length ? bo.sortedPrices[_front] : double.infinity;
+      final lb = _import && _importPrice < nextSeller ? _importPrice : nextSeller;
+      if (_keys.isNotEmpty && (lb == double.infinity || _keys[0] < lb)) return _pop();
+      if (lb == double.infinity) return null;
+      if (_import && _importPrice <= nextSeller) {
+        _import = false;
+        final r = s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0));
+        final o = _Offer(null, _importPrice, r, 1);
+        _push(o.p * (1 + 0.03 * o.r) * o.pull, 1 << 30, o);
+        continue;
+      }
+      final f = bo.byPrice[_front];
+      final place = idx[_front++];
+      if (identical(f, buyer) || (f.inv[good] ?? 0) <= eps) continue;
+      final r = s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, f.id));
+      final o = _Offer(f, f.price[good]!, r, 1);
+      _push(o.p * (1 + 0.03 * o.r) * o.pull, place, o);
+    }
+  }
+}
+
+/// Candidats à l'embauche du départ, triés par qualification croissante (à égalité : le dernier de la liste du jour, ou
+/// le premier avec le module jobs). `take(req)` rend le candidat admissible (qualification ≥ req, à `eps` près) le moins
+/// qualifié et le retire : le même choix que `_pickWorker` ou `_pickCandidate` suivi de `remove`, sans parcourir la liste
+/// à chaque poste (à 100 000 citoyens, l'initialisation prenait 50 s dans ces parcours). Les retraits sont des liens
+/// vers le candidat suivant, comme dans une structure d'ensembles disjoints.
+class _SkillPool {
+  final List<Citizen> _sorted;
+  final List<double> _skills;
+  final List<int> _next; // premier candidat encore là à partir de la place i (n : aucun)
+  _SkillPool(List<Citizen> pool, {required bool lowIndexOnTie})
+      : _sorted = [],
+        _skills = [],
+        _next = [] {
+    final n = pool.length;
+    final order = List<int>.generate(n, (i) => i);
+    order.sort((a, b) {
+      final d = pool[a].skill.compareTo(pool[b].skill);
+      return d != 0 ? d : (lowIndexOnTie ? a - b : b - a);
+    });
+    for (final i in order) {
+      _sorted.add(pool[i]);
+      _skills.add(pool[i].skill);
+    }
+    for (var i = 0; i <= n; i++) {
+      _next.add(i);
+    }
+  }
+
+  int _find(int i) {
+    var r = i;
+    while (_next[r] != r) {
+      r = _next[r];
+    }
+    while (_next[i] != r) {
+      final j = _next[i];
+      _next[i] = r;
+      i = j;
+    }
+    return r;
+  }
+
+  Citizen? take(double req) {
+    final n = _sorted.length;
+    var lo = 0, hi = n;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (_skills[mid] + eps < req) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    final p = _find(lo);
+    if (p >= n) return null;
+    _next[p] = p + 1;
+    return _sorted[p];
+  }
+}
+
+/// Les vendeurs d'un bien, en tableaux : prix affiché et « a au moins une unité en stock » de chacun, dans l'ordre de
+/// `Sim.sellersOf`. Ils se mettent à jour à chaque changement de stock (`_setStock`) et de prix (`_setPrice`). Le meilleur
+/// prix d'un bien (`_quoteAll`) est alors une boucle sur deux tableaux au lieu de deux lectures de table par vendeur
+/// (à 100 000 citoyens, un bien a des centaines de vendeurs et ce parcours était le cinquième d'une journée).
+class _Book {
+  final List<Firm> firms;
+  final Float64List price;
+  final Uint8List stocked;
+  final Map<int, int> pos; // identifiant de l'entreprise -> place
+  _Book(this.firms, String good)
+      : price = Float64List(firms.length),
+        stocked = Uint8List(firms.length),
+        pos = {for (var i = 0; i < firms.length; i++) firms[i].id: i} {
+    for (var i = 0; i < firms.length; i++) {
+      price[i] = firms[i].price[good]!;
+      stocked[i] = (firms[i].inv[good] ?? 0) >= 1 - eps ? 1 : 0;
+    }
   }
 }
 
@@ -629,7 +814,8 @@ class Sim {
       created.add(f);
     }
     // les postes les plus qualifiés d'abord, chacun pris par le candidat le moins surqualifié
-    final pool = _ordered(citizens, Flux.recrutement, (c) => c.id);
+    // les candidats, triés par qualification : chaque poste prend le moins surqualifié sans parcourir toute la liste
+    final pool = _SkillPool(_ordered(citizens, Flux.recrutement, (c) => c.id), lowIndexOnTie: this.modules.jobs);
     if (this.modules.jobs) {
       // module jobs : chaque poste de l'organigramme de chaque entreprise, les plus exigeants d'abord, à l'offre du rôle
       final seats = <(Firm, int)>[
@@ -638,9 +824,8 @@ class Sim {
       ];
       stableSort<(Firm, int)>(seats, (a, b) => roles[b.$1.type]![b.$2].minSkill.compareTo(roles[a.$1.type]![a.$2].minSkill));
       for (final (f, r) in seats) {
-        final c = _pickCandidate(pool, roles[f.type]![r].minSkill, const <int>{});
+        final c = pool.take(roles[f.type]![r].minSkill);
         if (c == null) continue;
-        pool.remove(c);
         _hire(f, c, 'poste ouvert', r, roleOffer(f, r));
       }
     } else {
@@ -649,9 +834,8 @@ class Sim {
       for (final i in order) {
         final f = created[i];
         for (var k = 0; k < staff[i]; k++) {
-          final c = _pickWorker(pool, f.template.skill);
+          final c = pool.take(f.template.skill.toDouble());
           if (c == null) break;
-          pool.remove(c);
           _hire(f, c);
         }
       }
@@ -915,6 +1099,7 @@ class Sim {
     // la liste des vendeurs disponibles se refait à la demande (_availFor) ou chaque matin : à chaque fermeture, une
     // reconstruction complète coûtait autant que le reste de la journée à très grande échelle
     _availValid = false;
+    _booksValid = false;
   }
 
   /// Diagnostic de performance (non sérialisé) : achats des ménages pendant la phase de consommation, et temps passé
@@ -932,6 +1117,31 @@ class Sim {
   /// (`_setStock`). Elle n'est pas sérialisée : elle se déduit de l'état du matin.
   final Map<String, _Avail> _avail = {};
   bool _availValid = false;
+
+  // vendeurs en tableaux (voir _Book), refaits à la demande après un changement du parc
+  final Map<String, _Book> _books = {};
+  bool _booksValid = false;
+
+  _Book? _book(String good) {
+    if (!_booksValid) {
+      _books.clear();
+      for (final e in _sellers.entries) {
+        _books[e.key] = _Book(e.value, e.key);
+      }
+      _booksValid = true;
+    }
+    return _books[good];
+  }
+
+  /// Prix affiché d'une entreprise pour l'un de ses extrants : le seul endroit où il change (avec la création, qui passe
+  /// par `_rebuildSellers`).
+  void _setPrice(Firm f, String g, double v) {
+    f.price[g] = v;
+    if (!_booksValid) return;
+    final b = _books[g];
+    final i = b?.pos[f.id];
+    if (i != null) b!.price[i] = v;
+  }
 
   /// Stock minimal qui compte comme « vendable » : les ménages achètent des unités entières (une unité moins une
   /// tolérance d'arrondi, voir `buy`). Drapeau de test : `eps` donne la définition « stock > 0 » (voir le rapport).
@@ -967,6 +1177,11 @@ class Sim {
   /// passent par `_rebuildSellers`) : met à jour la liste des vendeurs disponibles.
   void _setStock(Firm f, String g, double v) {
     f.inv[g] = v;
+    if (_booksValid) {
+      final b = _books[g];
+      final i = b?.pos[f.id];
+      if (i != null) b!.stocked[i] = v >= 1 - eps ? 1 : 0;
+    }
     if (!_availValid) return;
     final a = _avail[g];
     if (a == null) return;
@@ -1216,10 +1431,14 @@ class Sim {
 
   double _quoteAll(String good) {
     var best = double.infinity;
-    for (final f in sellersOf(good)) {
-      final pr = f.price[good]!; // le prix d'abord : il écarte la plupart des vendeurs sans lire leur stock
-      if (pr < best && (f.inv[good] ?? 0) >= 1 - eps) best = pr;
+    final b = _book(good);
+    if (b != null) {
+      final price = b.price, stocked = b.stocked;
+      for (var i = 0; i < price.length; i++) {
+        if (stocked[i] != 0 && price[i] < best) best = price[i];
+      }
     }
+    if (verifyFastPaths && best != _quoteScan(good)) throw StateError('Meilleur prix (tableaux) différent au jour $day ($good)');
     if (params.trade && !goods[good]!.perish && goods[good]!.tradable) {
       best = math.min(best, worldPrice[good]! * params.importMarkup);
     }
@@ -1237,11 +1456,24 @@ class Sim {
     return _bestPriceAll(good);
   }
 
+  /// Le même meilleur prix, par lecture des tables de chaque vendeur (vérification : verifyFastPaths).
+  double _quoteScan(String good) {
+    var best = double.infinity;
+    for (final f in sellersOf(good)) {
+      final pr = f.price[good]!;
+      if (pr < best && (f.inv[good] ?? 0) >= 1 - eps) best = pr;
+    }
+    return best;
+  }
+
   double _bestPriceAll(String good) {
     var best = _quoteAll(good);
     if (best == double.infinity) {
-      for (final f in sellersOf(good)) {
-        best = math.min(best, f.price[good]!);
+      final b = _book(good);
+      if (b != null) {
+        for (var i = 0; i < b.price.length; i++) {
+          best = math.min(best, b.price[i]);
+        }
       }
     }
     return best == double.infinity ? worldPrice[good]! : best;
@@ -1297,10 +1529,28 @@ class Sim {
       final bad = availMismatches();
       if (bad.isNotEmpty) throw StateError('Liste des vendeurs disponibles fausse au jour $day : ${bad.first}');
     }
-    final pick = (k > 0 && household && integer
-            ? _AllOffers.sampled(this, buyer, good, base, k, who, gi, n)
-            : _AllOffers(this, buyer, good, base, household, cached))
-        .pick;
+    // achat d'entreprise pendant les achats d'intrants : offres servies dans l'ordre, sans toutes les construire
+    final lazy = !household && qc != null ? _LazyOffers(this, qc[good] ??= _BestOffers(this, good), buyer, good, base) : null;
+    _Offer? Function(int) pick;
+    if (lazy != null) {
+      pick = (_) => lazy.next();
+      if (verifyFastPaths) {
+        final full = _AllOffers(this, buyer, good, base, household, cached).pick;
+        final fast = pick;
+        pick = (i) {
+          final a = fast(i), b = full(i);
+          if ((a == null) != (b == null) || (a != null && (!identical(a.firm, b!.firm) || a.p != b.p))) {
+            throw StateError('Offres différentes au jour $day (achat de $good, offre $i)');
+          }
+          return a;
+        };
+      }
+    } else {
+      pick = (k > 0 && household && integer
+              ? _AllOffers.sampled(this, buyer, good, base, k, who, gi, n)
+              : _AllOffers(this, buyer, good, base, household, cached))
+          .pick;
+    }
 
     var remaining = qty;
     var spent = 0.0;
@@ -1439,7 +1689,9 @@ class Sim {
     _safetyNets();
     if (p.trade) _export();
     _expire();
+    _quoteCache = {}; // investissements : prix constants, stocks qui ne font que baisser (comme pendant les achats d'intrants)
     _capital();
+    _quoteCache = null;
     _decide();
     _finance();
     for (final g in goods.keys) {
@@ -2859,7 +3111,7 @@ class Sim {
     for (final o in f.outputs.keys) {
       final others = sellersOf(o).where((x) => !identical(x, f) && x.workers.isNotEmpty).map((x) => x.price[o]!);
       final own = cost[o]! * p.markup;
-      f.price[o] = others.isEmpty ? own : math.min(own, others.reduce(math.min));
+      _setPrice(f, o, others.isEmpty ? own : math.min(own, others.reduce(math.min)));
       revenue += f.demandEma[o]! * f.price[o]!;
     }
     f.revenueEma = revenue;
@@ -3031,7 +3283,7 @@ class Sim {
         }
         f.markup[g] = mk;
         np = _capDrift(f, old, np, 'prix', goods[g]!.label.toLowerCase());
-        f.price[g] = np < 0.01 ? 0.01 : np;
+        _setPrice(f, g, np < 0.01 ? 0.01 : np);
       }
 
       // ------- plan d'embauche
@@ -3491,7 +3743,7 @@ class Sim {
     if (prices != null) {
       for (final e in prices.entries) {
         if (e.value.isFinite && f.price.containsKey(e.key)) {
-          f.price[e.key] = math.max(0.01, e.value);
+          _setPrice(f, e.key, math.max(0.01, e.value));
           notes.add('prix ${goods[e.key]!.label.toLowerCase()} ${fmtMoney0(f.price[e.key]!)}');
         }
       }
@@ -3559,7 +3811,7 @@ class Sim {
           minP = math.min(minP, o.price[g]!);
         }
         f.demandEma[g] = sum / (s.length + 1);
-        f.price[g] = minP;
+        _setPrice(f, g, minP);
       } else {
         f.demandEma[g] = 1;
       }
