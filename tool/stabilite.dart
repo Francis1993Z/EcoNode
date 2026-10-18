@@ -70,10 +70,10 @@ class Config {
     return p;
   }
 
-  /// Modules coupés. Un module apparu après la référence du moteur (entrepreneurship) n'y est listé que s'il est actif (voir
+  /// Modules coupés. Un module apparu après la référence du moteur (Modules.lateKeys) n'y est listé que s'il est actif (voir
   /// modulesOn) : coupé, la synthèse est celle d'avant lui, ce que vérifie tool/reference.sh.
-  List<String> get modulesOff => Modules.keys.where((k) => !modules.get(k) && k != 'entrepreneurship').toList();
-  List<String> get modulesOn => modules.entrepreneurship ? ['entrepreneurship'] : [];
+  List<String> get modulesOff => Modules.keys.where((k) => !modules.get(k) && !Modules.lateKeys.contains(k)).toList();
+  List<String> get modulesOn => [for (final k in Modules.lateKeys) if (modules.get(k)) k];
 
   /// Cette configuration modifiée par [spec] : « ref » (aucun changement) ou une liste « jeton,jeton,… » de
   ///   noyau | complet         modules ajoutés coupés (institutions actives) | tous les modules actifs

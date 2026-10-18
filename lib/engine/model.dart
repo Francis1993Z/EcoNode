@@ -115,6 +115,41 @@ const Map<String, List<String>> desireGoods = {
   'luxe': ['bijoux', 'hotel', 'voyage'],
 };
 
+/// Variétés de produits (module products). Une catégorie est un bien ; une variété, le produit d'une entreprise dans cette
+/// catégorie. Biens de consommation différenciés : choisis par les ménages selon leur goût, la qualité, le prix, la
+/// notoriété. Biens d'équipement différenciés : choisis par les entreprises selon le gain de productivité par dollar. Les
+/// autres biens (matières premières, biens intermédiaires, services aux entreprises et services publics) ne sont pas
+/// différenciés : prix et disponibilité, comme sans le module.
+const Set<String> consumerVarieties = {'pain', 'viande', 'repas', 'tele', 'loisirs', 'hotel', 'voyage', 'bijoux', 'ordinateur'};
+const Set<String> equipmentVarieties = {'machines'};
+bool isDifferentiated(String g) => consumerVarieties.contains(g) || equipmentVarieties.contains(g);
+
+/// Gain moyen d'un modèle de machine (1,01 + 0,99 u³, u uniforme : espérance 1,2575). Un modèle de gain g vaut g / ce gain
+/// machine standard : en moyenne, le module ne rend pas les machines plus productives qu'avant.
+const double machineGainRef = 1.2575;
+
+/// Une variété : le produit d'une entreprise dans une catégorie. Identifiant jamais réutilisé ; le nom est tiré à sa
+/// création et stocké (il reste stable d'un instantané à l'autre).
+class Product {
+  final int id;
+  final String category;
+  final int firmId;
+  String name;
+  final double quality; // 0,6 à 1,4 (1 : la qualité d'avant le module)
+  final int launched;
+  // équipement : gain de productivité (×1,01 à ×2), durabilité (0,7 à 1,3 : l'usure est divisée d'autant), marque
+  double gain;
+  double durability;
+  String maker;
+  bool alive = true;
+  int? ended;
+  double salesEma = 0; // ventes lissées (~10 jours), base des parts de marché
+  bool inStock = true;
+  int lastRupture = -1000;
+  Product(this.id, this.category, this.firmId, this.name, this.quality, this.launched,
+      {this.gain = 1, this.durability = 1, this.maker = ''});
+}
+
 /// Quantité « normale » par citoyen et par jour (on ne regarde qu'une télé à la fois). Lassitude : le n-ième achat du
 /// même bien dans la journée a un attrait divisé par 1 + (n / normale)². Le budget reste la seule limite :
 /// les achats se répartissent entre les biens au lieu d'être plafonnés, et un riche en achète davantage de chacun.
@@ -712,6 +747,23 @@ class Params {
   // Chance de survie sans connaissance du secteur, et gain maximal que la connaissance y ajoute.
   double entSurviveBase = 0.5;
   double entSurviveKnowledge = 0.35;
+
+  // ---- Variétés de produits (Modules.products). Ordres de grandeur a priori, non réglés sur un résultat.
+  // Utilité d'une variété pour un ménage : poids de la qualité × qualité × goût de sa classe pour la catégorie
+  // − sensibilité au prix × prix / prix mondial + notoriété (publicité) + habitude + goût personnel.
+  double prodQualityWeight = 1.0;
+  double prodPriceSens = 1.0; // sensibilité moyenne ; celle d'un citoyen va de 0,5 à 1,5 fois cette valeur (trait)
+  double prodTasteSpread = 0.5; // goût personnel durable : uniforme dans ± cette valeur
+  double prodHabit = 0.15; // bonus de la dernière variété achetée dans la catégorie
+  int prodForgetDays = 60; // une variété ni achetée ni revue depuis ce nombre de jours est oubliée
+  int prodKnownMax = 8; // variétés connues au plus, par catégorie
+  double prodAdRate = 0.03; // chance quotidienne de découvrir une variété (vitrine, publicité : pondérée par la notoriété)
+  double prodWordRate = 0.02; // chance quotidienne d'apprendre celle qu'achète un collègue (bouche-à-oreille)
+  double prodQualityCost = 0.5; // la productivité est divisée par 1 + ce coefficient × (qualité − 1)
+  int prodMakersMax = 3; // fabricants de machines connus par une entreprise
+  double prodMakerLearn = 0.01; // chance quotidienne qu'une entreprise découvre un fabricant
+  double prodLoyalty = 0.1; // préférence pour le fournisseur habituel (score × 1 + cette valeur)
+  double prodEntryMargin = 0.15; // marge moyenne des vendeurs en place jugée attrayante pour lancer une variété
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
@@ -767,6 +819,10 @@ class Modules {
   // et un prêt de la Caisse, au lieu de créations mécaniques de clones. Coupé par défaut. Suppose « Entrée et sortie
   // d'entreprises » (les fermetures) : seule la fondation change.
   bool entrepreneurship = false;
+  // Variétés de produits et marques : chaque entreprise d'un bien de consommation ou d'équipement vend sa variété (nom,
+  // qualité, goût des ménages, notoriété) au lieu d'un clone. Coupé par défaut. Les variétés naissent et meurent avec les
+  // entreprises : leur nombre n'est jamais fixé d'avance.
+  bool products = false;
 
   Modules();
 
@@ -793,14 +849,18 @@ class Modules {
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
     'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation', 'bankruptcy', 'buildings', 'jobs',
-    'entrepreneurship',
+    'entrepreneurship', 'products',
   ];
+
+  /// Modules apparus après la référence du moteur : ils n'apparaissent dans les instantanés, les empreintes et les
+  /// synthèses que lorsqu'ils sont actifs.
+  static const List<String> lateKeys = ['entrepreneurship', 'products'];
 
   /// Les modules sous forme de table pour les instantanés et les empreintes. Un module apparu après la référence du moteur
   /// n'y figure que lorsqu'il est actif : coupé, la sérialisation est celle d'avant lui.
   Map<String, bool> toJson() => {
         for (final k in keys)
-          if (k != 'entrepreneurship' || entrepreneurship) k: get(k),
+          if (!lateKeys.contains(k) || get(k)) k: get(k),
       };
   static const Map<String, String> labels = {
     'credit': 'Crédit bancaire (Caisse)',
@@ -821,6 +881,7 @@ class Modules {
     'buildings': 'Bâtiments, construction et hypothèques',
     'jobs': 'Rôles, contrats et négociation salariale',
     'entrepreneurship': 'Entrepreneuriat des citoyens',
+    'products': 'Variétés de produits et marques',
   };
 
   bool get(String k) {
@@ -861,6 +922,8 @@ class Modules {
         return jobs;
       case 'entrepreneurship':
         return entrepreneurship;
+      case 'products':
+        return products;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -903,6 +966,8 @@ class Modules {
         jobs = v;
       case 'entrepreneurship':
         entrepreneurship = v;
+      case 'products':
+        products = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -1228,6 +1293,10 @@ class Citizen extends Account {
   double aplomb = 0.5; // trait : aplomb en négociation, de 0 à 1
   // Entrepreneuriat : jours travaillés dans chaque type d'entreprise (connaissance du secteur ; tenu seulement avec le module).
   final Map<String, int> sectorDays = {};
+  // Variétés (module products) : par catégorie, les variétés connues et le dernier jour où chacune a été achetée ou revue ;
+  // la dernière achetée (habitude, bouche-à-oreille).
+  final Map<String, Map<int, int>> known = {};
+  final Map<String, int> lastChoice = {};
   Citizen(this.id, this.name, super.money, this.skill, this.ambition);
 
   /// 0 manœuvre, 1 technicien, 2 professionnel.
@@ -1323,6 +1392,13 @@ class Firm extends Account {
   int? founderId;
   int foundedDay = 0;
   double startCapital = 0;
+  // Variétés (module products) : la variété de l'entreprise ; machines installées (gain et durabilité moyens, 0 : modèle
+  // standard d'avant le module) ; fabricants connus et fournisseur habituel.
+  int? productId;
+  double machineGain = 0;
+  double machineLife = 0;
+  final List<int> knownMakers = [];
+  int? supplier;
   double lastBatches = 0;
   double outputEma = 0; // production lissée (~20 jours) : base du coût du travail réellement payé
   double effWorkers = 0;

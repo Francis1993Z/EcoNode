@@ -15,6 +15,7 @@ part 'snapshot.dart';
 part 'buildings.dart';
 part 'jobs.dart';
 part 'entrepreneuriat.dart';
+part 'produits.dart';
 
 /// mulberry32 (arithmétique 32 bits non signée) : même graine, même partie.
 class Mulberry32 {
@@ -100,7 +101,11 @@ enum Flux {
   logement(17), // bâtiments : état à la naissance, déménagement, regard sur le marché
   vendeurs(18), // recherche limitée : vendeurs examinés par un achat de ménage (Params.sellerSample)
   anciennete(19), // ancienneté des employés au départ de la partie (affichage ; module jobs : promotions, révisions)
-  entrepreneuriat(20); // un citoyen examine-t-il aujourd'hui la possibilité de fonder une entreprise (module entrepreneurship)
+  entrepreneuriat(20), // un citoyen examine-t-il aujourd'hui la possibilité de fonder une entreprise (module entrepreneurship)
+  qualite(21), // qualité d'une variété à son lancement ; gain et durabilité d'un modèle de machine (module products)
+  gouts(22), // goût personnel durable d'un citoyen pour une variété (tiré « au jour 0 » : rien à stocker)
+  connaissance(23), // découvertes du jour : vitrine et publicité, bouche-à-oreille, fabricants de machines
+  noms(24); // générateur de noms de variétés, de marques et d'entreprises (tiré « au jour 0 »)
 
   const Flux(this.code);
   final int code;
@@ -241,6 +246,13 @@ class _AllOffers {
           _Offer(null, s.worldPrice[good]! * p.importMarkup, s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), 1));
     }
     keys = [for (final o in offers) o.p * (1 + 0.03 * o.r) * o.pull];
+    used = List<bool>.filled(offers.length, false);
+  }
+
+  /// Offres déjà construites, avec leurs clés (module products : l'opposé de l'utilité de chaque variété).
+  _AllOffers.fromOffers(List<_Offer> list, List<double> k) {
+    offers.addAll(list);
+    keys = k;
     used = List<bool>.filled(offers.length, false);
   }
 
@@ -580,6 +592,14 @@ class Sim {
   /// Entrepreneuriat : fondations par des citoyens et fermetures, par année de partie (jour ÷ 365). Vides sans le module.
   final Map<int, int> foundedByYear = {};
   final Map<int, int> closedByYear = {};
+  /// Variétés de produits (module products) : toutes les variétés, vivantes ou abandonnées (identifiants jamais réutilisés),
+  /// la demande faiblement servie par catégorie (du jour, lissée) et les noms déjà pris.
+  bool productsActive = false;
+  final Map<int, Product> products = {};
+  int productSeq = 0;
+  final Map<String, double> poorToday = {};
+  final Map<String, double> poorEma = {};
+  final Set<String> usedNames = {};
   double householdSpend = 0;
   // positions des nodes spéciaux (ménages, État, Caisse, extérieur) ; l'interface les dispose
   final Map<String, List<double>> nodePos = {
@@ -718,6 +738,12 @@ class Sim {
     firmsClosed = 0;
     foundedByYear.clear();
     closedByYear.clear();
+    productsActive = false;
+    products.clear();
+    productSeq = 0;
+    poorToday.clear();
+    poorEma.clear();
+    usedNames.clear();
     householdSpend = 0;
     hype = {};
     adsBoost = 1;
@@ -883,6 +909,7 @@ class Sim {
       c.incomeEma = f != null ? (this.modules.jobs ? c.wage : f.wage) * (1 - p.taxRate) : p.benefit;
     }
     jobsActive = this.modules.jobs;
+    if (this.modules.products) _productsSwitch(); // les entreprises du départ reçoivent leur variété
     if (this.modules.buildings) _seedBuildings();
     m0 = totalMoney();
     bank.reserves = m0; // toute la monnaie de départ est « extérieure »
@@ -1092,6 +1119,7 @@ class Sim {
     firms.add(f);
     _fmap[f.id] = f;
     _rebuildSellers();
+    if (productsActive) _launchProduct(f); // module products : sa variété et un nom généré
     return f;
   }
 
@@ -1379,6 +1407,8 @@ class Sim {
     final a = f.template.capital;
     if (a <= 0 || !modules.capital) return 1;
     final k = f.machines / math.max(1, f.workers.length);
+    // module products : le gain moyen des modèles installés, rapporté au modèle standard
+    if (productsActive && f.machineGain > 0) return 1 + a * (f.machineGain / machineGainRef) * k / (k + 1);
     return 1 + a * k / (k + 1);
   }
 
@@ -1399,7 +1429,10 @@ class Sim {
   double adminMult(Firm f) => 0.88 + 0.12 * f.adminCover;
 
   /// Lots par employé et par jour, à efficacité 1.
-  double perWorker(Firm f) => f.rate * f.prodMult * machineMult(f) * techMult(f) * uptime(f) * adminMult(f);
+  double perWorker(Firm f) {
+    final v = f.rate * f.prodMult * machineMult(f) * techMult(f) * uptime(f) * adminMult(f);
+    return productsActive && f.productId != null ? v * qualityRate(f) : v; // module products : la qualité coûte
+  }
 
   /// Taux annuel d'une entreprise : taux de base + prime de risque proportionnelle à son endettement,
   /// mesuré par rapport à la valeur de ses machines (garantie maximale : 80 %).
@@ -1536,6 +1569,8 @@ class Sim {
       final bad = availMismatches();
       if (bad.isNotEmpty) throw StateError('Liste des vendeurs disponibles fausse au jour $day : ${bad.first}');
     }
+    Citizen? vc; // module products : le ménage qui choisit une variété
+    var searched = false;
     // achat d'entreprise pendant les achats d'intrants : offres servies dans l'ordre, sans toutes les construire
     final lazy = !household && qc != null ? _LazyOffers(this, qc[good] ??= _BestOffers(this, good), buyer, good, base) : null;
     _Offer? Function(int) pick;
@@ -1553,10 +1588,19 @@ class Sim {
         };
       }
     } else {
-      pick = (k > 0 && household && integer
-              ? _AllOffers.sampled(this, buyer, good, base, k, who, gi, n)
-              : _AllOffers(this, buyer, good, base, household, cached))
+      // module products : un ménage choisit parmi les variétés qu'il connaît ; faute d'en avoir une en stock, il cherche
+      // parmi les vendeurs disponibles (et apprend la variété trouvée)
+      _AllOffers? vo;
+      if (productsActive && household && integer && isDifferentiated(good)) {
+        vc = forCitizen ?? (buyer is Citizen ? buyer : null);
+        if (vc != null) vo = _varietyOffers(vc, buyer, good);
+      }
+      pick = (vo ??
+              (k > 0 && household && integer
+                  ? _AllOffers.sampled(this, buyer, good, base, k, who, gi, n)
+                  : _AllOffers(this, buyer, good, base, household, cached)))
           .pick;
+      searched = vc != null && vo == null;
     }
 
     var remaining = qty;
@@ -1586,7 +1630,9 @@ class Sim {
         s.sold[good] = (s.sold[good] ?? 0) + q;
         s.revenue += paid;
         if (k > 0 && household && sellerHabit) lastSeller[who * 64 + gi] = s.id; // habitude
+        if (vc != null) _boughtVariety(vc, good, s, q, searched);
       }
+      if (o.firm == null && vc != null) _boughtVariety(vc, good, null, q, searched);
       _flow(o.firm == null ? 'X' : o.firm!.id.toString(), buyerKey, good, q, paid);
       final ms = marketStats[good]!;
       ms.qty += q;
@@ -1674,6 +1720,7 @@ class Sim {
     labour.newDay();
     // module jobs activé ou coupé depuis la veille (onglet Diagnostic) : contrats créés ou mis de côté
     if (modules.jobs != jobsActive) _jobsSwitch();
+    if (modules.products != productsActive) _productsSwitch();
 
     // 0. Revenu de base divin (création monétaire)
     if (p.ubi > 0) {
@@ -1688,6 +1735,7 @@ class Sim {
     if (modules.buildings) _buildingsMorning();
     _laborMarket();
     if (modules.entrepreneurship) _learnSectors();
+    if (productsActive) _productsDay();
     if (modules.publicBudget) _publicBudget();
     _produce();
     _payWages();
@@ -1705,6 +1753,7 @@ class Sim {
     for (final g in goods.keys) {
       unmetEma[g] = 0.9 * (unmetEma[g] ?? 0) + 0.1 * (unmet[g] ?? 0);
     }
+    if (productsActive) _productsEndOfDay();
     if (modules.entry) {
       _entryExit();
       _purgeFlows();
@@ -2767,7 +2816,8 @@ class Sim {
       // usure : deux fois et demie plus rapide sans entretien
       if (modules.capital && f.machines > eps) {
         final cover = f.template.maint == null ? 1.0 : f.maintToday;
-        final dep = f.machines * p.depreciation * (1 + 1.5 * (1 - cover));
+        var dep = f.machines * p.depreciation * (1 + 1.5 * (1 - cover));
+        if (productsActive && f.machineLife > 0) dep /= f.machineLife; // module products : durabilité des modèles
         f.machines = math.max(0.0, f.machines - dep);
         f.costs += dep * pm; // amortissement : un coût, sans mouvement d'argent
       }
@@ -2916,8 +2966,9 @@ class Sim {
       if ((modules.bankRegulation || safeguards.credit) && !_creditOk(f, need)) return;
       _lend(f, need);
     }
-    final r = buy(f, f.id.toString(), 'machines', 1, f.money, true);
-    if (r.qty >= 1) {
+    // module products : le modèle au meilleur gain par dollar parmi les fabricants connus
+    final bought = productsActive ? _investBuy(f) : buy(f, f.id.toString(), 'machines', 1, f.money, true).qty;
+    if (bought >= 1) {
       f.machines += 1;
       f.lastInvest = day;
     }
@@ -3025,7 +3076,10 @@ class Sim {
       final g = t.outputs.keys.first;
       if (publicGood(g)) continue; // l'État fournit ce service : pas de concurrent privé
       if (g == 'logement' && modules.buildings) continue; // un bailleur sans bâtiment n'a rien à louer : on construit
-      final want = unmetEma[g] ?? 0; // unités par jour non servies
+      // module products, catégorie différenciée : demande non servie ou faiblement servie (voir entryWant)
+      final diff = productsActive && isDifferentiated(g);
+      final wantD = diff ? entryWant(g) : 0.0;
+      final want = diff ? math.max(0.0, wantD) : (unmetEma[g] ?? 0); // unités par jour non servies
       final perWorker0 = t.rate * t.outputs[g]!; // unités par employé et par jour, sans machines
       if (want < p.entryMinShare * perWorker0) continue; // pas de signal : pas de projet
       String? refused;
@@ -3042,11 +3096,13 @@ class Sim {
         // concurrence : seulement après le démarrage, si les marges sont fortes et que la demande laissée occupe
         // un employé à plein temps
         (refused, detail) = ('concurrence', 'avant le jour 100');
-      } else if (active.length >= 3) {
+      } else if (!diff && active.length >= 3) {
         (refused, detail) = ('concurrence', '${active.length} producteurs actifs');
+      } else if (diff && wantD < 0) {
+        (refused, detail) = ('concurrence', 'marge des variétés en place peu attrayante');
       } else if (want < perWorker0) {
         (refused, detail) = ('demande', 'n’occupe pas un employé');
-      } else if (!active.every((f) => f.profitEma > 0 && f.price[g]! >= p.entryMarginRatio * (f.unitCostCache[g] ?? double.infinity))) {
+      } else if (!diff && !active.every((f) => f.profitEma > 0 && f.price[g]! >= p.entryMarginRatio * (f.unitCostCache[g] ?? double.infinity))) {
         (refused, detail) = ('concurrence', 'marges des producteurs en place trop faibles');
       } else {
         why = 'demande non servie et fortes marges';
@@ -3106,7 +3162,9 @@ class Sim {
     final same = firms.where((o) => o.type == ty).toList();
     final slot = _slots.remove(ty) ?? (same.isNotEmpty ? [same.last.x, same.last.y + 170] : [600.0, 300.0]);
     final f = _newFirm(ty, '${t.label} ${founder.name.split(' ').last}', 0, founder.id, slot[0], slot[1]);
-    f.rate = t.rate * _minScale(w, 1); // échelle minimale si la demande n'occupe pas un employé
+    // échelle minimale si la demande n'occupe pas un employé ; module products, catégorie différenciée : pas de fraction
+    // d'employé, la variété doit faire vivre un employé entier
+    f.rate = productsActive && isDifferentiated(g) ? t.rate : t.rate * _minScale(w, 1);
     f.wage = wage;
     if (modules.jobs) {
       f.offer = marketOffer(t.skill);
@@ -3189,6 +3247,7 @@ class Sim {
     _rebuildSellers();
     _flowPurge.add(f.id.toString()); // ses flux lissés sont retirés en une passe à la fin de _entryExit (_purgeFlows)
     firmsClosed++;
+    if (productsActive) _productGone(f, '${f.name} ferme : ${SimEntrepreneurship.closeReasons[cause] ?? cause}');
     if (modules.entrepreneurship) {
       _entClosed(f, cause, left, owner);
       return;
