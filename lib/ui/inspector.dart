@@ -130,6 +130,7 @@ class _FirmView extends StatelessWidget {
       ]),
       if (sim.modules.entrepreneurship && !sim.publicService(f)) _foundingSection(context, ctrl, f),
       if (sim.modules.products) _productSection(context, ctrl, f),
+      if (sim.modules.banking) _firmBankSection(context, ctrl, f),
       if (sim.publicService(f)) _publicSection(context, ctrl, f),
       if (sim.modules.buildings && f.type == 'immobilier') landlordSection(context, ctrl, f),
       _StaffSection(ctrl, f),
@@ -850,6 +851,7 @@ class _CitizenViewState extends State<_CitizenView> {
           ]),
       ]),
       if (sim.modules.products) _citizenVarieties(context, widget.ctrl, c),
+      if (sim.modules.banking || sim.consumerLent > 0) _citizenCreditSection(context, widget.ctrl, c),
       Section('Satisfaction des désirs', [
         for (final d in desires) _Bar(desireLabels[d]!, c.sat[d] ?? 0.0),
       ]),
@@ -1368,5 +1370,37 @@ Widget _citizenVarieties(BuildContext context, SimController ctrl, Citizen c) {
       ],
     KV('Sensibilité au prix', '×${fmtNum(sim.priceSensitivity(c), 2)}'),
     Text('★ : la variété qu’il achète d’habitude.', style: TextStyle(color: pal.ink3, fontSize: 10.5)),
+  ]);
+}
+
+
+/// Crédit d'un citoyen : banque, cote, carte, prêts, retards, faillites.
+Widget _citizenCreditSection(BuildContext context, SimController ctrl, Citizen c) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final blocker = sim.creditBlocker(c);
+  return Section('Crédit', [
+    KV('Banque', sim.bankName(c.bankId)),
+    KV('Cote de crédit', '${sim.creditScore(c)} / 900'),
+    KV('Accès au crédit', blocker == null ? 'ouvert' : 'fermé : $blocker', color: blocker == null ? pal.ok : pal.warn),
+    KV('Carte : solde · limite', c.cardLimit > 0 ? '${money0(c.card)} · ${money0(c.cardLimit)}' : 'pas de carte'),
+    if (c.cardLimit > 0) KV('Taux de la carte', pct(sim.cardRateOf(c))),
+    for (final l in c.loans)
+      KV('Prêt (${l.reason})', '${money0(l.balance)} · ${money0(l.payment)}/mois · ${pct(l.rate)}'),
+    KV('Service de la dette par mois', money0(sim.monthlyDebtService(c))),
+    if (c.arrears > 0) KV('En retard', '${money0(c.arrears)} depuis le jour ${c.arrearsSince}', color: pal.bad),
+    if (c.latePayments > 0) KV('Retards récents', '${c.latePayments}', color: pal.warn),
+    if (c.bankruptcies > 0)
+      KV('Faillites', '${c.bankruptcies} — dernière ${c.lastBankruptcy}', color: pal.bad),
+  ]);
+}
+
+/// La banque d'une entreprise et sa dette.
+Widget _firmBankSection(BuildContext context, SimController ctrl, Firm f) {
+  final sim = ctrl.sim;
+  return Section('Banque', [
+    KV('Banque', sim.bankName(f.bankId)),
+    KV('Dette', money0(f.debt)),
+    if (f.workingDebt > 0) KV('dont fonds de roulement', money0(f.workingDebt)),
   ]);
 }

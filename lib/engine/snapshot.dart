@@ -160,6 +160,30 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.prodMakerLearn != d.prodMakerLearn) 'prodMakerLearn': _d(p.prodMakerLearn),
     if (p.prodLoyalty != d.prodLoyalty) 'prodLoyalty': _d(p.prodLoyalty),
     if (p.prodEntryMargin != d.prodEntryMargin) 'prodEntryMargin': _d(p.prodEntryMargin),
+    if (p.cardRate != d.cardRate) 'cardRate': _d(p.cardRate),
+    if (p.cardMinPct != d.cardMinPct) 'cardMinPct': _d(p.cardMinPct),
+    if (p.cardLimitDays != d.cardLimitDays) 'cardLimitDays': _d(p.cardLimitDays),
+    if (p.loanRateSpread != d.loanRateSpread) 'loanRateSpread': _d(p.loanRateSpread),
+    if (p.loanTermMonths != d.loanTermMonths) 'loanTermMonths': p.loanTermMonths,
+    if (p.creditRiskPremium != d.creditRiskPremium) 'creditRiskPremium': _d(p.creditRiskPremium),
+    if (p.dsrMax != d.dsrMax) 'dsrMax': _d(p.dsrMax),
+    if (p.creditMinScore != d.creditMinScore) 'creditMinScore': p.creditMinScore,
+    if (p.bkArrearsDays != d.bkArrearsDays) 'bkArrearsDays': p.bkArrearsDays,
+    if (p.bkDebtIncome != d.bkDebtIncome) 'bkDebtIncome': _d(p.bkDebtIncome),
+    if (p.bkBanDays != d.bkBanDays) 'bkBanDays': p.bkBanDays,
+    if (p.bankTightLoss != d.bankTightLoss) 'bankTightLoss': _d(p.bankTightLoss),
+    if (p.nBanks != d.nBanks) 'nBanks': p.nBanks,
+    if (p.reservePerCitizen != d.reservePerCitizen) 'reservePerCitizen': _d(p.reservePerCitizen),
+    if (p.policyRate != d.policyRate) 'policyRate': _d(p.policyRate),
+    if (p.reserveRatio != d.reserveRatio) 'reserveRatio': _d(p.reserveRatio),
+    if (p.bankStaff != d.bankStaff) 'bankStaff': p.bankStaff,
+    if (p.bankRentDaily != d.bankRentDaily) 'bankRentDaily': _d(p.bankRentDaily),
+    if (p.bankLookChance != d.bankLookChance) 'bankLookChance': _d(p.bankLookChance),
+    if (p.bankSwitchGain != d.bankSwitchGain) 'bankSwitchGain': _d(p.bankSwitchGain),
+    if (p.bankLossDays != d.bankLossDays) 'bankLossDays': p.bankLossDays,
+    if (p.bankFoundRate != d.bankFoundRate) 'bankFoundRate': _d(p.bankFoundRate),
+    if (p.bankMinCapital != d.bankMinCapital) 'bankMinCapital': _d(p.bankMinCapital),
+    if (p.bankEntryCost != d.bankEntryCost) 'bankEntryCost': _d(p.bankEntryCost),
   };
 }
 
@@ -276,7 +300,98 @@ Params _paramsFrom(Map j) => Params()
   ..prodMakersMax = (j['prodMakersMax'] as int?) ?? 3
   ..prodMakerLearn = _rdOr(j['prodMakerLearn'], 0.01)
   ..prodLoyalty = _rdOr(j['prodLoyalty'], 0.1)
-  ..prodEntryMargin = _rdOr(j['prodEntryMargin'], 0.15);
+  ..prodEntryMargin = _rdOr(j['prodEntryMargin'], 0.15)
+  ..cardRate = _rdOr(j['cardRate'], 0.20)
+  ..cardMinPct = _rdOr(j['cardMinPct'], 0.03)
+  ..cardLimitDays = _rdOr(j['cardLimitDays'], 30)
+  ..loanRateSpread = _rdOr(j['loanRateSpread'], 0.04)
+  ..loanTermMonths = (j['loanTermMonths'] as int?) ?? 12
+  ..creditRiskPremium = _rdOr(j['creditRiskPremium'], 0.10)
+  ..dsrMax = _rdOr(j['dsrMax'], 0.40)
+  ..creditMinScore = (j['creditMinScore'] as int?) ?? 550
+  ..bkArrearsDays = (j['bkArrearsDays'] as int?) ?? 90
+  ..bkDebtIncome = _rdOr(j['bkDebtIncome'], 2.0)
+  ..bkBanDays = (j['bkBanDays'] as int?) ?? 730
+  ..bankTightLoss = _rdOr(j['bankTightLoss'], 0.03)
+  ..nBanks = (j['nBanks'] as int?) ?? 3
+  ..reservePerCitizen = _rdOr(j['reservePerCitizen'], 100000)
+  ..policyRate = _rdOr(j['policyRate'], 0.03)
+  ..reserveRatio = _rdOr(j['reserveRatio'], 0.02)
+  ..bankStaff = (j['bankStaff'] as int?) ?? 3
+  ..bankRentDaily = _rdOr(j['bankRentDaily'], 100)
+  ..bankLookChance = _rdOr(j['bankLookChance'], 0.005)
+  ..bankSwitchGain = _rdOr(j['bankSwitchGain'], 0.005)
+  ..bankLossDays = (j['bankLossDays'] as int?) ?? 365
+  ..bankFoundRate = _rdOr(j['bankFoundRate'], 0.0005)
+  ..bankMinCapital = _rdOr(j['bankMinCapital'], 100000)
+  ..bankEntryCost = _rdOr(j['bankEntryCost'], 20000);
+
+List<Object?> _bankObjJson(Bank b) => [
+      b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
+      _d(b.depositRate), b.founded, b.alive, b.closed, b.state, b.lossDays, _d(b.profitEma), _d(b.lossEma),
+      _d(b.incomeEma), _d(b.costEma),
+    ];
+
+Bank _bankObjFrom(List l) => Bank(l[0] as int, l[1] as String)
+  ..ownerId = l[2] as int?
+  ..equity = _rd(l[3])
+  ..capital = _rd(l[4])
+  ..interbank = _rd(l[5])
+  ..loanSpread = _rd(l[6])
+  ..cardSpread = _rd(l[7])
+  ..depositRate = _rd(l[8])
+  ..founded = l[9] as int
+  ..alive = l[10] as bool
+  ..closed = l[11] as int?
+  ..state = l[12] as String
+  ..lossDays = l[13] as int
+  ..profitEma = _rd(l[14])
+  ..lossEma = _rd(l[15])
+  ..incomeEma = _rd(l[16])
+  ..costEma = _rd(l[17]);
+
+/// Crédit d'un citoyen (module banking) : écrit seulement s'il diffère de l'état initial.
+bool _hasCredit(Citizen c) =>
+    c.loans.isNotEmpty || c.card > 0 || c.cardLimit > 0 || c.cardOpened >= 0 || c.arrears > 0 || c.latePayments > 0 ||
+    c.bankruptcies > 0 || c.creditBanUntil > 0 || c.bankId != 0 || c.cardInterest > 0;
+
+Map<String, Object?> _creditJson(Citizen c) => {
+      'loans': [
+        for (final l in c.loans) [l.bankId, _d(l.balance), _d(l.rate), l.months, _d(l.payment), l.start, l.reason]
+      ],
+      'card': _d(c.card),
+      'cardLimit': _d(c.cardLimit),
+      'cardInterest': _d(c.cardInterest),
+      'cardOpened': c.cardOpened,
+      'arrears': _d(c.arrears),
+      'arrearsSince': c.arrearsSince,
+      'latePayments': c.latePayments,
+      'lastLate': c.lastLate,
+      'bankruptcies': c.bankruptcies,
+      'creditBanUntil': c.creditBanUntil,
+      'lastBankruptcy': c.lastBankruptcy,
+      'bankId': c.bankId,
+    };
+
+void _creditFrom(Citizen c, Map j) {
+  for (final l in j['loans'] as List) {
+    final x = l as List;
+    c.loans.add(PersonalLoan(x[0] as int, _rd(x[1]), _rd(x[2]), x[3] as int, _rd(x[4]), x[5] as int, x[6] as String));
+  }
+  c
+    ..card = _rd(j['card'])
+    ..cardLimit = _rd(j['cardLimit'])
+    ..cardInterest = _rd(j['cardInterest'])
+    ..cardOpened = j['cardOpened'] as int
+    ..arrears = _rd(j['arrears'])
+    ..arrearsSince = j['arrearsSince'] as int?
+    ..latePayments = j['latePayments'] as int
+    ..lastLate = j['lastLate'] as int
+    ..bankruptcies = j['bankruptcies'] as int
+    ..creditBanUntil = j['creditBanUntil'] as int
+    ..lastBankruptcy = j['lastBankruptcy'] as String
+    ..bankId = j['bankId'] as int;
+}
 
 /// Une variété : liste compacte.
 List<Object?> _productJson(Product p) => [
@@ -347,6 +462,7 @@ Map<String, Object?> _citizenJson(Citizen c) => {
       if (c.known.isNotEmpty)
         'known': {for (final e in c.known.entries) e.key: {for (final k in e.value.entries) '${k.key}': k.value}},
       if (c.lastChoice.isNotEmpty) 'lastChoice': c.lastChoice,
+      if (_hasCredit(c)) 'credit': _creditJson(c),
     };
 
 Citizen _citizenFrom(Map j) {
@@ -383,6 +499,7 @@ Citizen _citizenFrom(Map j) {
     }
   }
   if (j['lastChoice'] != null) c.lastChoice.addAll(_rim(j['lastChoice']));
+  if (j['credit'] != null) _creditFrom(c, j['credit'] as Map);
   return c;
 }
 
@@ -459,6 +576,7 @@ Map<String, Object?> _firmJson(Firm f) => {
       if (f.machineLife > 0) 'machineLife': _d(f.machineLife),
       if (f.knownMakers.isNotEmpty) 'knownMakers': f.knownMakers,
       if (f.supplier != null) 'supplier': f.supplier,
+      if (f.bankId != 0) 'bankId': f.bankId,
     };
 
 List<Object?> _talkJson(Talk t) =>
@@ -540,7 +658,8 @@ Firm _firmFrom(Map j) {
     ..productId = j['productId'] as int?
     ..machineGain = _rdOr(j['machineGain'], 0)
     ..machineLife = _rdOr(j['machineLife'], 0)
-    ..supplier = j['supplier'] as int?;
+    ..supplier = j['supplier'] as int?
+    ..bankId = (j['bankId'] as int?) ?? 0;
   if (j['knownMakers'] != null) f.knownMakers.addAll(_ril(j['knownMakers']));
   f.talks.addAll([for (final t in (j['talks'] as List?) ?? const []) _talkFrom(t as List)]);
   f.workers.addAll(_ril(j['workers']));
@@ -622,6 +741,8 @@ Map<String, Object?> _dayFlowsJson(DayFlows f) => {
       'imports': _d(f.imports),
       'capitalized': _d(f.capitalized),
       'writtenOff': _d(f.writtenOff),
+      if (f.bankIn != 0) 'bankIn': _d(f.bankIn),
+      if (f.bankOut != 0) 'bankOut': _d(f.bankOut),
     };
 
 void _dayFlowsLoad(DayFlows f, Map j) {
@@ -635,7 +756,9 @@ void _dayFlowsLoad(DayFlows f, Map j) {
     ..exports = _rd(j['exports'])
     ..imports = _rd(j['imports'])
     ..capitalized = _rd(j['capitalized'])
-    ..writtenOff = _rd(j['writtenOff']);
+    ..writtenOff = _rd(j['writtenOff'])
+    ..bankIn = _rdOr(j['bankIn'], 0)
+    ..bankOut = _rdOr(j['bankOut'], 0);
 }
 
 Map<String, Object?> _serviceJson(ServiceStats s) => {
@@ -796,6 +919,14 @@ extension SimSnapshot on Sim {
         if (productSeq > 0) 'productSeq': productSeq,
         if (products.isNotEmpty) 'products': [for (final p in products.values) _productJson(p)],
         if (poorEma.isNotEmpty) 'poorEma': _dm(poorEma),
+        if (bankingActive) 'bankingActive': true,
+        if (banks.isNotEmpty) 'banks': [for (final b in banks) _bankObjJson(b)],
+        if (bankCountHist.isNotEmpty) 'bankCountHist': bankCountHist,
+        if (banksFounded + banksClosed > 0) 'banksEntryExit': [banksFounded, banksClosed],
+        if (consumerLent > 0 || consumerBankruptcies > 0)
+          'consumerCredit': [
+            _d(consumerLent), _d(consumerWrittenOff), consumerBankruptcies, _d(consumerLossEma), _d(consumerLossToday)
+          ],
         'depositsAtCheck': _d(_depositsAtCheck),
         'cpiBase': _d(_cpiBase),
         'cpiWeights': _dm(cpiWeights),
@@ -922,6 +1053,22 @@ extension SimSnapshot on Sim {
       ..clear()
       ..addAll({for (final e in ((j['foundedByYear'] as Map?) ?? const {}).entries) int.parse(e.key as String): e.value as int});
     productsActive = (j['productsActive'] as bool?) ?? false;
+    bankingActive = (j['bankingActive'] as bool?) ?? false;
+    banks
+      ..clear()
+      ..addAll([for (final l in (j['banks'] as List?) ?? const []) _bankObjFrom(l as List)]);
+    bankCountHist
+      ..clear()
+      ..addAll(_ril(j['bankCountHist'] ?? const []));
+    final ee = (j['banksEntryExit'] as List?) ?? const [0, 0];
+    banksFounded = ee[0] as int;
+    banksClosed = ee[1] as int;
+    final cc = (j['consumerCredit'] as List?) ?? const [0, 0, 0, 0, 0];
+    consumerLent = _rd(cc[0]);
+    consumerWrittenOff = _rd(cc[1]);
+    consumerBankruptcies = cc[2] as int;
+    consumerLossEma = _rd(cc[3]);
+    consumerLossToday = _rd(cc[4]);
     productSeq = (j['productSeq'] as int?) ?? 0;
     products
       ..clear()

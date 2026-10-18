@@ -263,6 +263,8 @@ variable de tirages et décalait toute la suite de la partie.
 | 22 | `gouts` | goût personnel durable (citoyen, variété), tiré au jour 0 : rien à stocker | `produits.dart:tasteOf` |
 | 23 | `connaissance` | découvertes du jour : vitrine et publicité, bouche-à-oreille, fabricants de machines | `produits.dart:_productsDay` |
 | 24 | `noms` | générateur de noms de variétés, de marques et d'entreprises (tiré au jour 0) | `produits.dart:_uniqueName` |
+| 25 | `credit` | achat important à crédit d'un citoyen (module `banking`, § 6.19) | `banques.dart:_citizenCredit` |
+| 26 | `banques` | banque d'un nouveau client, comparaison de banques, projet de banque d'un citoyen | `banques.dart` |
 
 La création d'entreprise ne tire rien : le fondateur est le citoyen le plus riche.
 
@@ -873,6 +875,27 @@ aucune variété créée d'avance : une entreprise lance la sienne à sa créati
 - **Entrée** (`entryWant`) : pour une catégorie différenciée, plus de plafond de 3 producteurs ni de test de marge par vendeur : demande non
   servie + demande faiblement servie (achat d'une variété mal aimée ou trouvée faute d'en connaître) ÷ (1 + variétés actives), si la marge
   moyenne en place ≥ `prodEntryMargin` ; seule limite dure : un employé entier (pas d'échelle minimale fractionnaire) et la viabilité.
+
+### 6.19 Crédit aux citoyens et banques (module `banking`, `banques.dart`)
+
+Coupé par défaut (l'interface le lance actif). **Crédit aux particuliers** : carte de crédit quand l'argent ne couvre pas les besoins
+du jour (limite `cardLimitDays` jours de revenu selon la cote, paiement minimum `cardMinPct` par mois, taux `cardRate` + marge de la
+banque + prime de cote), prêt personnel à mensualités constantes (`loanTermMonths`) pour un creux de chômage ou un achat important ;
+remboursement de la carte quand le revenu arrive. Cote 300–900 (retards récents, dette / revenu, emploi, faillite) ; service de la
+dette ≤ `dsrMax` du revenu ; I4 à chaque crédit. Comptes : comme les prêts aux entreprises (création de dépôts, remboursement qui
+détruit la monnaie, intérêts aux fonds propres, impayés capitalisés). **Faillite personnelle** : retards depuis `bkArrearsDays` jours,
+ou dette sans emploi > `bkDebtIncome` ans de revenu → radiation (perte de la banque), crédit fermé `bkBanDays` jours.
+**Plusieurs banques** (`nBanks` ≥ 2) : toute la monnaie passe par le compte consolidé `Sim.bank` (invariants inchangés) ; chaque banque
+(`Bank`) en est une répartition : fonds propres (la Caisse, banque 0, a le reste et n'est jamais résolue), prêts et dépôts de ses
+clients, réserves = solde de son bilan (règlement net), position interbancaire au taux directeur `policyRate` sous les réserves
+minimales `reserveRatio`. Dotation `reservePerCitizen` × population par banque de départ : monnaie extérieure, contrepartie capital
+plancher d'un actionnaire institutionnel ; dividendes au-delà du plancher → citoyens (fondateur pour une banque de citoyen). Coûts : le
+travail de `bankStaff` employés de services comptables acheté au marché, un loyer. Taux revus tous les 30 jours (stress → marges en
+hausse ; réserves inactives → marges en baisse, dépôts mieux payés). Clients : comparaison rare (`bankLookChance`), changement si
+l'avantage dépasse `bankSwitchGain`, jamais avec une dette. Faillite (fonds propres négatifs, ratio sous I4, pertes `bankLossDays`
+jours) : reprise par la banque la plus solide, actionnaires effacés, déposants intacts. **Fondation par un citoyen** : décision de
+l'entrepreneuriat (connaissance du secteur : jours dans un cabinet comptable) sur le profit espéré à la part de marché restante
+1/(n+1) moins le coût fixe ; capital minimum absolu `bankMinCapital` versé par `transfer()`, frais irrécupérables `bankEntryCost`.
 
 ---
 

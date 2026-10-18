@@ -8,6 +8,7 @@ import 'charts.dart';
 import 'controller.dart';
 import 'format.dart';
 import 'palette.dart';
+import 'start_params.dart';
 import 'widgets.dart';
 
 class EconomyTab extends StatelessWidget {
@@ -203,7 +204,6 @@ class ModelTab extends StatefulWidget {
 class _ModelTabState extends State<ModelTab> {
   double seed = 42;
   double pop = 240;
-  double wallet = 3000;
 
   SimController get ctrl => widget.ctrl;
 
@@ -317,6 +317,8 @@ class _ModelTabState extends State<ModelTab> {
       ]),
       _entrepreneurSection(context, ctrl, upd),
       _productsSection(context, ctrl, upd),
+      _creditSection(context, ctrl, upd),
+      _banksSection(context, ctrl, upd),
       Section('Nouvelle partie', [
         Row(children: [
           Expanded(
@@ -329,21 +331,18 @@ class _ModelTabState extends State<ModelTab> {
                   value: pop,
                   decimals: 0,
                   onSubmit: (v) => setState(() => pop = v.abs().clamp(40, 1000).toDouble()))),
-          const SizedBox(width: 8),
-          Expanded(
-              child: NumField(
-                  label: 'Capital initial',
-                  value: wallet,
-                  suffix: '\$',
-                  decimals: 0,
-                  onSubmit: (v) => setState(() => wallet = v.abs()))),
         ]),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(bottom: 8),
+          title: const Text('Paramètres de départ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          subtitle: const Text('Pris en compte au prochain « Recommencer » (les mêmes que l’écran de départ).',
+              style: TextStyle(fontSize: 11)),
+          children: [StartParamsEditor(ctrl.startParams, onChanged: () => setState(() {}))],
+        ),
         const SizedBox(height: 8),
         Btn('Recommencer', () {
-          final np = Params()
-            ..population = pop.round()
-            ..startWallet = wallet;
-          ctrl.newGame(seed.round(), params: np);
+          ctrl.newGame(seed.round(), params: freshParams(ctrl.startParams, pop.round()));
         }, primary: true, icon: Icons.restart_alt),
         Text(
             'Même graine, mêmes réglages : la simulation se déroule toujours de la même façon. '
@@ -558,4 +557,206 @@ Widget _categoryTile(BuildContext context, SimController ctrl, String g) {
         KV('Demande faiblement servie (lissée)', '${fmtNum(sim.poorEma[g]!, 1)} ${goods[g]!.unit}/j'),
     ],
   );
+}
+
+
+/// Crédit aux citoyens : l'interrupteur, les réglages et les totaux.
+Widget _creditSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final p = sim.params;
+  var cards = 0, loans = 0, late = 0;
+  var cardDebt = 0.0, loanDebt = 0.0;
+  for (final c in sim.citizens) {
+    if (c.cardLimit > 0) cards++;
+    loans += c.loans.length;
+    if (c.arrears > 0) late++;
+    cardDebt += c.card;
+    for (final l in c.loans) {
+      loanDebt += l.balance;
+    }
+  }
+  return Section('Crédit aux citoyens', [
+    Text(
+        'Un citoyen à court d’argent pour manger, se loger ou se soigner paie avec sa carte de crédit et la rembourse quand '
+        'son revenu arrive ; un creux de chômage ou un achat important passe par un prêt personnel. Le taux suit sa cote. '
+        'Quand il ne peut plus payer, il fait faillite : la banque radie la dette et lui ferme le crédit un temps.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: Text(Modules.labels['banking']!, style: const TextStyle(fontSize: 13)),
+      subtitle: const Text('Coupé en cours de partie : les dettes se remboursent, plus aucun crédit nouveau.',
+          style: TextStyle(fontSize: 11)),
+      value: sim.modules.banking,
+      onChanged: (v) => upd(() => sim.modules.banking = v),
+    ),
+    ParamSlider(
+        label: 'Taux de la carte de crédit (base annuelle)',
+        value: p.cardRate,
+        min: 0.05,
+        max: 0.35,
+        format: pct,
+        hint: 'Taux de base ; la cote y ajoute jusqu’à ${pct(p.creditRiskPremium / 2)} et une banque qui resserre, 5 points.',
+        onChanged: (v) => upd(() => p.cardRate = (v * 200).round() / 200)),
+    ParamSlider(
+        label: 'Faillite : jours de retard',
+        value: p.bkArrearsDays.toDouble(),
+        min: 30,
+        max: 360,
+        format: (v) => '${v.round()} j',
+        hint: 'Un citoyen qui n’a pas rattrapé ses paiements en retard depuis ce nombre de jours fait faillite.',
+        onChanged: (v) => upd(() => p.bkArrearsDays = v.round())),
+    ParamSlider(
+        label: 'Faillite : dette sans emploi (années de revenu)',
+        value: p.bkDebtIncome,
+        min: 0.5,
+        max: 5,
+        format: (v) => '${fmtNum(v, 1)} an${v >= 2 ? 's' : ''}',
+        hint: 'Sans emploi, une dette au-delà de ce nombre d’années de revenu déclenche la faillite.',
+        onChanged: (v) => upd(() => p.bkDebtIncome = (v * 10).round() / 10)),
+    ParamSlider(
+        label: 'Faillite : crédit fermé ensuite',
+        value: p.bkBanDays.toDouble(),
+        min: 0,
+        max: 2190,
+        format: (v) => '${v.round()} j',
+        hint: 'Durée pendant laquelle un failli n’obtient aucun crédit ; sa cote reste abaissée ensuite.',
+        onChanged: (v) => upd(() => p.bkBanDays = v.round())),
+    ParamSlider(
+        label: 'Service de la dette maximal',
+        value: p.dsrMax,
+        min: 0.1,
+        max: 0.8,
+        format: pct,
+        hint: 'Mensualités et paiement minimum de la carte, en part du revenu mensuel : au-delà, la banque refuse.',
+        onChanged: (v) => upd(() => p.dsrMax = (v * 100).round() / 100)),
+    const SizedBox(height: 4),
+    KV('Cartes ouvertes · prêts personnels en cours', '$cards · $loans'),
+    KV('Dette des citoyens : cartes · prêts', '${money0(cardDebt)} · ${money0(loanDebt)}'),
+    KV('Citoyens en retard de paiement', '$late', color: late > 0 ? pal.warn : null),
+    KV('Prêté aux citoyens · radié (total)', '${money0(sim.consumerLent)} · ${money0(sim.consumerWrittenOff)}'),
+    KV('Faillites personnelles (total)', '${sim.consumerBankruptcies}', color: sim.consumerBankruptcies > 0 ? pal.warn : null),
+  ]);
+}
+
+
+/// Banques : réglages, liste (capital, ratio, prêts, dépôts, taux, profit, clients, état) et nombre de banques dans le temps.
+Widget _banksSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final p = sim.params;
+  String rate(double v) => '${fmtNum(v * 100, 1)} %';
+  return Section('Banques', [
+    Text(
+        'À partir de deux banques, chaque compte appartient à une banque. Elles visent le profit : intérêts reçus moins '
+        'intérêts des dépôts, pertes et coûts (employés, local). Les paiements entre banques se règlent en réserves ; '
+        'une banque à court emprunte aux autres au taux directeur. Les clients changent rarement de banque.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    ParamSlider(
+        label: 'Banques de départ (nouvelle partie)',
+        value: p.nBanks.toDouble(),
+        min: 1,
+        max: 8,
+        format: (v) => '${v.round()}',
+        hint: '1 : la Caisse populaire seule, sans concurrence. Pris en compte à la prochaine partie.',
+        onChanged: (v) => upd(() => p.nBanks = v.round())),
+    ParamSlider(
+        label: 'Dotation par citoyen (nouvelle partie)',
+        value: p.reservePerCitizen,
+        min: 0,
+        max: 200000,
+        format: money0,
+        hint: 'Réserves de chaque banque de départ, par citoyen ; contrepartie : capital d’un actionnaire institutionnel, '
+            'jamais distribué, dont les dividendes vont aux citoyens.',
+        onChanged: (v) => upd(() => p.reservePerCitizen = (v / 1000).round() * 1000.0)),
+    ParamSlider(
+        label: 'Taux directeur',
+        value: p.policyRate,
+        min: 0,
+        max: 0.12,
+        format: rate,
+        hint: 'Taux du marché interbancaire, et plafond des taux de dépôt.',
+        onChanged: (v) => upd(() => p.policyRate = (v * 400).round() / 400)),
+    ParamSlider(
+        label: 'Coût fixe : employés par banque',
+        value: p.bankStaff.toDouble(),
+        min: 0,
+        max: 20,
+        format: (v) => '${v.round()}',
+        hint: 'Chaque banque achète chaque jour le travail de ce nombre d’employés de services comptables (embauchés sur le '
+            'marché du travail par les cabinets).',
+        onChanged: (v) => upd(() => p.bankStaff = v.round())),
+    ParamSlider(
+        label: 'Coût fixe : loyer quotidien',
+        value: p.bankRentDaily,
+        min: 0,
+        max: 1000,
+        format: money0,
+        hint: 'Loyer du local, versé chaque jour à un bailleur.',
+        onChanged: (v) => upd(() => p.bankRentDaily = (v / 10).round() * 10.0)),
+    ParamSlider(
+        label: 'Fondation de banques : taux',
+        value: p.bankFoundRate * 10000,
+        min: 0,
+        max: 50,
+        format: (v) => '${fmtNum(v / 100, 2)} %/j',
+        hint: 'Chance quotidienne qu’un citoyen candidat (désir de posséder, ambition, tolérance au risque) examine un projet '
+            'de banque ; il ne fonde que si le profit espéré sur la part de marché restante couvre le risque.',
+        onChanged: (v) => upd(() => p.bankFoundRate = v.round() / 10000)),
+    ParamSlider(
+        label: 'Capital minimum d’une banque',
+        value: p.bankMinCapital,
+        min: 0,
+        max: 1000000,
+        format: money0,
+        hint: 'Montant absolu, en dollars, que le fondateur verse de sa poche (pas proportionnel à la population).',
+        onChanged: (v) => upd(() => p.bankMinCapital = (v / 5000).round() * 5000.0)),
+    ParamSlider(
+        label: 'Coût d’entrée irrécupérable',
+        value: p.bankEntryCost,
+        min: 0,
+        max: 200000,
+        format: money0,
+        hint: 'Permis et systèmes, versés à l’État à la fondation : perdus même si la banque ferme.',
+        onChanged: (v) => upd(() => p.bankEntryCost = (v / 1000).round() * 1000.0)),
+    KV('Banques fondées · fermées (total)', '${sim.banksFounded} · ${sim.banksClosed}'),
+    KV('Profit espéré d’une nouvelle banque', sim.banks.isEmpty ? '—' : '${money0(sim.bankEntrantProfit())}/j'),
+    const SizedBox(height: 6),
+    if (sim.banks.isEmpty)
+      Text(sim.modules.banking ? 'La Caisse populaire seule (une banque).' : 'Module coupé.',
+          style: TextStyle(color: pal.ink3, fontSize: 12))
+    else ...[
+      for (final b in sim.banks)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(
+                  child: Text('${b.name}${b.ownerId != null ? ' (fondée par ${sim.citizen(b.ownerId!)?.name ?? 'un citoyen parti'})' : ''}',
+                      style: TextStyle(color: b.alive ? pal.ink : pal.ink3, fontSize: 12.5, fontWeight: FontWeight.w600))),
+              Text(b.alive ? b.state : 'fermée j${b.closed}',
+                  style: TextStyle(
+                      color: !b.alive ? pal.ink3 : (b.state == 'saine' ? pal.ok : pal.warn), fontSize: 11.5)),
+            ]),
+            if (b.alive) ...[
+              KV('Capital · ratio de capital',
+                  '${kmoney(b.equityNow)} · ${b.capitalRatio.isFinite ? pct(b.capitalRatio) : '—'}'),
+              KV('Prêts · dépôts · réserves', '${kmoney(b.loans)} · ${kmoney(b.deposits)} · ${kmoney(b.reserves)}'),
+              KV('Taux : dépôts · prêts · carte',
+                  '${rate(b.depositRate)} · ${rate(p.interestRate + b.loanSpread)} · ${rate(p.cardRate + b.cardSpread)}'),
+              KV('Profit lissé · clients', '${money0(b.profitEma)}/j · ${b.clients}',
+                  color: b.profitEma < 0 ? pal.warn : null),
+              if (b.interbank != 0)
+                KV(b.interbank > 0 ? 'Prêté aux autres banques' : 'Emprunté aux autres banques', kmoney(b.interbank.abs())),
+            ],
+          ]),
+        ),
+      if (sim.bankCountHist.length > 1)
+        ChartCard(
+            title: 'Nombre de banques',
+            minY: 0,
+            series: [Series('banques', pal.money, downsample([for (final n in sim.bankCountHist) n.toDouble()]))]),
+    ],
+  ]);
 }

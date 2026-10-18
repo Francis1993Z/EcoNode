@@ -69,6 +69,8 @@ class SimController extends ChangeNotifier {
 
   /// L'interface lance ses parties avec les rôles, contrats et négociation salariale, l'entrepreneuriat des citoyens et les
   /// variétés de produits (modules jobs, entrepreneurship et products, coupés par défaut dans le moteur et le protocole).
+  /// Le crédit aux citoyens et les banques (module banking) restent coupés : à activer à l'écran de départ ou dans l'onglet
+  /// Diagnostic.
   SimController({int seed = 42})
       : sim = Sim(
             seed: seed,
@@ -187,6 +189,9 @@ class SimController extends ChangeNotifier {
   }
 
   /// Nouvelle partie : les modules et les filets en cours sont conservés.
+  /// Paramètres de départ de la prochaine partie (écran de départ, onglet Modèle).
+  final Params startParams = Params();
+
   void newGame(int seed, {Params? params}) {
     realSpeed = 0;
     sim = Sim(seed: seed, params: params, modules: sim.modules.copy(), safeguards: sim.safeguards.copy());
