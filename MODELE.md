@@ -259,6 +259,10 @@ variable de tirages et décalait toute la suite de la partie.
 | 18 | `vendeurs` | recherche limitée : tirage des vendeurs examinés par un achat de ménage dans la liste des vendeurs avec stock (`sellerSample` > 0) | `_AllOffers.sampled` |
 | 19 | `anciennete` | ancienneté des employés du départ (0 à 4 ans ; l'encadrement, au moins celle qu'il exige) | `reset` |
 | 20 | `entrepreneuriat` | un citoyen examine-t-il aujourd'hui la possibilité de fonder (module `entrepreneurship`, § 6.17) | `entrepreneuriat.dart:_entrepreneurship` |
+| 21 | `qualite` | qualité d'une variété à son lancement ; gain et durabilité d'un modèle de machine (§ 6.18) | `produits.dart:_launchProduct` |
+| 22 | `gouts` | goût personnel durable (citoyen, variété), tiré au jour 0 : rien à stocker | `produits.dart:tasteOf` |
+| 23 | `connaissance` | découvertes du jour : vitrine et publicité, bouche-à-oreille, fabricants de machines | `produits.dart:_productsDay` |
+| 24 | `noms` | générateur de noms de variétés, de marques et d'entreprises (tiré au jour 0) | `produits.dart:_uniqueName` |
 
 La création d'entreprise ne tire rien : le fondateur est le citoyen le plus riche.
 
@@ -849,6 +853,26 @@ la fondation devient une décision de citoyen. Il suppose le module `entry`.
   et le propriétaire (dividendes I1). À la fermeture : I5 inchangée, il perd sa mise, la Caisse radie le solde (pas de dette personnelle).
 - Valeurs : ordres de grandeur a priori, **non ajustées** sur le repère canadien (≈ 10 % d'entrées, 9 % de sorties par an). Limites : une seule
   fondation par citoyen à la fois, au plus une par type et par `entryCooldown` ; la qualité du produit viendra avec le module Produits (compteur de secteur).
+
+### 6.18 Variétés de produits et marques (module `products`, `produits.dart`)
+
+Coupé par défaut (l'interface le lance actif). Une **catégorie** est un bien ; une **variété**, le produit d'une entreprise (une par
+entreprise) dans les catégories différenciées : consommation (`consumerVarieties` : pain, viande, repas, télé, loisirs, hôtel, voyages,
+bijoux, ordinateurs) et équipement (`machines`). Les matières premières et biens intermédiaires ne changent pas. Aucune catégorie ajoutée,
+aucune variété créée d'avance : une entreprise lance la sienne à sa création (ou à l'activation), l'abandonne à sa fermeture.
+- **Variété** (`Product`) : id jamais réutilisé, nom généré (`_uniqueName`, unique, sans marque réelle : `realBrands`), qualité 0,6–1,4
+  tirée au lancement (`Flux.qualite`, tirée vers le haut par la connaissance du secteur du propriétaire). La qualité coûte : productivité
+  ÷ (1 + `prodQualityCost` × (q − 1)). Machine : gain 1,01 + 0,99u³ (×1,01 à ×2, espérance 1,2575 = `machineGainRef`), durabilité 0,7–1,3.
+- **Ménages** : au plus `prodKnownMax` variétés connues par catégorie (vitrine/publicité pondérée par la notoriété, bouche-à-oreille entre
+  collègues, habitude ; oubli après `prodForgetDays` jours). Utilité = `prodQualityWeight` × q × goût de classe − sensibilité × prix / prix
+  mondial + notoriété + habitude + goût personnel (hachage graine × citoyen × variété, ± `prodTasteSpread`) ; sensibilité = trait
+  (`Flux.traits` 72). Choix : la meilleure utilité parmi les connues en stock (le goût durable tient lieu de terme logit) ; sinon la
+  recherche dans les vendeurs disponibles (qui remplace `sellerSample` pour ces biens), et la demande non servie seulement si tout est vide.
+- **Machines** (`_investBuy`) : parmi au plus `prodMakersMax` fabricants connus, le meilleur gain / gain standard × durabilité / prix,
+  +`prodLoyalty` pour le fournisseur habituel ; `machineMult` utilise le gain moyen installé (moyenne pondérée, jamais un produit : plafond ×2).
+- **Entrée** (`entryWant`) : pour une catégorie différenciée, plus de plafond de 3 producteurs ni de test de marge par vendeur : demande non
+  servie + demande faiblement servie (achat d'une variété mal aimée ou trouvée faute d'en connaître) ÷ (1 + variétés actives), si la marge
+  moyenne en place ≥ `prodEntryMargin` ; seule limite dure : un employé entier (pas d'échelle minimale fractionnaire) et la viabilité.
 
 ---
 

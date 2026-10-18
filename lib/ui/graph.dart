@@ -1213,9 +1213,12 @@ class GraphPainter extends CustomPainter {
     final sec = pal.sector(tpl.sector);
     _header(canvas, r, sec, tpl.code, f.name, '${tpl.label} · ${f.workers.length} empl. · ${money0(f.wage)}');
     var y = r.top + kHeaderH;
+    final variety = sim.modules.products ? sim.productOf(f) : null;
     for (final g in f.outputs.keys) {
       final gd = goods[g]!;
-      _row(canvas, r, y, pal.sector(gd.sector), gd.label, '${qty(f.inv[g] ?? 0.0)} · ${money(f.price[g] ?? 0.0)}');
+      // module products : le nom de la variété à la place de celui de la catégorie
+      final label = variety != null && variety.category == g ? '« ${variety.name} »' : gd.label;
+      _row(canvas, r, y, pal.sector(gd.sector), label, '${qty(f.inv[g] ?? 0.0)} · ${money(f.price[g] ?? 0.0)}');
       _port(canvas, b.outPort(g), pal.sector(gd.sector));
       y += kRowH;
     }

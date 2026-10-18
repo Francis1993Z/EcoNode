@@ -129,6 +129,7 @@ class _FirmView extends StatelessWidget {
               child: Text('⚠ Production limitée par manque d’intrants.', style: TextStyle(color: pal.warn, fontSize: 12))),
       ]),
       if (sim.modules.entrepreneurship && !sim.publicService(f)) _foundingSection(context, ctrl, f),
+      if (sim.modules.products) _productSection(context, ctrl, f),
       if (sim.publicService(f)) _publicSection(context, ctrl, f),
       if (sim.modules.buildings && f.type == 'immobilier') landlordSection(context, ctrl, f),
       _StaffSection(ctrl, f),
@@ -848,6 +849,7 @@ class _CitizenViewState extends State<_CitizenView> {
             TextButton(onPressed: () => widget.ctrl.select(Selection('firm', f.id)), child: Text(f.name)),
           ]),
       ]),
+      if (sim.modules.products) _citizenVarieties(context, widget.ctrl, c),
       Section('Satisfaction des désirs', [
         for (final d in desires) _Bar(desireLabels[d]!, c.sat[d] ?? 0.0),
       ]),
@@ -1289,4 +1291,82 @@ List<Widget> _founderTraits(BuildContext context, SimController ctrl, Citizen c)
       for (final s in sectors.take(4)) KV('Connaît : ${templates[s.$1]?.label ?? s.$1}', '${s.$2} j · ${pct(s.$3)}'),
     if (sectors.length > 4) KV('… et d’autres secteurs', '${sectors.length - 4}'),
   ];
+}
+
+
+/// La variété d'une entreprise, sa catégorie (parts de marché), et pour une acheteuse de machines, ses modèles installés.
+Widget _productSection(BuildContext context, SimController ctrl, Firm f) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final pr = sim.productOf(f);
+  final buysMachines = f.template.capital > 0 && sim.modules.capital;
+  if (pr == null && !buysMachines) return const SizedBox.shrink();
+  final rivals = pr == null ? const <Product>[] : sim.varietiesOf(pr.category);
+  return Section('Produit', [
+    if (pr != null) ...[
+      KV('Variété', '« ${pr.name} »'),
+      KV('Catégorie', goods[pr.category]!.label),
+      KV('Qualité', '${fmtNum(pr.quality * 100, 0)} %  (productivité ×${fmtNum(sim.qualityRate(f), 2)})'),
+      KV('Lancée le jour', '${pr.launched}'),
+      KV('Part de marché', pct(sim.marketShare(pr))),
+      if (equipmentVarieties.contains(pr.category)) ...[
+        KV('Gain de productivité du modèle', '×${fmtNum(pr.gain, 2)}'),
+        KV('Durabilité', '×${fmtNum(pr.durability, 2)}'),
+      ],
+      const SizedBox(height: 4),
+      Text('Variétés de la catégorie (${rivals.length}) : part · prix · qualité',
+          style: TextStyle(color: pal.ink3, fontSize: 10.5, fontWeight: FontWeight.w700)),
+      for (final r in rivals)
+        InkWell(
+          onTap: () => ctrl.select(Selection('firm', r.firmId)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(children: [
+              Expanded(
+                  child: Text('« ${r.name} »', overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: identical(r, pr) ? pal.accent : pal.ink2, fontSize: 11.5))),
+              Text('${pct(sim.marketShare(r))} · ${money(sim.firm(r.firmId)?.price[r.category] ?? 0)} · '
+                  '${fmtNum(r.quality * 100, 0)} %', style: mono(pal.ink, 11)),
+            ]),
+          ),
+        ),
+    ],
+    if (buysMachines) ...[
+      const SizedBox(height: 6),
+      KV('Machines installées : gain moyen', f.machineGain > 0 ? '×${fmtNum(f.machineGain, 2)}' : 'modèle standard'),
+      KV('Durabilité moyenne', f.machineLife > 0 ? '×${fmtNum(f.machineLife, 2)}' : 'standard'),
+      KV('Fournisseur habituel', f.supplier != null ? '« ${sim.products[f.supplier!]?.name ?? '?'} »' : 'aucun'),
+      KV('Fabricants connus', f.knownMakers.isEmpty
+          ? 'aucun'
+          : [for (final id in f.knownMakers) sim.products[id]?.maker ?? '?'].join(', ')),
+    ],
+  ]);
+}
+
+/// Variétés qu'un citoyen connaît, par catégorie ; celle qu'il achète d'habitude est marquée.
+Widget _citizenVarieties(BuildContext context, SimController ctrl, Citizen c) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final known = sim.knownVarieties(c);
+  return Section('Variétés connues', [
+    if (known.isEmpty)
+      Text('Aucune pour l’instant.', style: TextStyle(color: pal.ink3, fontSize: 12))
+    else
+      for (final e in known.entries) ...[
+        Text(goods[e.key]!.label, style: TextStyle(color: pal.ink3, fontSize: 10.5, fontWeight: FontWeight.w700)),
+        for (final (pr, d) in e.value)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 1.5),
+            child: Row(children: [
+              Expanded(
+                  child: Text('${c.lastChoice[e.key] == pr.id ? '★ ' : ''}« ${pr.name} »', overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: c.lastChoice[e.key] == pr.id ? pal.accent : pal.ink2, fontSize: 11.5))),
+              Text('goût ${sim.tasteOf(c, pr.id) >= 0 ? '+' : ''}${fmtNum(sim.tasteOf(c, pr.id), 2)} · vue j$d',
+                  style: mono(pal.ink3, 10.5)),
+            ]),
+          ),
+      ],
+    KV('Sensibilité au prix', '×${fmtNum(sim.priceSensitivity(c), 2)}'),
+    Text('★ : la variété qu’il achète d’habitude.', style: TextStyle(color: pal.ink3, fontSize: 10.5)),
+  ]);
 }

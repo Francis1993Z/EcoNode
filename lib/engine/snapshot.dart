@@ -147,6 +147,19 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.entKnowledgeDays != d.entKnowledgeDays) 'entKnowledgeDays': _d(p.entKnowledgeDays),
     if (p.entSurviveBase != d.entSurviveBase) 'entSurviveBase': _d(p.entSurviveBase),
     if (p.entSurviveKnowledge != d.entSurviveKnowledge) 'entSurviveKnowledge': _d(p.entSurviveKnowledge),
+    if (p.prodQualityWeight != d.prodQualityWeight) 'prodQualityWeight': _d(p.prodQualityWeight),
+    if (p.prodPriceSens != d.prodPriceSens) 'prodPriceSens': _d(p.prodPriceSens),
+    if (p.prodTasteSpread != d.prodTasteSpread) 'prodTasteSpread': _d(p.prodTasteSpread),
+    if (p.prodHabit != d.prodHabit) 'prodHabit': _d(p.prodHabit),
+    if (p.prodForgetDays != d.prodForgetDays) 'prodForgetDays': p.prodForgetDays,
+    if (p.prodKnownMax != d.prodKnownMax) 'prodKnownMax': p.prodKnownMax,
+    if (p.prodAdRate != d.prodAdRate) 'prodAdRate': _d(p.prodAdRate),
+    if (p.prodWordRate != d.prodWordRate) 'prodWordRate': _d(p.prodWordRate),
+    if (p.prodQualityCost != d.prodQualityCost) 'prodQualityCost': _d(p.prodQualityCost),
+    if (p.prodMakersMax != d.prodMakersMax) 'prodMakersMax': p.prodMakersMax,
+    if (p.prodMakerLearn != d.prodMakerLearn) 'prodMakerLearn': _d(p.prodMakerLearn),
+    if (p.prodLoyalty != d.prodLoyalty) 'prodLoyalty': _d(p.prodLoyalty),
+    if (p.prodEntryMargin != d.prodEntryMargin) 'prodEntryMargin': _d(p.prodEntryMargin),
   };
 }
 
@@ -250,7 +263,34 @@ Params _paramsFrom(Map j) => Params()
   ..entMinOwnShare = _rdOr(j['entMinOwnShare'], 0.3)
   ..entKnowledgeDays = _rdOr(j['entKnowledgeDays'], 365)
   ..entSurviveBase = _rdOr(j['entSurviveBase'], 0.5)
-  ..entSurviveKnowledge = _rdOr(j['entSurviveKnowledge'], 0.35);
+  ..entSurviveKnowledge = _rdOr(j['entSurviveKnowledge'], 0.35)
+  ..prodQualityWeight = _rdOr(j['prodQualityWeight'], 1.0)
+  ..prodPriceSens = _rdOr(j['prodPriceSens'], 1.0)
+  ..prodTasteSpread = _rdOr(j['prodTasteSpread'], 0.5)
+  ..prodHabit = _rdOr(j['prodHabit'], 0.15)
+  ..prodForgetDays = (j['prodForgetDays'] as int?) ?? 60
+  ..prodKnownMax = (j['prodKnownMax'] as int?) ?? 8
+  ..prodAdRate = _rdOr(j['prodAdRate'], 0.03)
+  ..prodWordRate = _rdOr(j['prodWordRate'], 0.02)
+  ..prodQualityCost = _rdOr(j['prodQualityCost'], 0.5)
+  ..prodMakersMax = (j['prodMakersMax'] as int?) ?? 3
+  ..prodMakerLearn = _rdOr(j['prodMakerLearn'], 0.01)
+  ..prodLoyalty = _rdOr(j['prodLoyalty'], 0.1)
+  ..prodEntryMargin = _rdOr(j['prodEntryMargin'], 0.15);
+
+/// Une variété : liste compacte.
+List<Object?> _productJson(Product p) => [
+      p.id, p.category, p.firmId, p.name, _d(p.quality), p.launched, _d(p.gain), _d(p.durability), p.maker, p.alive,
+      p.ended, _d(p.salesEma), p.inStock, p.lastRupture,
+    ];
+
+Product _productFrom(List l) => Product(l[0] as int, l[1] as String, l[2] as int, l[3] as String, _rd(l[4]), l[5] as int,
+    gain: _rd(l[6]), durability: _rd(l[7]), maker: l[8] as String)
+  ..alive = l[9] as bool
+  ..ended = l[10] as int?
+  ..salesEma = _rd(l[11])
+  ..inStock = l[12] as bool
+  ..lastRupture = l[13] as int;
 
 Map<String, Object?> _safeguardsJson(Safeguards s) => {
       for (final k in Safeguards.keys) k: s.get(k),
@@ -304,6 +344,9 @@ Map<String, Object?> _citizenJson(Citizen c) => {
       'wage': _d(c.wage),
       'aplomb': _d(c.aplomb),
       if (c.sectorDays.isNotEmpty) 'sectorDays': c.sectorDays,
+      if (c.known.isNotEmpty)
+        'known': {for (final e in c.known.entries) e.key: {for (final k in e.value.entries) '${k.key}': k.value}},
+      if (c.lastChoice.isNotEmpty) 'lastChoice': c.lastChoice,
     };
 
 Citizen _citizenFrom(Map j) {
@@ -334,6 +377,12 @@ Citizen _citizenFrom(Map j) {
     ..clear()
     ..addAll(_rdm(j['sat']));
   if (j['sectorDays'] != null) c.sectorDays.addAll(_rim(j['sectorDays']));
+  if (j['known'] != null) {
+    for (final e in (j['known'] as Map).entries) {
+      c.known[e.key as String] = {for (final k in (e.value as Map).entries) int.parse(k.key as String): k.value as int};
+    }
+  }
+  if (j['lastChoice'] != null) c.lastChoice.addAll(_rim(j['lastChoice']));
   return c;
 }
 
@@ -405,6 +454,11 @@ Map<String, Object?> _firmJson(Firm f) => {
       'talks': [for (final t in f.talks) _talkJson(t)],
       'hist': [for (final p in f.hist) _pointJson(p)],
       if (f.founderId != null) ...{'founderId': f.founderId, 'foundedDay': f.foundedDay, 'startCapital': _d(f.startCapital)},
+      if (f.productId != null) 'productId': f.productId,
+      if (f.machineGain > 0) 'machineGain': _d(f.machineGain),
+      if (f.machineLife > 0) 'machineLife': _d(f.machineLife),
+      if (f.knownMakers.isNotEmpty) 'knownMakers': f.knownMakers,
+      if (f.supplier != null) 'supplier': f.supplier,
     };
 
 List<Object?> _talkJson(Talk t) =>
@@ -482,6 +536,12 @@ Firm _firmFrom(Map j) {
       ..foundedDay = (j['foundedDay'] as int?) ?? 0
       ..startCapital = _rdOr(j['startCapital'], 0);
   }
+  f
+    ..productId = j['productId'] as int?
+    ..machineGain = _rdOr(j['machineGain'], 0)
+    ..machineLife = _rdOr(j['machineLife'], 0)
+    ..supplier = j['supplier'] as int?;
+  if (j['knownMakers'] != null) f.knownMakers.addAll(_ril(j['knownMakers']));
   f.talks.addAll([for (final t in (j['talks'] as List?) ?? const []) _talkFrom(t as List)]);
   f.workers.addAll(_ril(j['workers']));
   f.inv.addAll(_rdm(j['inv']));
@@ -732,6 +792,10 @@ extension SimSnapshot on Sim {
         'firmsClosed': firmsClosed,
         if (foundedByYear.isNotEmpty) 'foundedByYear': {for (final e in foundedByYear.entries) '${e.key}': e.value},
         if (closedByYear.isNotEmpty) 'closedByYear': {for (final e in closedByYear.entries) '${e.key}': e.value},
+        if (productsActive) 'productsActive': true,
+        if (productSeq > 0) 'productSeq': productSeq,
+        if (products.isNotEmpty) 'products': [for (final p in products.values) _productJson(p)],
+        if (poorEma.isNotEmpty) 'poorEma': _dm(poorEma),
         'depositsAtCheck': _d(_depositsAtCheck),
         'cpiBase': _d(_cpiBase),
         'cpiWeights': _dm(cpiWeights),
@@ -808,6 +872,7 @@ extension SimSnapshot on Sim {
       ])),
       if (buildings.isNotEmpty || mortgages.isNotEmpty) 'batiments': _fnv(j(_buildingsState())),
       if (jobsActive) 'travail': _fnv(j(_labourJson(labour))),
+      if (products.isNotEmpty) 'produits': _fnv(j([for (final p in products.values) _productJson(p), _dm(poorEma)])),
       'moniteur': _fnv(j(monitor.toJson())),
       'historique': _fnv(j(history.isEmpty ? null : _histJson(history.last))),
       'journal': _fnv(j([for (final e in events) if (e.day == day) [e.day, e.type, e.text]])),
@@ -856,6 +921,15 @@ extension SimSnapshot on Sim {
     foundedByYear
       ..clear()
       ..addAll({for (final e in ((j['foundedByYear'] as Map?) ?? const {}).entries) int.parse(e.key as String): e.value as int});
+    productsActive = (j['productsActive'] as bool?) ?? false;
+    productSeq = (j['productSeq'] as int?) ?? 0;
+    products
+      ..clear()
+      ..addAll({for (final l in (j['products'] as List?) ?? const []) (l as List)[0] as int: _productFrom(l)});
+    poorToday.clear();
+    poorEma
+      ..clear()
+      ..addAll(_rdm(j['poorEma'] ?? const {}));
     closedByYear
       ..clear()
       ..addAll({for (final e in ((j['closedByYear'] as Map?) ?? const {}).entries) int.parse(e.key as String): e.value as int});
@@ -930,6 +1004,9 @@ extension SimSnapshot on Sim {
       ..clear()
       ..addAll({for (final c in citizens) c.id: c});
     firms = [for (final f in j['firms'] as List) _firmFrom(f as Map)];
+    usedNames
+      ..clear()
+      ..addAll([for (final p in products.values) p.name, for (final f in firms) f.name]);
     _fmap
       ..clear()
       ..addAll({for (final f in firms) f.id: f});

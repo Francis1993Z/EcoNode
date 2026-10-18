@@ -41,8 +41,9 @@ class Case {
       ..trade = u() < 0.3;
     final m = Modules();
     for (final k in Modules.keys) {
-      // l'entrepreneuriat (module apparu après ces cas) reste coupé et ne consomme pas de tirage : les cas restent les mêmes
-      if (k == 'entrepreneurship') continue;
+      // les modules apparus après ces cas (Modules.lateKeys) restent coupés et ne consomment pas de tirage : les cas restent
+      // les mêmes
+      if (Modules.lateKeys.contains(k)) continue;
       m.set(k, u() < 0.75);
     }
     final sg = Safeguards();
