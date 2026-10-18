@@ -371,7 +371,7 @@ extension SimJobs on Sim {
       for (final c in List<Citizen>.from(citizens)) {
         if (c.employer == null || draw(Flux.depart, c.id) > p.jobSwitch) continue;
         final cur = firm(c.employer!);
-        if (cur == null || c.role < 0) continue;
+        if (cur == null || c.role < 0 || cur.founderId == c.id) continue; // un fondateur ne quitte pas sa propre entreprise
         final res = reservationWage(c);
         Firm? best;
         var bestR = -1;

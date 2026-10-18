@@ -26,7 +26,9 @@ int fold(int h, double v) {
 void main() {
   print('hash32 ${[hash32(0, 0), hash32(42, 1), hash32(0xFFFFFFFF, 0x7FFFFFFF), hash32(123456789, 987654321)]}');
   final s0 = Sim(seed: 42);
-  print('tirages ${[for (final f in Flux.values) bits(s0.draw(f, 17))].join(' ')}');
+  // Les flux de code 1 à 19 : la référence (tool/reference.sh) les fixe ; les flux ajoutés depuis (code 20 et au-delà) sont
+  // couverts par test/hasard_test.dart, qui parcourt tous les flux.
+  print('tirages ${[for (final f in Flux.values) if (f.code <= 19) bits(s0.draw(f, 17))].join(' ')}');
   for (final seed in [1, 42]) {
     final s = Sim(seed: seed);
     var h = 0;

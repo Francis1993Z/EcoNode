@@ -139,7 +139,7 @@ Source? readSource(String path, bool partial) {
 
 /// Champs de configuration qui doivent être les mêmes dans toutes les entrées.
 const List<String> configKeys = [
-  'version', 'level', 'label', 'days', 'warmup', 'shockDay', 'shockHorizon', 'modulesOff', 'params',
+  'version', 'level', 'label', 'days', 'warmup', 'shockDay', 'shockHorizon', 'modulesOff', 'modulesOn', 'params',
 ];
 
 /// Forme comparable d'un champ de configuration ; l'ordre des paramètres ne compte pas.
@@ -286,6 +286,7 @@ Json merge(List<Source> src, FusionOptions o) {
     'shockDay': first.sum['shockDay'],
     'shockHorizon': first.sum['shockHorizon'],
     'modulesOff': first.sum['modulesOff'],
+    if (first.sum['modulesOn'] != null) 'modulesOn': first.sum['modulesOn'],
     'params': first.sum['params'],
     if (o.seconds != null) 'seconds': o.seconds,
     'runs': runs,

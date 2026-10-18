@@ -131,6 +131,25 @@ Map<String, Object?> _paramsJson(Params p) => {
       'promotionRaise': _d(p.promotionRaise),
     };
 
+/// Paramètres de l'entrepreneuriat : seuls ceux qui diffèrent du défaut sont écrits, si bien qu'un instantané sans
+/// changement est celui d'avant le module.
+Map<String, Object?> _entParamsJson(Params p) {
+  final d = Params();
+  return {
+    if (p.entFoundRate != d.entFoundRate) 'entFoundRate': _d(p.entFoundRate),
+    if (p.entConsiderRate != d.entConsiderRate) 'entConsiderRate': _d(p.entConsiderRate),
+    if (p.entRiskMean != d.entRiskMean) 'entRiskMean': _d(p.entRiskMean),
+    if (p.entRiskSpread != d.entRiskSpread) 'entRiskSpread': _d(p.entRiskSpread),
+    if (p.entMinAmbition != d.entMinAmbition) 'entMinAmbition': _d(p.entMinAmbition),
+    if (p.entMinTolerance != d.entMinTolerance) 'entMinTolerance': _d(p.entMinTolerance),
+    if (p.entCapitalMult != d.entCapitalMult) 'entCapitalMult': _d(p.entCapitalMult),
+    if (p.entMinOwnShare != d.entMinOwnShare) 'entMinOwnShare': _d(p.entMinOwnShare),
+    if (p.entKnowledgeDays != d.entKnowledgeDays) 'entKnowledgeDays': _d(p.entKnowledgeDays),
+    if (p.entSurviveBase != d.entSurviveBase) 'entSurviveBase': _d(p.entSurviveBase),
+    if (p.entSurviveKnowledge != d.entSurviveKnowledge) 'entSurviveKnowledge': _d(p.entSurviveKnowledge),
+  };
+}
+
 Params _paramsFrom(Map j) => Params()
   ..population = j['population'] as int
   ..startWallet = _rd(j['startWallet'])
@@ -220,7 +239,18 @@ Params _paramsFrom(Map j) => Params()
   ..reviewCutMax = _rdOr(j['reviewCutMax'], 1)
   ..seniorityStep = _rdOr(j['seniorityStep'], 0.015)
   ..seniorityCap = _rdOr(j['seniorityCap'], 0.15)
-  ..promotionRaise = _rdOr(j['promotionRaise'], 0.05);
+  ..promotionRaise = _rdOr(j['promotionRaise'], 0.05)
+  ..entFoundRate = _rdOr(j['entFoundRate'], 1.0)
+  ..entConsiderRate = _rdOr(j['entConsiderRate'], 0.001)
+  ..entRiskMean = _rdOr(j['entRiskMean'], 0.5)
+  ..entRiskSpread = _rdOr(j['entRiskSpread'], 0.5)
+  ..entMinAmbition = _rdOr(j['entMinAmbition'], 0.3)
+  ..entMinTolerance = _rdOr(j['entMinTolerance'], 0.25)
+  ..entCapitalMult = _rdOr(j['entCapitalMult'], 1.0)
+  ..entMinOwnShare = _rdOr(j['entMinOwnShare'], 0.3)
+  ..entKnowledgeDays = _rdOr(j['entKnowledgeDays'], 365)
+  ..entSurviveBase = _rdOr(j['entSurviveBase'], 0.5)
+  ..entSurviveKnowledge = _rdOr(j['entSurviveKnowledge'], 0.35);
 
 Map<String, Object?> _safeguardsJson(Safeguards s) => {
       for (final k in Safeguards.keys) k: s.get(k),
@@ -273,6 +303,7 @@ Map<String, Object?> _citizenJson(Citizen c) => {
       'role': c.role,
       'wage': _d(c.wage),
       'aplomb': _d(c.aplomb),
+      if (c.sectorDays.isNotEmpty) 'sectorDays': c.sectorDays,
     };
 
 Citizen _citizenFrom(Map j) {
@@ -302,6 +333,7 @@ Citizen _citizenFrom(Map j) {
   c.sat
     ..clear()
     ..addAll(_rdm(j['sat']));
+  if (j['sectorDays'] != null) c.sectorDays.addAll(_rim(j['sectorDays']));
   return c;
 }
 
@@ -372,6 +404,7 @@ Map<String, Object?> _firmJson(Firm f) => {
       'offer': _d(f.offer),
       'talks': [for (final t in f.talks) _talkJson(t)],
       'hist': [for (final p in f.hist) _pointJson(p)],
+      if (f.founderId != null) ...{'founderId': f.founderId, 'foundedDay': f.foundedDay, 'startCapital': _d(f.startCapital)},
     };
 
 List<Object?> _talkJson(Talk t) =>
@@ -443,6 +476,12 @@ Firm _firmFrom(Map j) {
     ..carry = _rdOr(j['carry'], 0)
     ..reinvest = _rdOr(j['reinvest'], 0)
     ..offer = _rdOr(j['offer'], _rd(j['wage']));
+  if (j['founderId'] != null) {
+    f
+      ..founderId = j['founderId'] as int
+      ..foundedDay = (j['foundedDay'] as int?) ?? 0
+      ..startCapital = _rdOr(j['startCapital'], 0);
+  }
   f.talks.addAll([for (final t in (j['talks'] as List?) ?? const []) _talkFrom(t as List)]);
   f.workers.addAll(_ril(j['workers']));
   f.inv.addAll(_rdm(j['inv']));
@@ -673,8 +712,8 @@ extension SimSnapshot on Sim {
         'day': day,
         'devChecks': devChecks,
         'sansHasard': sansHasard,
-        'params': _paramsJson(params),
-        'modules': {for (final k in Modules.keys) k: modules.get(k)},
+        'params': {..._paramsJson(params), ..._entParamsJson(params)},
+        'modules': modules.toJson(),
         'safeguards': _safeguardsJson(safeguards),
         'nextCitizenId': _nextCitizenId,
         'firmSeq': _firmSeq,
@@ -691,6 +730,8 @@ extension SimSnapshot on Sim {
         'householdSpend': _d(householdSpend),
         'firmsCreated': firmsCreated,
         'firmsClosed': firmsClosed,
+        if (foundedByYear.isNotEmpty) 'foundedByYear': {for (final e in foundedByYear.entries) '${e.key}': e.value},
+        if (closedByYear.isNotEmpty) 'closedByYear': {for (final e in closedByYear.entries) '${e.key}': e.value},
         'depositsAtCheck': _d(_depositsAtCheck),
         'cpiBase': _d(_cpiBase),
         'cpiWeights': _dm(cpiWeights),
@@ -734,8 +775,8 @@ extension SimSnapshot on Sim {
     return {
       'temps': _fnv(j([seed, day, _nextCitizenId, _firmSeq, _godSeq, firmsCreated, firmsClosed])),
       'reglages': _fnv(j([
-        _paramsJson(params),
-        {for (final k in Modules.keys) k: modules.get(k)},
+        {..._paramsJson(params), ..._entParamsJson(params)},
+        modules.toJson(),
         _safeguardsJson(safeguards),
       ])),
       'citoyens': _fnv(j([for (final c in citizens) _citizenJson(c)])),
@@ -812,6 +853,12 @@ extension SimSnapshot on Sim {
     householdSpend = _rd(j['householdSpend']);
     firmsCreated = j['firmsCreated'] as int;
     firmsClosed = j['firmsClosed'] as int;
+    foundedByYear
+      ..clear()
+      ..addAll({for (final e in ((j['foundedByYear'] as Map?) ?? const {}).entries) int.parse(e.key as String): e.value as int});
+    closedByYear
+      ..clear()
+      ..addAll({for (final e in ((j['closedByYear'] as Map?) ?? const {}).entries) int.parse(e.key as String): e.value as int});
     _depositsAtCheck = _rd(j['depositsAtCheck']);
     _cpiBase = _rd(j['cpiBase']);
     cpiWeights = _rdm(j['cpiWeights']);

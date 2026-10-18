@@ -70,7 +70,10 @@ class Config {
     return p;
   }
 
-  List<String> get modulesOff => Modules.keys.where((k) => !modules.get(k)).toList();
+  /// Modules coupés. Un module apparu après la référence du moteur (entrepreneurship) n'y est listé que s'il est actif (voir
+  /// modulesOn) : coupé, la synthèse est celle d'avant lui, ce que vérifie tool/reference.sh.
+  List<String> get modulesOff => Modules.keys.where((k) => !modules.get(k) && k != 'entrepreneurship').toList();
+  List<String> get modulesOn => modules.entrepreneurship ? ['entrepreneurship'] : [];
 
   /// Cette configuration modifiée par [spec] : « ref » (aucun changement) ou une liste « jeton,jeton,… » de
   ///   noyau | complet         modules ajoutés coupés (institutions actives) | tous les modules actifs
@@ -928,6 +931,7 @@ Json summaryOf(Config c, Options o, List<Task> tasks, List<Json> results, int ci
     'shockDay': o.shockDay,
     'shockHorizon': o.shockHorizon,
     'modulesOff': c.modulesOff,
+    if (c.modulesOn.isNotEmpty) 'modulesOn': c.modulesOn,
     'params': c.params,
     'seconds': seconds,
     'runs': tasks.where((t) => t.config == ci).length,
@@ -1358,6 +1362,8 @@ void headerLines(StringBuffer b, Json sum, {String prefix = ''}) {
   final off = (sum['modulesOff'] as List).cast<String>();
   final params = (sum['params'] as Map? ?? const {}).cast<String, dynamic>();
   b.writeln('- ${prefix}Modules coupés : ${off.isEmpty ? 'aucun' : off.map((k) => Modules.labels[k] ?? k).join(', ')}');
+  final on = ((sum['modulesOn'] as List?) ?? const []).cast<String>();
+  if (on.isNotEmpty) b.writeln('- ${prefix}Modules activés en plus : ${on.map((k) => Modules.labels[k] ?? k).join(', ')}');
   if (params.isNotEmpty) {
     b.writeln('- ${prefix}Paramètres changés : ${params.entries.map((e) => '${e.key} = ${e.value}').join(', ')}');
   }
