@@ -16,6 +16,7 @@ part 'buildings.dart';
 part 'jobs.dart';
 part 'entrepreneuriat.dart';
 part 'produits.dart';
+part 'banques.dart';
 
 /// mulberry32 (arithmétique 32 bits non signée) : même graine, même partie.
 class Mulberry32 {
@@ -105,7 +106,9 @@ enum Flux {
   qualite(21), // qualité d'une variété à son lancement ; gain et durabilité d'un modèle de machine (module products)
   gouts(22), // goût personnel durable d'un citoyen pour une variété (tiré « au jour 0 » : rien à stocker)
   connaissance(23), // découvertes du jour : vitrine et publicité, bouche-à-oreille, fabricants de machines
-  noms(24); // générateur de noms de variétés, de marques et d'entreprises (tiré « au jour 0 »)
+  noms(24), // générateur de noms de variétés, de marques et d'entreprises (tiré « au jour 0 »)
+  credit(25), // crédit aux particuliers : achat important à crédit (module banking)
+  banques(26); // choix d'une banque, fondation d'une banque par un citoyen (module banking)
 
   const Flux(this.code);
   final int code;
@@ -600,6 +603,19 @@ class Sim {
   final Map<String, double> poorToday = {};
   final Map<String, double> poorEma = {};
   final Set<String> usedNames = {};
+  /// Crédit et banques (module banking) : les banques (vide : la Caisse seule), totaux des prêts aux particuliers, pertes
+  /// lissées, et caches du jour (dette pondérée au début de la consommation, crédit accordé depuis).
+  bool bankingActive = false;
+  final List<Bank> banks = [];
+  double consumerLent = 0;
+  double consumerWrittenOff = 0;
+  int consumerBankruptcies = 0;
+  double consumerLossEma = 0;
+  double consumerLossToday = 0;
+  double _creditToday = 0;
+  double _debtBase = 0;
+  final List<double> tightToday = [];
+  int tightDay = -1;
   double householdSpend = 0;
   // positions des nodes spéciaux (ménages, État, Caisse, extérieur) ; l'interface les dispose
   final Map<String, List<double>> nodePos = {
@@ -744,6 +760,17 @@ class Sim {
     poorToday.clear();
     poorEma.clear();
     usedNames.clear();
+    bankingActive = false;
+    banks.clear();
+    consumerLent = 0;
+    consumerWrittenOff = 0;
+    consumerBankruptcies = 0;
+    consumerLossEma = 0;
+    consumerLossToday = 0;
+    _creditToday = 0;
+    _debtBase = 0;
+    tightToday.clear();
+    tightDay = -1;
     householdSpend = 0;
     hype = {};
     adsBoost = 1;
@@ -910,6 +937,7 @@ class Sim {
     }
     jobsActive = this.modules.jobs;
     if (this.modules.products) _productsSwitch(); // les entreprises du départ reçoivent leur variété
+    bankingActive = this.modules.banking;
     if (this.modules.buildings) _seedBuildings();
     m0 = totalMoney();
     bank.reserves = m0; // toute la monnaie de départ est « extérieure »
@@ -1295,6 +1323,7 @@ class Sim {
       d += f.debt;
     }
     if (mortgages.isNotEmpty) d += params.mortgageRiskWeight * mortgageDebt();
+    if (consumerLent > 0) d += consumerDebtOf(); // module banking : crédit aux particuliers, pondéré à 100 %
     return d;
   }
 
@@ -1305,6 +1334,7 @@ class Sim {
       d += f.debt;
     }
     if (mortgages.isNotEmpty) d += mortgageDebt();
+    if (consumerLent > 0) d += consumerDebtOf(); // module banking : prêts personnels et soldes de carte
     return d;
   }
 
@@ -1721,6 +1751,7 @@ class Sim {
     // module jobs activé ou coupé depuis la veille (onglet Diagnostic) : contrats créés ou mis de côté
     if (modules.jobs != jobsActive) _jobsSwitch();
     if (modules.products != productsActive) _productsSwitch();
+    if (modules.banking != bankingActive) bankingActive = modules.banking;
 
     // 0. Revenu de base divin (création monétaire)
     if (p.ubi > 0) {
@@ -1754,6 +1785,7 @@ class Sim {
       unmetEma[g] = 0.9 * (unmetEma[g] ?? 0) + 0.1 * (unmet[g] ?? 0);
     }
     if (productsActive) _productsEndOfDay();
+    if (bankingActive || consumerLent > 0) _creditEndOfDay();
     if (modules.entry) {
       _entryExit();
       _purgeFlows();
@@ -2411,8 +2443,10 @@ class Sim {
     adsBoost = 1 + p.adsEffect * totalBrand / (totalBrand + 0.3 * math.max(1, citizens.length));
     _prepareLeisure();
     final floor = _stateFloor();
+    if (bankingActive) _creditMorning(); // exposition du matin (I4 des crédits du jour), resserrement des banques
 
     for (final c in _ordered(citizens, Flux.consommation, (c) => c.id)) {
+      if (bankingActive || c.card > 0 || c.loans.isNotEmpty) _citizenCredit(c); // module banking
       final before = c.money;
       for (final d in desires) {
         if (d != 'sante') c.sat[d] = math.max(0.0, c.sat[d]! - desireDecay[d]!);

@@ -317,6 +317,7 @@ class _ModelTabState extends State<ModelTab> {
       ]),
       _entrepreneurSection(context, ctrl, upd),
       _productsSection(context, ctrl, upd),
+      _creditSection(context, ctrl, upd),
       Section('Nouvelle partie', [
         Row(children: [
           Expanded(
@@ -558,4 +559,85 @@ Widget _categoryTile(BuildContext context, SimController ctrl, String g) {
         KV('Demande faiblement servie (lissée)', '${fmtNum(sim.poorEma[g]!, 1)} ${goods[g]!.unit}/j'),
     ],
   );
+}
+
+
+/// Crédit aux citoyens : l'interrupteur, les réglages et les totaux.
+Widget _creditSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final p = sim.params;
+  var cards = 0, loans = 0, late = 0;
+  var cardDebt = 0.0, loanDebt = 0.0;
+  for (final c in sim.citizens) {
+    if (c.cardLimit > 0) cards++;
+    loans += c.loans.length;
+    if (c.arrears > 0) late++;
+    cardDebt += c.card;
+    for (final l in c.loans) {
+      loanDebt += l.balance;
+    }
+  }
+  return Section('Crédit aux citoyens', [
+    Text(
+        'Un citoyen à court d’argent pour manger, se loger ou se soigner paie avec sa carte de crédit et la rembourse quand '
+        'son revenu arrive ; un creux de chômage ou un achat important passe par un prêt personnel. Le taux suit sa cote. '
+        'Quand il ne peut plus payer, il fait faillite : la banque radie la dette et lui ferme le crédit un temps.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: Text(Modules.labels['banking']!, style: const TextStyle(fontSize: 13)),
+      subtitle: const Text('Coupé en cours de partie : les dettes se remboursent, plus aucun crédit nouveau.',
+          style: TextStyle(fontSize: 11)),
+      value: sim.modules.banking,
+      onChanged: (v) => upd(() => sim.modules.banking = v),
+    ),
+    ParamSlider(
+        label: 'Taux de la carte de crédit (base annuelle)',
+        value: p.cardRate,
+        min: 0.05,
+        max: 0.35,
+        format: pct,
+        hint: 'Taux de base ; la cote y ajoute jusqu’à ${pct(p.creditRiskPremium / 2)} et une banque qui resserre, 5 points.',
+        onChanged: (v) => upd(() => p.cardRate = (v * 200).round() / 200)),
+    ParamSlider(
+        label: 'Faillite : jours de retard',
+        value: p.bkArrearsDays.toDouble(),
+        min: 30,
+        max: 360,
+        format: (v) => '${v.round()} j',
+        hint: 'Un citoyen qui n’a pas rattrapé ses paiements en retard depuis ce nombre de jours fait faillite.',
+        onChanged: (v) => upd(() => p.bkArrearsDays = v.round())),
+    ParamSlider(
+        label: 'Faillite : dette sans emploi (années de revenu)',
+        value: p.bkDebtIncome,
+        min: 0.5,
+        max: 5,
+        format: (v) => '${fmtNum(v, 1)} an${v >= 2 ? 's' : ''}',
+        hint: 'Sans emploi, une dette au-delà de ce nombre d’années de revenu déclenche la faillite.',
+        onChanged: (v) => upd(() => p.bkDebtIncome = (v * 10).round() / 10)),
+    ParamSlider(
+        label: 'Faillite : crédit fermé ensuite',
+        value: p.bkBanDays.toDouble(),
+        min: 0,
+        max: 2190,
+        format: (v) => '${v.round()} j',
+        hint: 'Durée pendant laquelle un failli n’obtient aucun crédit ; sa cote reste abaissée ensuite.',
+        onChanged: (v) => upd(() => p.bkBanDays = v.round())),
+    ParamSlider(
+        label: 'Service de la dette maximal',
+        value: p.dsrMax,
+        min: 0.1,
+        max: 0.8,
+        format: pct,
+        hint: 'Mensualités et paiement minimum de la carte, en part du revenu mensuel : au-delà, la banque refuse.',
+        onChanged: (v) => upd(() => p.dsrMax = (v * 100).round() / 100)),
+    const SizedBox(height: 4),
+    KV('Cartes ouvertes · prêts personnels en cours', '$cards · $loans'),
+    KV('Dette des citoyens : cartes · prêts', '${money0(cardDebt)} · ${money0(loanDebt)}'),
+    KV('Citoyens en retard de paiement', '$late', color: late > 0 ? pal.warn : null),
+    KV('Prêté aux citoyens · radié (total)', '${money0(sim.consumerLent)} · ${money0(sim.consumerWrittenOff)}'),
+    KV('Faillites personnelles (total)', '${sim.consumerBankruptcies}', color: sim.consumerBankruptcies > 0 ? pal.warn : null),
+  ]);
 }

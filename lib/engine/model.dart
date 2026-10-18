@@ -764,6 +764,20 @@ class Params {
   double prodMakerLearn = 0.01; // chance quotidienne qu'une entreprise découvre un fabricant
   double prodLoyalty = 0.1; // préférence pour le fournisseur habituel (score × 1 + cette valeur)
   double prodEntryMargin = 0.15; // marge moyenne des vendeurs en place jugée attrayante pour lancer une variété
+
+  // ---- Crédit aux citoyens et banques (Modules.banking). Ordres de grandeur a priori, non réglés sur un résultat.
+  double cardRate = 0.20; // taux annuel de base de la carte de crédit
+  double cardMinPct = 0.03; // paiement minimum mensuel : part du solde (au moins les intérêts du mois)
+  double cardLimitDays = 30; // limite de la carte : jours de revenu, selon la cote
+  double loanRateSpread = 0.04; // prêt personnel : taux d'intérêt de base + cette marge
+  int loanTermMonths = 12; // durée d'un prêt personnel (mois de 30 jours)
+  double creditRiskPremium = 0.10; // prime annuelle maximale selon la cote (cote 300 : toute la prime)
+  double dsrMax = 0.40; // service de la dette (mensualités + paiement minimum de la carte) ≤ cette part du revenu mensuel
+  int creditMinScore = 550; // cote minimale pour obtenir un crédit
+  int bkArrearsDays = 90; // faillite d'un citoyen : paiements en retard depuis ce nombre de jours…
+  double bkDebtIncome = 2.0; // … ou, sans emploi, dette au-delà de ce nombre d'années de revenu
+  int bkBanDays = 730; // après une faillite : crédit fermé pendant ce nombre de jours, cote abaissée ensuite
+  double bankTightLoss = 0.03; // pertes annualisées sur les prêts aux particuliers à partir desquelles la banque resserre
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
@@ -823,6 +837,9 @@ class Modules {
   // qualité, goût des ménages, notoriété) au lieu d'un clone. Coupé par défaut. Les variétés naissent et meurent avec les
   // entreprises : leur nombre n'est jamais fixé d'avance.
   bool products = false;
+  // Crédit aux citoyens (prêt personnel, carte de crédit, cote, faillite personnelle) et, à partir de deux banques,
+  // concurrence bancaire (réserves, marché interbancaire, fondations et faillites de banques). Coupé par défaut.
+  bool banking = false;
 
   Modules();
 
@@ -849,12 +866,12 @@ class Modules {
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
     'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation', 'bankruptcy', 'buildings', 'jobs',
-    'entrepreneurship', 'products',
+    'entrepreneurship', 'products', 'banking',
   ];
 
   /// Modules apparus après la référence du moteur : ils n'apparaissent dans les instantanés, les empreintes et les
   /// synthèses que lorsqu'ils sont actifs.
-  static const List<String> lateKeys = ['entrepreneurship', 'products'];
+  static const List<String> lateKeys = ['entrepreneurship', 'products', 'banking'];
 
   /// Les modules sous forme de table pour les instantanés et les empreintes. Un module apparu après la référence du moteur
   /// n'y figure que lorsqu'il est actif : coupé, la sérialisation est celle d'avant lui.
@@ -882,6 +899,7 @@ class Modules {
     'jobs': 'Rôles, contrats et négociation salariale',
     'entrepreneurship': 'Entrepreneuriat des citoyens',
     'products': 'Variétés de produits et marques',
+    'banking': 'Crédit aux citoyens et banques',
   };
 
   bool get(String k) {
@@ -924,6 +942,8 @@ class Modules {
         return entrepreneurship;
       case 'products':
         return products;
+      case 'banking':
+        return banking;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -968,6 +988,8 @@ class Modules {
         entrepreneurship = v;
       case 'products':
         products = v;
+      case 'banking':
+        banking = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -1297,11 +1319,75 @@ class Citizen extends Account {
   // la dernière achetée (habitude, bouche-à-oreille).
   final Map<String, Map<int, int>> known = {};
   final Map<String, int> lastChoice = {};
+  // Crédit (module banking) : prêts personnels, carte (solde, limite, intérêts courus, jour d'ouverture), arriérés
+  // (montant en retard et jour du premier retard), retards récents, faillites, crédit fermé jusqu'au jour…, banque.
+  final List<PersonalLoan> loans = [];
+  double card = 0;
+  double cardLimit = 0;
+  double cardInterest = 0;
+  int cardOpened = -1;
+  double arrears = 0;
+  int? arrearsSince;
+  int latePayments = 0;
+  int lastLate = -1000;
+  int bankruptcies = 0;
+  int creditBanUntil = 0;
+  String lastBankruptcy = '';
+  int bankId = 0;
+  double get consumerDebt {
+    var d = card;
+    for (final l in loans) {
+      d += l.balance;
+    }
+    return d;
+  }
   Citizen(this.id, this.name, super.money, this.skill, this.ambition);
 
   /// 0 manœuvre, 1 technicien, 2 professionnel.
   int get level => skill >= 2 ? 2 : (skill >= 1 ? 1 : 0);
   double get health => sat['sante']!;
+}
+
+/// Une banque (module banking, à partir de deux). Ses comptes sont une répartition du bilan consolidé du système bancaire
+/// (`Sim.bank`) : toute la monnaie passe par ce compte unique, si bien que les invariants consolidés restent exacts ; chaque
+/// banque tient ses fonds propres (la Caisse populaire, banque 0, a le reste), ses prêts et ses dépôts se lisent dans les
+/// comptes de ses clients, et ses réserves sont le solde de son bilan.
+class Bank {
+  final int id;
+  String name;
+  int? ownerId; // fondateur ; null : actionnaire institutionnel (dividendes redistribués aux citoyens)
+  double equity = 0; // fonds propres (banque 0 : calculés comme le reste du bilan consolidé)
+  double capital = 0; // capital de départ, jamais distribué
+  double interbank = 0; // > 0 : prêté aux autres banques ; < 0 : emprunté
+  double loanSpread = 0; // marge sur le taux de base des prêts
+  double cardSpread = 0; // marge sur le taux de base de la carte
+  double depositRate = 0; // taux annuel versé sur les dépôts
+  int founded = 0;
+  bool alive = true;
+  int? closed;
+  String state = 'saine';
+  int lossDays = 0; // jours consécutifs de profit lissé négatif
+  double profitEma = 0;
+  double lossEma = 0; // radiations lissées (~100 jours), par jour
+  double incomeToday = 0, lossToday = 0, costToday = 0;
+  // chiffres du jour, pour les règles et l'interface (non sérialisés : ils se recalculent)
+  double equityNow = 0, deposits = 0, reserves = 0, firmLoans = 0, consumerLoans = 0, riskLoans = 0;
+  int clients = 0;
+  double get loans => firmLoans + consumerLoans;
+  double get capitalRatio => riskLoans > 0 ? equityNow / riskLoans : double.infinity;
+  Bank(this.id, this.name);
+}
+
+/// Prêt personnel à terme : mensualités constantes (amortissement), tous les 30 jours depuis l'octroi.
+class PersonalLoan {
+  final int bankId;
+  double balance;
+  final double rate; // annuel
+  final int months;
+  final double payment; // mensualité
+  final int start;
+  final String reason;
+  PersonalLoan(this.bankId, this.balance, this.rate, this.months, this.payment, this.start, this.reason);
 }
 
 class StateAccount extends Account {
@@ -1399,6 +1485,7 @@ class Firm extends Account {
   double machineLife = 0;
   final List<int> knownMakers = [];
   int? supplier;
+  int bankId = 0; // module banking : la banque de l'entreprise (0 : la Caisse populaire)
   double lastBatches = 0;
   double outputEma = 0; // production lissée (~20 jours) : base du coût du travail réellement payé
   double effWorkers = 0;

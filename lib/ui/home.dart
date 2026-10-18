@@ -41,6 +41,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     var jobs = ctrl.sim.modules.jobs;
     var founders = ctrl.sim.modules.entrepreneurship;
     var varieties = ctrl.sim.modules.products;
+    var banking = ctrl.sim.modules.banking;
     final seedCtl = TextEditingController(text: '42');
     final go = await showDialog<bool>(
       context: context,
@@ -100,6 +101,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     'goût, la qualité, le prix et ce qu’ils connaissent. Réglable dans l’onglet Modèle.',
                     style: TextStyle(fontSize: 12)),
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: banking,
+                onChanged: (v) => set(() => banking = v),
+                title: const Text('Crédit et banques', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Prêts personnels, cartes de crédit, cote, faillites personnelles ; plusieurs banques en '
+                    'concurrence. Réglable dans l’onglet Modèle.', style: TextStyle(fontSize: 12)),
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: seedCtl,
@@ -127,6 +136,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ctrl.sim.modules.jobs = jobs;
       ctrl.sim.modules.entrepreneurship = founders;
       ctrl.sim.modules.products = varieties;
+      ctrl.sim.modules.banking = banking;
       ctrl.newGame(seed, params: Params()..population = pop.round());
     }
     seedCtl.dispose();
