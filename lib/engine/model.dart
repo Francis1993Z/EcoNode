@@ -589,11 +589,15 @@ class Params {
   // A2. Travail divisible : une équipe sous-employée travaille, et est payée, à temps partiel selon la production du
   // jour (au moins 20 % du temps, un jour par semaine) ; le coût de revient ne répartit plus les heures oisives.
   bool partTime = false;
-  // Recherche limitée des vendeurs (coupée : 0, chaque achat d'un ménage compare tous les vendeurs du bien). k > 0 :
-  // chaque achat d'un ménage n'examine que k vendeurs tirés parmi ceux qui ont du stock, plus celui de son dernier achat
-  // de ce bien (habitude), et prend le meilleur de cet échantillon selon la règle habituelle (prix, notoriété).
-  // Information imparfaite sur les prix (choix de jeu ; mesure au journal, § 8).
-  int sellerSample = 0;
+  // Recherche limitée des vendeurs : chaque achat d'un ménage n'examine que k vendeurs tirés parmi ceux qui ont une unité
+  // en stock, plus celui de son dernier achat de ce bien (habitude), et prend le meilleur de cet échantillon selon la
+  // règle habituelle (prix, notoriété). 0 : chaque achat compare tous les vendeurs du bien.
+  // RÈGLE DE MARCHÉ, pas une optimisation neutre : c'est une information imparfaite des ménages sur les prix. Valeur par
+  // défaut du jeu depuis la décision de Francis (18 octobre 2026) : k = 5, qui ne change rien à 240 et à 1 000 citoyens
+  // (jamais plus de k + 1 vendeurs d'un même bien) et qui évite à grande échelle l'effondrement de la comparaison complète
+  // (journal, § 9). À réexaminer avec les variétés de produits. Le protocole historique à k = 0 se rejoue avec
+  // `--param sellerSample=0`.
+  int sellerSample = 5;
 
   // ---- Rôles, contrats et négociation salariale (module « jobs »). Choix de jeu, sauf mention.
   // Salaire de réserve d'un sans-emploi : son dernier salaire, qui baisse de reservationDecay par jour de chômage

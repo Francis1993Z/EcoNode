@@ -44,7 +44,7 @@ void main() {
   test('3 000 citoyens : un échantillon plus grand que tous les vendeurs (k = 100 000) donne la partie de k = 0', () {
     // le chemin de l'échantillonnage (liste des vendeurs disponibles, tirage, offres) examine alors tous les vendeurs
     // qui ont une unité en stock : il doit redonner exactement la recherche complète
-    final a = Sim(seed: 9, params: Params()..population = 3000);
+    final a = Sim(seed: 9, params: Params()..population = 3000..sellerSample = 0);
     final b = Sim(seed: 9, params: Params()..population = 3000..sellerSample = 100000);
     for (var d = 1; d <= 50; d++) {
       a.step();
@@ -59,7 +59,7 @@ void main() {
   });
 
   test('240 citoyens : k = 5 donne exactement la même partie que k = 0', () {
-    final a = Sim(seed: 7);
+    final a = Sim(seed: 7, params: Params()..sellerSample = 0);
     final b = Sim(seed: 7, params: Params()..sellerSample = 5);
     for (var d = 1; d <= 200; d++) {
       a.step();
