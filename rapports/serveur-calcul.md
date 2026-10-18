@@ -5,6 +5,11 @@ Branches `tests/serveur-calcul` (fusionnée dans main) puis `tests/serveur-revis
 modifié ; ajouts : `tool/envoyer_serveur.sh`, `tool/lot_serveur.sh`, `tool/mesure_debit.sh`, `tool/etat_serveur.sh`,
 `tool/parite_plateformes.sh`, `tool/parite_serveur.sh`, `tool/parite_comparer.dart`.
 
+> **Mise à jour du 18 octobre 2026 : tous les chiffres de débit, de durée et de coût ci-dessous ont été mesurés avec
+> `sellerSample` = 0 (k = 0, tous les vendeurs).** Le moteur joue maintenant k = 5 par défaut, environ 3,5 fois plus vite à
+> 10 000 habitants. Ces chiffres sont donc des **bornes hautes** ; l'estimation pour k = 5 est au § 8, **non mesurée sur
+> le serveur** (éteint à ce jour). La parité PC ↔ serveur à k = 5 reste à vérifier (§ 8).
+
 ## En bref
 
 - **Parité PC ↔ serveur : identique.** Mêmes états au bit près sur 9 300 jours d'empreintes quotidiennes (16 parties
@@ -231,8 +236,10 @@ Linux. La copie part maintenant sans retours chariot.
 
 - **`tool/lot_serveur.sh`** (sur le serveur) :
   `bash ~/econodes/<révision>/tool/lot_serveur.sh [-j 8] [--eteindre-a-la-fin] taches.txt`.
-  - Une tâche par ligne : `graine niveau population jours [options de partie.exe]`. Le lot part dans une session tmux,
-    qui survit à la fermeture du SSH.
+  - Une tâche par ligne : `graine étiquette population jours k filets [options de partie.exe]`. **k** (recherche
+    limitée des vendeurs, `Params.sellerSample`) et les **filets** (1 ou 0) sont écrits sur chaque ligne : aucune valeur
+    par défaut cachée, et le script refuse une ligne qui les met aussi dans les options. Le lot part dans une session
+    tmux, qui survit à la fermeture du SSH.
   - Il joue N parties à la fois, 8 par défaut (le nombre de vCPU), et écrit un journal par partie dans
     `~/resultats/<date>-<nom du fichier de tâches>-<révision>/`. Chaque journal contient la commande, la sortie, le
     code de sortie, la durée et la mémoire. Le lot écrit aussi `resume.csv` et `vmstat.log`.
@@ -248,9 +255,9 @@ Linux. La copie part maintenant sans retours chariot.
     - lot de 5 parties coupé au milieu (`tmux kill-session`, ce qui arrête aussi les parties en cours), puis relancé :
       les 2 parties finies sont sautées, les 3 autres jouées, 5 / 5 à la fin ;
     - `{dossier}` remplacé par le dossier propre à la partie, pour `--trace`.
-  - **La colonne `niveau`** : `partie.exe` n'a pas de niveau. Pour une partie seule, un niveau du protocole ne fixe
-    que la graine, la durée et la population, déjà données sur la ligne ; la colonne sert donc d'étiquette (nom des
-    journaux). Les filets et les modules passent par les options (`--filets 0`, `--modules …`).
+  - **La colonne `étiquette`** (ex-« niveau ») : `partie.exe` n'a pas de niveau de protocole ; la colonne est un nom libre
+    (lettres, chiffres, `_`, `.`) qui sert aux journaux. Les modules passent par les options (`--modules …`).
+    Le nom d'une partie est `g<graine>-<étiquette>-p<population>-j<jours>-k<k>-f<filets>`.
 - **`tool/mesure_debit.sh`** (sur le serveur) : les paliers du § 3, à refaire tels quels sur une autre instance.
 - **`tool/envoyer_serveur.sh`** (sur le PC) : installe la révision HEAD dans son dossier et la compile (§ 1, § 5.1).
 - **`tool/parite_serveur.sh`** (sur le PC) : la parité du § 2 en une commande, environ 3 minutes ; s'appuie sur
@@ -260,7 +267,7 @@ Linux. La copie part maintenant sans retours chariot.
 Exemple, le protocole de stabilité à 10 000 habitants par `lot_serveur.sh`, sur la révision `19ae708722d0` :
 
 ```bash
-for g in $(seq 1 30); do for f in 0 1; do echo "$g 1 10000 1500 --filets $f"; done; done > stabilite10k.txt
+for g in $(seq 1 30); do for f in 0 1; do echo "$g stab10k 10000 1500 5 $f"; done; done > stabilite10k.txt
 bash ~/econodes/19ae708722d0/tool/lot_serveur.sh -j 8 --eteindre-a-la-fin stabilite10k.txt
 ```
 
@@ -319,3 +326,27 @@ tmux new -d -s stab "R=19ae708722d0; ~/econodes/\$R/build/outils/stabilite.exe -
     une reprise après coupure. Écrit depuis dans une autre session (`tool/fusion_syntheses.dart`, branche
     `claude/trusting-elbakyan-e28442`, commit `8a94490`), pas encore relu ni fusionné ;
   - une mesure de 15 minutes sur une c7a.2xlarge, qui pourrait diviser le coût d'un protocole par 1,4.
+
+## 8. Mise à jour pour k = 5 (estimation, à mesurer)
+
+`sellerSample` = 5 est le réglage par défaut du moteur (décision du 18 octobre 2026), puis le moteur a été accéléré
+sans changer un seul résultat (`rapports/vitesse-calibration.md`). Le serveur est éteint : rien de ce paragraphe n'a été
+mesuré dessus.
+
+**Mesuré sur le PC** (une partie seule, k = 5, jours 11 à 50, 10 000 habitants) : 255 ms par jour, contre 909 pour k = 0
+avant les optimisations (rapport de 0,28).
+
+**Estimation pour le serveur**, en appliquant ce rapport aux mesures k = 0 de ce rapport (1 778 ms par jour à 8 parties
+à la fois) : environ 500 ms par jour, soit 12 à 13 minutes pour une partie de 1 500 jours.
+
+| | k = 0 (mesuré) | k = 5 (estimé, ±30 %) |
+|---|---|---|
+| Une partie de 1 500 jours à 10 000 habitants, 8 à la fois | 44 min 27 s | ≈ 12,5 min |
+| Protocole de stabilité, 60 parties (`lot_serveur.sh`) | 5 h 39, 2,02 $ | ≈ 1 h 35 à 1 h 45, ≈ 0,6 $ |
+| Nuit de 10 h (`lot_serveur.sh`) | 104 parties | environ 300 parties |
+
+Le rapport de 0,28 vient des jours 11 à 50 : il peut changer aux jours suivants (l'économie à k = 5 n'a ni le même
+nombre d'entreprises ni la même demande). La première mesure sur le serveur (`bash tool/mesure_debit.sh --paliers 1,8`,
+environ 5 minutes) remplacera cette estimation. **À faire dès que le serveur est rallumé :** `bash tool/envoyer_serveur.sh`,
+`bash tool/parite_serveur.sh` (doit finir par `PARITÉ : IDENTIQUE`), `bash tool/reference.sh --verifier` sur le serveur,
+puis la mesure de débit, puis arrêt de la machine.

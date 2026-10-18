@@ -256,7 +256,7 @@ variable de tirages et décalait toute la suite de la partie.
 | 15 | `prix` | pas d'ajustement de la marge | `_decide` |
 | 16 | `divin` | actions du god mode (épidémie) | `godEpidemic` |
 | 17 | `logement` | bâtiments : état à la naissance, déménagement, regard sur le marché (module `buildings`) | `buildings.dart` |
-| 18 | `vendeurs` | recherche limitée : vendeurs examinés par un achat de ménage (`sellerSample` > 0) | `_AllOffers.sampled` |
+| 18 | `vendeurs` | recherche limitée : tirage des vendeurs examinés par un achat de ménage dans la liste des vendeurs avec stock (`sellerSample` > 0) | `_AllOffers.sampled` |
 | 19 | `anciennete` | ancienneté des employés du départ (0 à 4 ans ; l'encadrement, au moins celle qu'il exige) | `reset` |
 
 La création d'entreprise ne tire rien : le fondateur est le citoyen le plus riche.
@@ -350,7 +350,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 |---|---|---|---|
 | `population` | 240 | citoyens au départ (`--population N` dans les outils) | choix de jeu |
 | `scenarioPopulation` | 240 | population pour laquelle le scénario par défaut a été réglé ; au-delà, il est répété | taille de réglage du modèle (journal, § 6, tâche 1) |
-| `sellerSample` | 0 | recherche limitée : un achat de ménage n'examine que k vendeurs tirés (plus celui de son dernier achat) ; 0 = tous | choix de jeu, coupé par défaut (journal, § 8) |
+| `sellerSample` | 5 | recherche limitée : un achat de ménage (une unité) n'examine que k vendeurs tirés dans la liste de ceux qui ont une unité en stock (plus celui de son dernier achat) ; 0 = tous | règle de marché, actif par défaut depuis le 18 octobre 2026 (journal, §§ 9 et 11) |
 | `startWallet` | 3 000 $ | argent de départ de référence | choix de jeu |
 | `startWage` | 150 $/j | salaire de base d'un manœuvre | choix de jeu |
 | `markup` | 1,15 | majoration normale du coût | choix de jeu |
@@ -447,6 +447,17 @@ règle au § 6.
 
   Il achète au moins cher d'abord, dans la limite de son budget. Avec le commerce, l'extérieur offre sans limite les
   biens non périssables au prix mondial × `importMarkup`.
+- **Recherche limitée des vendeurs (`sellerSample` = k, 5 par défaut).** Un achat de ménage ne compare pas tous les
+  vendeurs du bien : il examine le vendeur de son dernier achat (habitude) et au plus k vendeurs tirés au hasard dans la
+  liste de ceux qui ont une unité en stock (flux `vendeurs`), et prend le meilleur de cet échantillon. **C'est une règle
+  de marché** (information imparfaite des ménages sur les prix), **pas une optimisation neutre** : à grande échelle elle
+  change l'économie. À 13 240 citoyens, k = 5 évite l'effondrement de la comparaison complète (k = 0 : faim 51 %, chômage
+  62 % ; k = 5 : faim 0,2 %, chômage 24 %, jours 100 à 1 000). Les résultats croissent avec k jusqu'à rejoindre ceux de k = 0 quand k couvre
+  tous les vendeurs (k ≈ 20) ; avec un échantillon plus grand que tous les vendeurs, le chemin redonne exactement k = 0.
+  À 240 et 1 000 citoyens (jamais plus de k + 1 vendeurs d'un même bien), k = 5 donne la partie de k = 0. Les achats non
+  entiers d'un ménage (réparations du module Bâtiments) gardent la recherche complète. **Cette valeur sera à réexaminer
+  avec les variétés de produits** : plus de vendeurs par bien ferait jouer k autrement. Mesures et limites :
+  `rapports/vendeurs-correction.md`, journal § 9.
 - **Demande non servie.** La quantité qui n'a pas trouvé de vendeur, faute de stock et non faute d'argent, est notée
   `unmet`. C'est le signal d'embauche, de prix et d'entrée.
 - **Prix de référence** (`bestPrice`) : la meilleure offre disponible, sinon le plus bas prix affiché, sinon le prix

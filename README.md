@@ -160,8 +160,20 @@ flutter build web
 - `tool/stabilite.dart --niveau 0|1|2` : protocole en trois niveaux (fumée, décision, échelle) ; `tool/perf.dart` :
   temps par jour et mémoire d'une partie ; `tool/echelle.dart` : ratios du jour 1 selon la population ;
   `bash tool/compiler.sh` : exécutables natifs des outils dans `build/outils/`.
+- `bash tool/reference.sh --verifier` : rejoue la batterie de parité (3 minutes) et la compare à
+  `rapports/reference/reference.txt` (empreintes de 9 000 jours, 21 instantanés complets, protocole niveau 0, 10 000
+  habitants). À lancer après tout changement qui ne doit rien changer au moteur (optimisation, outil, interface), sur
+  le PC et sur le serveur ; `--ecrire` n'est pour un changement de comportement voulu, avec son commit.
 - `tool/fusion_syntheses.dart` : fusionne les synthèses `--save` de lancements séparés (une graine et une étape par
   processus) en celle d'un lancement unique.
+- `tool/vendeurs_controle.dart A.json B.json` : comparaison appariée de deux synthèses (k = 0 contre k > 0) avec
+  intervalles ; `tool/vendeurs_cout.dart` : coût d'un achat selon le nombre de vendeurs ; `tool/vendeurs_verif.dart` :
+  liste des vendeurs disponibles vérifiée à grande échelle (rapport : `rapports/vendeurs-correction.md`).
+- Calibration (rapport : `rapports/vitesse-calibration.md`) : `tool/sequentiel.dart` : comparaison appariée à arrêt
+  séquentiel par lots de graines (le nombre de graines devient un résultat) ; `tool/convergence.dart` : deux tailles de
+  population, mêmes indicateurs, avec intervalles ; `tool/criblage.dart morris|lhs` : criblage de Morris puis hypercube
+  latin sur les paramètres de `tool/parametres.dart` (13 paramètres et leurs plages d'exploration) ; `tool/profil.dart` :
+  profil CPU d'une partie ; `tool/comparer_moteurs.sh` : deux moteurs, mêmes parties, empreintes comparées.
 - `tool/partie.dart` : une partie en ligne de commande, avec ses journaux complets, ses instantanés et `--diff` ;
   `--sans-hasard` joue une partie où tous les tirages valent 0,5, lisible à la main.
 - `tool/detresse.dart` : ce qui distingue les citoyens en détresse des autres (à partir d'`agents_fin.csv`).

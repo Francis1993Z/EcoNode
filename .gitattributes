@@ -1,0 +1,2 @@
+# Scripts shell : toujours en LF (bash les refuse en CRLF sous Linux)
+*.sh text eol=lf

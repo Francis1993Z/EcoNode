@@ -64,6 +64,7 @@ const Map<String, String> alertLabels = {
   'sansEmploye': 'Entreprise sans employé',
   'sansClient': 'Entreprise sans client',
   'invariant': 'Invariant comptable rompu',
+  'listeVendeurs': 'Liste des vendeurs disponibles fausse',
   'caisse': 'Caisse insolvable',
   'sante': 'Santé de la population effondrée',
   'efficacite': 'Productivité du travail effondrée',
@@ -78,6 +79,7 @@ const Map<String, String> alertLabels = {
 /// La santé effondrée est une détresse de la population, comme la faim : elle est critique.
 const Set<String> criticalAlerts = {
   'chomageHaut', 'faim', 'sansAbri', 'sante', 'inflationJour', 'inflation100', 'invariant',
+  'listeVendeurs',
 };
 
 /// Une ligne de la liste des agents impliqués : le texte, et l'agent qu'il cite (pour ouvrir son inspecteur).
@@ -361,6 +363,13 @@ class Monitor {
               'bilan ${inv.bank.toStringAsExponential(2)}',
               'ΔM ${inv.flows.toStringAsExponential(2)}',
             ]));
+
+    // ---- liste des vendeurs disponibles (recherche limitée) : doit être exactement les vendeurs avec du stock
+    if (s.params.sellerSample > 0) {
+      final bad = s.availMismatches();
+      cond('listeVendeurs', 'listeVendeurs', bad.isNotEmpty, 1, bad.length.toDouble(), 0,
+          () => '${bad.length} biens dont la liste des vendeurs disponibles est fausse', () => _plain(bad.take(4).toList()));
+    }
 
     // fermer les alertes dont la condition ne tient plus
     for (final k in active.keys.toList()) {
