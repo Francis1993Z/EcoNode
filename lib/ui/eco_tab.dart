@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../engine/model.dart';
+import '../engine/sim.dart';
 import 'charts.dart';
 import 'controller.dart';
 import 'format.dart';
@@ -314,6 +315,7 @@ class _ModelTabState extends State<ModelTab> {
             hint: 'Avec entretien ; sans entretien, l’usure est 2,5 fois plus rapide.',
             onChanged: (v) => upd(() => p.depreciation = v)),
       ]),
+      _entrepreneurSection(context, ctrl, upd),
       Section('Nouvelle partie', [
         Row(children: [
           Expanded(
@@ -364,4 +366,92 @@ class _ModelTabState extends State<ModelTab> {
       const SizedBox(height: 24),
     ]);
   }
+}
+
+
+/// Entrepreneuriat des citoyens : l'interrupteur du module, ses réglages et ce qu'il produit.
+Widget _entrepreneurSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final p = sim.params;
+  final on = sim.modules.entrepreneurship;
+  final year = sim.day ~/ 365;
+  final f = sim.entryFunnel;
+  int fn(String k) => f['fond_$k'] ?? 0;
+  final refusals = {
+    'capital': 'épargne insuffisante',
+    'pret_paiements': 'prêt refusé : paiements trop lourds',
+    'pret_fonds_propres': 'prêt refusé : fonds propres de la Caisse',
+    'pret_credit_coupe': 'prêt impossible : crédit coupé',
+  };
+  final tol = (p.entRiskMean - p.entRiskSpread).clamp(0.0, 1.0).toDouble();
+  final tolHi = (p.entRiskMean + p.entRiskSpread).clamp(0.0, 1.0).toDouble();
+  return Section('Entrepreneuriat des citoyens', [
+    Text(
+        'Des citoyens qui veulent posséder, ont assez d’ambition et de tolérance au risque, examinent de temps en temps un '
+        'secteur où la demande reste sans réponse. Ils comparent ce qu’ils espéreraient y gagner (marge observée, demande non '
+        'servie, connaissance du secteur) à leur revenu actuel, pesé par leur aversion au risque. Capital : leur épargne '
+        'plus un prêt de la Caisse selon ses règles prudentielles. Ils deviennent propriétaires et premiers employés.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: Text(Modules.labels['entrepreneurship']!, style: const TextStyle(fontSize: 13)),
+      subtitle: Text(
+          sim.modules.entry
+              ? 'Prend effet au prochain jour. Coupé : les créations redeviennent automatiques.'
+              : 'Suppose « Entrée et sortie d’entreprises », actuellement coupée : rien ne sera fondé.',
+          style: const TextStyle(fontSize: 11)),
+      value: on,
+      onChanged: (v) => upd(() => sim.modules.entrepreneurship = v),
+    ),
+    ParamSlider(
+        label: 'Taux de fondation (multiplicateur)',
+        value: p.entFoundRate,
+        min: 0,
+        max: 10,
+        format: (v) => '×${fmtNum(v, 1)}',
+        hint: 'Chance quotidienne qu’un candidat examine un projet : ${fmtNum(p.entConsiderRate * 100, 2)} % × ce '
+            'multiplicateur. 0 : personne ne fonde.',
+        onChanged: (v) => upd(() => p.entFoundRate = (v * 10).round() / 10)),
+    ParamSlider(
+        label: 'Tolérance au risque : moyenne',
+        value: p.entRiskMean,
+        min: 0,
+        max: 1,
+        format: pct,
+        hint: 'Un citoyen au-dessous de ${pct(p.entMinTolerance)} ne fonde jamais ; plus il est tolérant, moins sa mise '
+            'perdue pèse dans sa décision.',
+        onChanged: (v) => upd(() => p.entRiskMean = (v * 100).round() / 100)),
+    ParamSlider(
+        label: 'Tolérance au risque : dispersion',
+        value: p.entRiskSpread,
+        min: 0,
+        max: 0.5,
+        format: pct,
+        hint: 'Les tolérances s’étalent de ${pct(tol)} à ${pct(tolHi)} (répartition uniforme). Change la distribution de '
+            'tous les citoyens, présents compris.',
+        onChanged: (v) => upd(() => p.entRiskSpread = (v * 100).round() / 100)),
+    ParamSlider(
+        label: 'Exigence de capital (× capital de démarrage)',
+        value: p.entCapitalMult,
+        min: 0.5,
+        max: 3,
+        format: (v) => '×${fmtNum(v, 2)}',
+        hint: 'Capital de démarrage = 10 jours de salaires + 5 jours d’intrants de l’équipe. Le fondateur en met au moins '
+            '${pct(p.entMinOwnShare)} ; le reste est un prêt de la Caisse, qu’elle peut refuser.',
+        onChanged: (v) => upd(() => p.entCapitalMult = (v * 20).round() / 20)),
+    const SizedBox(height: 4),
+    KV('Fondations par des citoyens : année ${year + 1} · précédente',
+        '${sim.foundedIn(year)} · ${year > 0 ? sim.foundedIn(year - 1) : '—'}'),
+    KV('Fermetures : année ${year + 1} · précédente', '${sim.closedIn(year)} · ${year > 0 ? sim.closedIn(year - 1) : '—'}'),
+    KV('Candidats à fonder aujourd’hui', on ? '${sim.foundingCandidates()} sur ${sim.citizens.length}' : '—'),
+    KV('Projets examinés · fondés (total)', '${fn('projet')} · ${fn('creation')}'),
+    for (final e in refusals.entries)
+      if (fn(e.key) > 0) KV('Refus : ${e.value}', '${fn(e.key)}', color: pal.warn),
+    Text(
+        'Repère, non visé : au Canada, environ 10 % d’entrées et 9 % de sorties d’entreprises par an (Statistique Canada). '
+        'Aucun réglage n’a été ajusté pour s’en approcher.',
+        style: TextStyle(color: pal.ink3, fontSize: 11, height: 1.35)),
+  ]);
 }

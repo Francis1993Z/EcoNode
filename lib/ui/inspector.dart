@@ -128,6 +128,7 @@ class _FirmView extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4),
               child: Text('⚠ Production limitée par manque d’intrants.', style: TextStyle(color: pal.warn, fontSize: 12))),
       ]),
+      if (sim.modules.entrepreneurship && !sim.publicService(f)) _foundingSection(context, ctrl, f),
       if (sim.publicService(f)) _publicSection(context, ctrl, f),
       if (sim.modules.buildings && f.type == 'immobilier') landlordSection(context, ctrl, f),
       _StaffSection(ctrl, f),
@@ -796,6 +797,7 @@ class _CitizenViewState extends State<_CitizenView> {
         KV('Dépenses hier', money(c.spend)),
         KV('Qualification', '${classLabels[c.level]} (${fmtNum(c.skill, 2)})'),
         KV('Ambition (envie de se former)', pct(c.ambition)),
+        if (sim.modules.entrepreneurship) ..._founderTraits(context, widget.ctrl, c),
         KV('Bonheur', pct(c.happiness)),
         KV('Jours de faim', '${c.hungerDays}', color: c.hungerDays > 0 ? pal.bad : null),
         KV('Logement', c.homeless ? 'sans logis (${c.homelessDays} j)' : 'logé', color: c.homeless ? pal.bad : null),
@@ -1242,4 +1244,49 @@ class _WorldView extends StatelessWidget {
       const SizedBox(height: 24),
     ]);
   }
+}
+
+
+/// Fondation d'une entreprise : qui l'a fondée, quand, avec quel capital ; les compteurs de l'année.
+Widget _foundingSection(BuildContext context, SimController ctrl, Firm f) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final founder = f.founderId != null ? sim.citizen(f.founderId!) : null;
+  final year = sim.day ~/ 365;
+  return Section('Fondation', [
+    if (f.founderId == null)
+      Text('Entreprise du départ de la partie : aucun fondateur.', style: TextStyle(color: pal.ink3, fontSize: 12))
+    else ...[
+      Row(children: [
+        Expanded(child: Text('Fondateur', style: TextStyle(color: pal.ink2, fontSize: 12.5))),
+        if (founder != null)
+          TextButton(onPressed: () => ctrl.select(Selection('citizen', founder.id)), child: Text(founder.name))
+        else
+          Text('a quitté la région', style: TextStyle(color: pal.ink3, fontSize: 12.5)),
+      ]),
+      KV('Fondée le jour', '${f.foundedDay}  (il y a ${sim.day - f.foundedDay} j)'),
+      KV('Capital de départ', money0(f.startCapital)),
+      KV('Dette envers la Caisse', money0(f.debt), color: f.debt > 0 ? pal.warn : null),
+    ],
+    KV('Fondations · fermetures cette année', '${sim.foundedIn(year)} · ${sim.closedIn(year)}'),
+  ]);
+}
+
+/// Traits d'entrepreneur d'un citoyen : désir de posséder, tolérance au risque, secteurs connus, et ce qui l'empêche de fonder.
+List<Widget> _founderTraits(BuildContext context, SimController ctrl, Citizen c) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final blocker = sim.foundingBlocker(c);
+  final sectors = sim.knownSectors(c);
+  return [
+    KV('Veut posséder', sim.wantsToFound(c) ? 'oui' : 'non'),
+    KV('Tolérance au risque', pct(sim.riskTolerance(c))),
+    KV('Peut fonder une entreprise', blocker == null ? 'oui, candidat' : 'non : $blocker',
+        color: blocker == null ? pal.ok : null),
+    if (sectors.isEmpty)
+      const KV('Connaissance des secteurs', 'aucune')
+    else
+      for (final s in sectors.take(4)) KV('Connaît : ${templates[s.$1]?.label ?? s.$1}', '${s.$2} j · ${pct(s.$3)}'),
+    if (sectors.length > 4) KV('… et d’autres secteurs', '${sectors.length - 4}'),
+  ];
 }

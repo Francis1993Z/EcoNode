@@ -67,9 +67,9 @@ class SimController extends ChangeNotifier {
   /// Temps de calcul accordé à la simulation par image, pour que l'interface reste fluide.
   static const int _budgetUs = 10000;
 
-  /// L'interface lance ses parties avec les rôles, contrats et négociation salariale (module jobs, coupé par défaut
-  /// dans le moteur et le protocole).
-  SimController({int seed = 42}) : sim = Sim(seed: seed, modules: Modules()..jobs = true) {
+  /// L'interface lance ses parties avec les rôles, contrats et négociation salariale et avec l'entrepreneuriat des citoyens
+  /// (modules jobs et entrepreneurship, coupés par défaut dans le moteur et le protocole).
+  SimController({int seed = 42}) : sim = Sim(seed: seed, modules: Modules()..jobs = true..entrepreneurship = true) {
     autoLayout(sim);
   }
 

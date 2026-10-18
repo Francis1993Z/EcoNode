@@ -39,6 +39,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     var pop = 240.0;
     var housing = ctrl.sim.modules.buildings;
     var jobs = ctrl.sim.modules.jobs;
+    var founders = ctrl.sim.modules.entrepreneurship;
     final seedCtl = TextEditingController(text: '42');
     final go = await showDialog<bool>(
       context: context,
@@ -78,6 +79,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 subtitle: const Text('Organigrammes, salaires négociés à l’embauche, contre-offres, promotions et '
                     'révisions annuelles.', style: TextStyle(fontSize: 12)),
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: founders,
+                onChanged: (v) => set(() => founders = v),
+                title: const Text('Entrepreneuriat des citoyens',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Des citoyens ambitieux fondent des entreprises avec leur épargne et un prêt de la '
+                    'Caisse, au lieu de créations automatiques. Réglable dans l’onglet Modèle.',
+                    style: TextStyle(fontSize: 12)),
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: seedCtl,
@@ -103,6 +114,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       // la nouvelle partie reprend les modules en cours : on y règle le marché immobilier avant de la créer
       ctrl.sim.modules.buildings = housing;
       ctrl.sim.modules.jobs = jobs;
+      ctrl.sim.modules.entrepreneurship = founders;
       ctrl.newGame(seed, params: Params()..population = pop.round());
     }
     seedCtl.dispose();
