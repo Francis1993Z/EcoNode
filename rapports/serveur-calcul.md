@@ -5,6 +5,11 @@ Branches `tests/serveur-calcul` (fusionnée dans main) puis `tests/serveur-revis
 modifié ; ajouts : `tool/envoyer_serveur.sh`, `tool/lot_serveur.sh`, `tool/mesure_debit.sh`, `tool/etat_serveur.sh`,
 `tool/parite_plateformes.sh`, `tool/parite_serveur.sh`, `tool/parite_comparer.dart`.
 
+> **Mise à jour du 18 octobre 2026 : tous les chiffres de débit, de durée et de coût ci-dessous ont été mesurés avec
+> `sellerSample` = 0 (k = 0, tous les vendeurs).** Le moteur joue maintenant k = 5 par défaut, environ 3,5 fois plus vite à
+> 10 000 habitants. Ces chiffres sont donc des **bornes hautes** ; l'estimation pour k = 5 est au § 8, **non mesurée sur
+> le serveur** (éteint à ce jour). La parité PC ↔ serveur à k = 5 reste à vérifier (§ 8).
+
 ## En bref
 
 - **Parité PC ↔ serveur : identique.** Mêmes états au bit près sur 9 300 jours d'empreintes quotidiennes (16 parties
@@ -321,3 +326,27 @@ tmux new -d -s stab "R=19ae708722d0; ~/econodes/\$R/build/outils/stabilite.exe -
     une reprise après coupure. Écrit depuis dans une autre session (`tool/fusion_syntheses.dart`, branche
     `claude/trusting-elbakyan-e28442`, commit `8a94490`), pas encore relu ni fusionné ;
   - une mesure de 15 minutes sur une c7a.2xlarge, qui pourrait diviser le coût d'un protocole par 1,4.
+
+## 8. Mise à jour pour k = 5 (estimation, à mesurer)
+
+`sellerSample` = 5 est le réglage par défaut du moteur (décision du 18 octobre 2026), puis le moteur a été accéléré
+sans changer un seul résultat (`rapports/vitesse-calibration.md`). Le serveur est éteint : rien de ce paragraphe n'a été
+mesuré dessus.
+
+**Mesuré sur le PC** (une partie seule, k = 5, jours 11 à 50, 10 000 habitants) : 255 ms par jour, contre 909 pour k = 0
+avant les optimisations (rapport de 0,28).
+
+**Estimation pour le serveur**, en appliquant ce rapport aux mesures k = 0 de ce rapport (1 778 ms par jour à 8 parties
+à la fois) : environ 500 ms par jour, soit 12 à 13 minutes pour une partie de 1 500 jours.
+
+| | k = 0 (mesuré) | k = 5 (estimé, ±30 %) |
+|---|---|---|
+| Une partie de 1 500 jours à 10 000 habitants, 8 à la fois | 44 min 27 s | ≈ 12,5 min |
+| Protocole de stabilité, 60 parties (`lot_serveur.sh`) | 5 h 39, 2,02 $ | ≈ 1 h 35 à 1 h 45, ≈ 0,6 $ |
+| Nuit de 10 h (`lot_serveur.sh`) | 104 parties | environ 300 parties |
+
+Le rapport de 0,28 vient des jours 11 à 50 : il peut changer aux jours suivants (l'économie à k = 5 n'a ni le même
+nombre d'entreprises ni la même demande). La première mesure sur le serveur (`bash tool/mesure_debit.sh --paliers 1,8`,
+environ 5 minutes) remplacera cette estimation. **À faire dès que le serveur est rallumé :** `bash tool/envoyer_serveur.sh`,
+`bash tool/parite_serveur.sh` (doit finir par `PARITÉ : IDENTIQUE`), `bash tool/reference.sh --verifier` sur le serveur,
+puis la mesure de débit, puis arrêt de la machine.

@@ -2104,3 +2104,25 @@ l'idée que le sans-abri venait du logement : après correction, le logement n'e
 
 **Vérifications.** `dart analyze` : aucun problème. `flutter test` : 65 réussis, 2 ignorés. Protocole par défaut à k = 0 :
 identique à `7e8029a`.
+
+## 11. Calibration à 10 000 citoyens : k = 5 par défaut, vitesse, graines (18 octobre 2026)
+
+Rapport complet : `rapports/vitesse-calibration.md`. Ce qui a changé, dans l'ordre :
+
+1. **`sellerSample` = 5 devient le réglage par défaut** (décision de Francis). Seul changement de comportement de la
+   mission ; nouvelle référence dans `rapports/reference/reference.txt`. À 240 citoyens, rien de conclu (avec filets :
+   identique). À 2 500 citoyens, l'effet « chômage 13,2 → 24,6 % » vu à 10 graines **n'est pas confirmé à 30 graines
+   appariées** (+4,1 pt [−3,3 ; +6,9]) : le chômage y est trop dispersé pour conclure. Seul le parc d'entreprises est plus
+   haut de façon établie (+3,6 % sans filets, +2,3 % avec filets). MODELE.md : c'est une règle de marché, à réexaminer avec
+   les variétés de produits.
+2. **Quatorze optimisations exactes** (commits `f475202`, `4f8dfe5`) : −28 % à 10 000 citoyens, −35 % à 30 000, empreintes et
+   instantanés identiques. Échelle : exposant 0,99 de 10 000 à 30 000, 1,22 de 30 000 à 100 000 ; 100 000 citoyens =
+   3,3 s par jour, 324 Mo ; un million ≈ 50 s par jour, ≈ 2,8 Go (extrapolé).
+3. **Nombre de graines** : 30 ne suffisent pas pour le chômage à 2 500 citoyens (demi-largeur 5,1 pt contre 2 voulus,
+   ≈ 190 graines estimées) ; elles suffisent pour les entreprises (5), le sans-abri et la faim avec filets (10).
+4. **2 500 citoyens ne remplace pas 10 000** pour les niveaux (8 différences conclues sur 16). Il sert au criblage.
+5. **Outils** : `sequentiel.dart`, `convergence.dart`, `criblage.dart` (Morris puis hypercube latin), `parametres.dart`,
+   `profil.dart`, `comparer_moteurs.sh`, `reference.sh`. Rien n'a été calibré. `entryMinShare` n'a aucun effet mesuré :
+   à vérifier avant de le calibrer.
+6. **Non fait** : parité PC ↔ serveur et débit à k = 5 (serveur éteint, commandes prêtes) ; première nuit de référence
+   (accord de Francis attendu).
