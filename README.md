@@ -83,6 +83,23 @@ Options : `--graines 30`, `--seeds 1,2,3`, `--isolats 16`, `--days 1500`, `--war
 (série avec filets sauf celui-là ; `--sauf chacun` : une série par filet), `--param nom=valeur`, `--key raffinerie`,
 `--relire synthese.json` (refait un rapport sans relancer de partie).
 
+Lot réparti sur des processus séparés (une graine et une étape par processus : plus rapide que les isolats d'un même
+processus, et une coupure ne perd que les parties en cours) : chaque processus enregistre sa synthèse, puis
+`tool/fusion_syntheses.dart` les fusionne en celle qu'aurait enregistrée un seul lancement sur toutes les graines
+(mêmes valeurs, même ordre ; relisible par `--relire`, opérande de `--compare`). Un dossier vaut tous ses `.json` ; une
+graine relancée à l'identique n'est comptée qu'une fois ; un lot incomplet est refusé, sauf avec `--partiel`.
+
+```bash
+dart run tool/stabilite.dart --population 10000 --seeds 7 --phases nets --isolats 1 --save lot/g07-nets.json --out lot/g07-nets.md
+```
+
+```bash
+dart run tool/fusion_syntheses.dart --graines 30 --save rapports/stabilite-10000.json --out rapports/stabilite-10000.md lot
+```
+
+Options de la fusion : `--seeds 3,1,2` (ordre des graines du lancement unique), `--shock-seeds` (chocs sur d'autres
+graines), `--secondes 7200 --isolats 8` (durée réelle du lot, pour la ligne « Temps total » du rapport), `--partiel`.
+
 Une partie avec ses journaux complets (`evenements.jsonl`, `series.csv`, `agents_fin.csv`, `entreprises.csv`) et un
 instantané tous les 500 jours, puis la reprise depuis un instantané, puis la comparaison de deux versions du moteur :
 
@@ -143,6 +160,8 @@ flutter build web
 - `tool/stabilite.dart --niveau 0|1|2` : protocole en trois niveaux (fumée, décision, échelle) ; `tool/perf.dart` :
   temps par jour et mémoire d'une partie ; `tool/echelle.dart` : ratios du jour 1 selon la population ;
   `bash tool/compiler.sh` : exécutables natifs des outils dans `build/outils/`.
+- `tool/fusion_syntheses.dart` : fusionne les synthèses `--save` de lancements séparés (une graine et une étape par
+  processus) en celle d'un lancement unique.
 - `tool/partie.dart` : une partie en ligne de commande, avec ses journaux complets, ses instantanés et `--diff` ;
   `--sans-hasard` joue une partie où tous les tirages valent 0,5, lisible à la main.
 - `tool/detresse.dart` : ce qui distingue les citoyens en détresse des autres (à partir d'`agents_fin.csv`).
