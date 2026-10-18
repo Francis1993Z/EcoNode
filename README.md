@@ -160,6 +160,10 @@ flutter build web
 - `tool/stabilite.dart --niveau 0|1|2` : protocole en trois niveaux (fumée, décision, échelle) ; `tool/perf.dart` :
   temps par jour et mémoire d'une partie ; `tool/echelle.dart` : ratios du jour 1 selon la population ;
   `bash tool/compiler.sh` : exécutables natifs des outils dans `build/outils/`.
+- `bash tool/reference.sh --verifier` : rejoue la batterie de parité (3 minutes) et la compare à
+  `rapports/reference/reference.txt` (empreintes de 9 000 jours, 21 instantanés complets, protocole niveau 0, 10 000
+  habitants). À lancer après tout changement qui ne doit rien changer au moteur (optimisation, outil, interface), sur
+  le PC et sur le serveur ; `--ecrire` n'est pour un changement de comportement voulu, avec son commit.
 - `tool/fusion_syntheses.dart` : fusionne les synthèses `--save` de lancements séparés (une graine et une étape par
   processus) en celle d'un lancement unique.
 - `tool/vendeurs_controle.dart A.json B.json` : comparaison appariée de deux synthèses (k = 0 contre k > 0) avec
