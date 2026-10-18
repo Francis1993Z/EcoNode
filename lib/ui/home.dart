@@ -40,6 +40,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     var housing = ctrl.sim.modules.buildings;
     var jobs = ctrl.sim.modules.jobs;
     var founders = ctrl.sim.modules.entrepreneurship;
+    var varieties = ctrl.sim.modules.products;
     final seedCtl = TextEditingController(text: '42');
     final go = await showDialog<bool>(
       context: context,
@@ -89,6 +90,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     'Caisse, au lieu de créations automatiques. Réglable dans l’onglet Modèle.',
                     style: TextStyle(fontSize: 12)),
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: varieties,
+                onChanged: (v) => set(() => varieties = v),
+                title: const Text('Variétés de produits et marques',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Chaque entreprise vend sa variété (nom, qualité) ; les ménages choisissent selon leur '
+                    'goût, la qualité, le prix et ce qu’ils connaissent. Réglable dans l’onglet Modèle.',
+                    style: TextStyle(fontSize: 12)),
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: seedCtl,
@@ -115,6 +126,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ctrl.sim.modules.buildings = housing;
       ctrl.sim.modules.jobs = jobs;
       ctrl.sim.modules.entrepreneurship = founders;
+      ctrl.sim.modules.products = varieties;
       ctrl.newGame(seed, params: Params()..population = pop.round());
     }
     seedCtl.dispose();

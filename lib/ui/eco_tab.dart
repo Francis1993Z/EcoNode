@@ -316,6 +316,7 @@ class _ModelTabState extends State<ModelTab> {
             onChanged: (v) => upd(() => p.depreciation = v)),
       ]),
       _entrepreneurSection(context, ctrl, upd),
+      _productsSection(context, ctrl, upd),
       Section('Nouvelle partie', [
         Row(children: [
           Expanded(
@@ -454,4 +455,107 @@ Widget _entrepreneurSection(BuildContext context, SimController ctrl, void Funct
         'Aucun réglage n’a été ajusté pour s’en approcher.',
         style: TextStyle(color: pal.ink3, fontSize: 11, height: 1.35)),
   ]);
+}
+
+
+/// Variétés de produits : l'interrupteur, les réglages du choix des ménages et le panneau de chaque catégorie.
+Widget _productsSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final p = sim.params;
+  final on = sim.modules.products;
+  final cats = [...consumerVarieties, ...equipmentVarieties];
+  return Section('Variétés de produits et marques', [
+    Text(
+        'Chaque entreprise d’un bien de consommation ou d’équipement vend sa variété : un nom, une qualité (qui coûte en '
+        'productivité). Les ménages connaissent quelques variétés par catégorie (vitrine, publicité, collègues, habitude) '
+        'et achètent celle qui leur plaît le plus : qualité, prix, notoriété, goût personnel. Les variétés naissent et '
+        'meurent avec les entreprises.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: Text(Modules.labels['products']!, style: const TextStyle(fontSize: 13)),
+      subtitle: const Text('Prend effet au prochain jour : chaque entreprise reçoit sa variété.', style: TextStyle(fontSize: 11)),
+      value: on,
+      onChanged: (v) => upd(() => sim.modules.products = v),
+    ),
+    ParamSlider(
+        label: 'Importance de la qualité',
+        value: p.prodQualityWeight,
+        min: 0,
+        max: 3,
+        format: (v) => '×${fmtNum(v, 2)}',
+        hint: 'Poids de la qualité dans l’utilité d’une variété (la qualité va de 60 à 140 %).',
+        onChanged: (v) => upd(() => p.prodQualityWeight = (v * 20).round() / 20)),
+    ParamSlider(
+        label: 'Sensibilité au prix',
+        value: p.prodPriceSens,
+        min: 0,
+        max: 3,
+        format: (v) => '×${fmtNum(v, 2)}',
+        hint: 'Poids du prix (rapporté au prix mondial) ; chaque citoyen en a de 0,5 à 1,5 fois cette valeur.',
+        onChanged: (v) => upd(() => p.prodPriceSens = (v * 20).round() / 20)),
+    ParamSlider(
+        label: 'Durée d’oubli',
+        value: p.prodForgetDays.toDouble(),
+        min: 5,
+        max: 365,
+        format: (v) => '${fmtNum(v, 0)} j',
+        hint: 'Une variété ni achetée ni revue depuis ce nombre de jours sort de la liste du citoyen.',
+        onChanged: (v) => upd(() => p.prodForgetDays = v.round())),
+    ParamSlider(
+        label: 'Taille de la liste de connaissance',
+        value: p.prodKnownMax.toDouble(),
+        min: 1,
+        max: 8,
+        format: (v) => '${v.round()} variétés',
+        hint: 'Variétés connues au plus par catégorie ; la plus ancienne est oubliée quand une nouvelle arrive.',
+        onChanged: (v) => upd(() => p.prodKnownMax = v.round())),
+    const SizedBox(height: 4),
+    if (!on && sim.products.isEmpty)
+      Text('Module coupé : aucune variété.', style: TextStyle(color: pal.ink3, fontSize: 12))
+    else
+      for (final g in cats) _categoryTile(context, ctrl, g),
+  ]);
+}
+
+/// Panneau d'une catégorie : nombre de variétés vivantes, part du premier vendeur, et chaque variété (part, prix, qualité).
+Widget _categoryTile(BuildContext context, SimController ctrl, String g) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final list = sim.varietiesOf(g);
+  final top = list.isEmpty ? 0.0 : sim.marketShare(list.first);
+  final margin = sim.categoryMargin(g);
+  return ExpansionTile(
+    dense: true,
+    tilePadding: EdgeInsets.zero,
+    childrenPadding: const EdgeInsets.only(bottom: 6),
+    title: Text(goods[g]!.label, style: TextStyle(color: pal.ink, fontSize: 12.5)),
+    subtitle: Text(
+        '${list.length} variété${list.length > 1 ? 's' : ''} vivante${list.length > 1 ? 's' : ''}'
+        '${list.isEmpty ? '' : ' · premier vendeur ${pct(top)}'}${margin == null ? '' : ' · marge ${pct(margin)}'}',
+        style: TextStyle(color: pal.ink3, fontSize: 11)),
+    children: [
+      if (list.isEmpty) Text('Aucune variété.', style: TextStyle(color: pal.ink3, fontSize: 11.5)),
+      for (final pr in list)
+        InkWell(
+          onTap: () => ctrl.select(Selection('firm', pr.firmId)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(children: [
+              Expanded(
+                  child: Text('« ${pr.name} » · ${sim.firm(pr.firmId)?.name ?? ''}',
+                      overflow: TextOverflow.ellipsis, style: TextStyle(color: pal.ink2, fontSize: 11.5))),
+              Text(
+                  '${pct(sim.marketShare(pr))} · ${money(sim.firm(pr.firmId)?.price[g] ?? 0)} · q ${fmtNum(pr.quality * 100, 0)} %'
+                  '${equipmentVarieties.contains(g) ? ' · ×${fmtNum(pr.gain, 2)}' : ''}',
+                  style: mono(pal.ink, 11)),
+            ]),
+          ),
+        ),
+      if (sim.poorEma[g] != null)
+        KV('Demande faiblement servie (lissée)', '${fmtNum(sim.poorEma[g]!, 1)} ${goods[g]!.unit}/j'),
+    ],
+  );
 }
