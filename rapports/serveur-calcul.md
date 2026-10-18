@@ -41,14 +41,16 @@ Branche `tests/serveur-calcul`, 17–18 octobre 2026, révision du moteur `e723f
 - **Compilation** : `bash tool/compiler.sh`, 11 s, 5 exécutables natifs dans `~/econodes/build/outils/`, aucune erreur
   de compilation (deux problèmes d'environnement réglés, § 6).
 - **Envoi d'une nouvelle révision** : `bash tool/envoyer_serveur.sh` depuis le PC (archive en LF, configuration des
-  paquets, compilation, révision notée dans `~/econodes/.revision`). Testé : il recompile `e723f5c`, et le
-  `parite.exe` recompilé donne la même sortie qu'avant.
+  paquets, compilation, révision notée dans `~/econodes/.revision`). Testé deux fois (`e723f5c`, puis `772e874`) ; la
+  parité des exécutables recompilés a été revérifiée.
 
 ## 2. Parité PC ↔ serveur
 
-Mêmes exécutables natifs des deux côtés, compilés de la même révision `e723f5c`, mêmes commandes
+Mêmes exécutables natifs des deux côtés, compilés de la même révision, mêmes commandes
 (`tool/parite_plateformes.sh`, lancé sur les deux machines en même temps), sorties comparées par
-`tool/parite_comparer.dart`. Verdict : **PARITÉ : IDENTIQUE**.
+`tool/parite_comparer.dart`. Verdict : **PARITÉ : IDENTIQUE**, deux fois : à la révision `e723f5c`, puis à `772e874`
+(ces outils ajoutés, moteur inchangé) après le redémarrage du serveur, par `bash tool/parite_serveur.sh` en une
+commande.
 
 | Vérification | Étendue | Résultat |
 |---|---|---|
@@ -240,13 +242,14 @@ tmux new -d -s stab "cd ~/econodes && build/outils/stabilite.exe --population 10
    instantanés. Les sorties texte diffèrent donc sans que les parties diffèrent ; le comparateur en tient compte.
 4. **Mesure de mémoire.** Le RSS des paliers compte l'encodage de l'instantané du jour 100 (≈ 120 Mo de plus par
    partie). La mémoire d'une partie sans instantané vient de `perf.exe` et de `stabilite.exe`.
-5. **Serveur injoignable.** Le 18 octobre vers 02 h 12 UTC (22 h 12, heure du PC), pendant la dernière vérification
-   (la batterie de parité relancée par `tool/parite_serveur.sh`, sur des exécutables recompilés), le serveur est
-   devenu injoignable : Tailscale le donne hors ligne, SSH expire. La partie PC de cette vérification a abouti, et la
-   partie serveur s'est interrompue dans la phase à 10 000 habitants. La première vérification complète
-   (§ 2) n'est pas en cause, et le `parite.exe` recompilé avait déjà été vérifié identique. Cause inconnue : je n'ai
-   pas regardé côté AWS. À vérifier : l'état de l'instance dans la console, et, si tu as une limite de dépenses, son
-   état dans AWS Settings > Billing (une limite atteinte met le projet en pause).
+5. **Arrêt de l'instance pendant une vérification.** Le 18 octobre à 02 h 08 min 47 s UTC (22 h 08, heure du PC), le
+   serveur s'est éteint proprement pendant la batterie de parité lancée par `tool/parite_serveur.sh`, alors dans sa
+   phase à 10 000 habitants. Le journal système dit `systemd-logind: Power key pressed short`, puis `System is powering
+   down` : c'est le signal qu'EC2 envoie quand l'instance est arrêtée de l'extérieur (console, API, ou pause par une
+   limite de dépenses). Rien sur la machine ne l'a déclenché : ni commande `shutdown` ni `sudo` hormis l'installation,
+   ni manque de mémoire, ni erreur du noyau. Le disque a tout gardé (Dart, code, résultats). L'instance a été relancée
+   à 02 h 49 UTC. La vérification a ensuite été refaite en entier (§ 2) : identique. **Leçon pour les lots** : un arrêt
+   imprévu fait tout recommencer à `stabilite.exe`, alors que `lot_serveur.sh` ne rejoue que les parties en cours.
 
 ## 7. Recommandation
 
@@ -260,9 +263,12 @@ tmux new -d -s stab "cd ~/econodes && build/outils/stabilite.exe --population 10
     avec 3 h de marge. Une comparaison appariée complète (`--compare A B`, 120 parties) ne tient pas en une nuit ;
     elle tient si on la limite à l'étape avec filets (60 parties).
 - **Premier lot proposé, à valider** : le protocole de stabilité à 10 000 habitants (60 parties), par
-  `stabilite.exe --isolats 8` dans tmux, suivi de l'arrêt de la machine. Environ 7 h et 2,5 $. Avant chaque lot qui
-  suit un changement du moteur : `bash tool/envoyer_serveur.sh`, puis `bash tool/parite_serveur.sh` (3 min).
-- **Pistes, non faites** :
+  `stabilite.exe --isolats 8` dans tmux, suivi de l'arrêt de la machine. Environ 7 h et 2,5 $. Un arrêt de l'instance
+  pendant ces 7 h ferait tout perdre (§ 6, point 5) : si une limite de dépenses ou un arrêt programmé peut tomber
+  pendant la nuit, vérifier la marge avant de lancer. Avant chaque lot qui suit un changement du moteur :
+  `bash tool/envoyer_serveur.sh`, puis `bash tool/parite_serveur.sh` (3 min).
+- **Pistes** :
   - un outil de fusion des synthèses de `stabilite` (une graine par processus) : −13 % sur la durée du protocole et
-    une reprise après coupure ;
+    une reprise après coupure. Écrit depuis dans une autre session (`tool/fusion_syntheses.dart`, branche
+    `claude/trusting-elbakyan-e28442`, commit `8a94490`), pas encore relu ni fusionné ;
   - une mesure de 15 minutes sur une c7a.2xlarge, qui pourrait diviser le coût d'un protocole par 1,4.
