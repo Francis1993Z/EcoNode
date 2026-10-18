@@ -6,7 +6,7 @@
 set -e
 cd "$(dirname "$0")/.."
 mkdir -p build/outils
-for t in stabilite fusion_syntheses partie perf parite echelle reference; do
+for t in stabilite fusion_syntheses partie perf parite echelle reference sequentiel criblage; do
   dart compile exe "tool/$t.dart" -o "build/outils/$t.exe" > /dev/null
   echo "build/outils/$t.exe"
 done

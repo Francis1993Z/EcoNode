@@ -51,6 +51,8 @@ import 'package:econodes/engine/model.dart';
 import 'package:econodes/engine/monitor.dart';
 import 'package:econodes/engine/sim.dart';
 
+import 'parametres.dart' show appliquerParametre;
+
 // ------------------------------------------------------------------ configurations et options
 
 /// Une configuration du modèle : modules et paramètres. Les filets dépendent de l'étape (sans, avec, avec sauf).
@@ -303,7 +305,7 @@ void applyParam(Params p, String k, String v) {
     case 'promotionRaise':
       p.promotionRaise = double.parse(v);
     default:
-      throw ArgumentError('Paramètre inconnu : $k');
+      if (!appliquerParametre(p, k, v)) throw ArgumentError('Paramètre inconnu : $k');
   }
 }
 
