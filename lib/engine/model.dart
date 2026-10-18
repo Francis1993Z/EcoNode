@@ -788,6 +788,10 @@ class Params {
   double bankLookChance = 0.005; // chance quotidienne qu'un client compare sa banque à une autre
   double bankSwitchGain = 0.005; // avantage annuel minimal pour changer de banque (coût de changer)
   int bankLossDays = 365; // faillite : profit lissé négatif depuis ce nombre de jours (ou capital sous le minimum)
+  // Fondation de banques par des citoyens : freins d'entrée (des mécanismes, pas des plafonds de nombre).
+  double bankFoundRate = 0.0005; // chance quotidienne qu'un candidat examine un projet de banque
+  double bankMinCapital = 100000; // capital minimum absolu, en dollars (pas proportionnel à la population)
+  double bankEntryCost = 20000; // coût d'entrée irrécupérable (permis, systèmes), versé à l'État
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

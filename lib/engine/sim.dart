@@ -616,6 +616,8 @@ class Sim {
   double _debtBase = 0;
   final List<double> tightToday = [];
   final List<int> bankCountHist = []; // banques vivantes, chaque jour (module banking, plusieurs banques)
+  int banksFounded = 0; // banques fondées par des citoyens
+  int banksClosed = 0; // banques fermées (résolution)
   int tightDay = -1;
   double householdSpend = 0;
   // positions des nodes spéciaux (ménages, État, Caisse, extérieur) ; l'interface les dispose
@@ -773,6 +775,8 @@ class Sim {
     tightToday.clear();
     tightDay = -1;
     bankCountHist.clear();
+    banksFounded = 0;
+    banksClosed = 0;
     householdSpend = 0;
     hype = {};
     adsBoost = 1;

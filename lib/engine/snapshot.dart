@@ -181,6 +181,9 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.bankLookChance != d.bankLookChance) 'bankLookChance': _d(p.bankLookChance),
     if (p.bankSwitchGain != d.bankSwitchGain) 'bankSwitchGain': _d(p.bankSwitchGain),
     if (p.bankLossDays != d.bankLossDays) 'bankLossDays': p.bankLossDays,
+    if (p.bankFoundRate != d.bankFoundRate) 'bankFoundRate': _d(p.bankFoundRate),
+    if (p.bankMinCapital != d.bankMinCapital) 'bankMinCapital': _d(p.bankMinCapital),
+    if (p.bankEntryCost != d.bankEntryCost) 'bankEntryCost': _d(p.bankEntryCost),
   };
 }
 
@@ -318,7 +321,10 @@ Params _paramsFrom(Map j) => Params()
   ..bankRentDaily = _rdOr(j['bankRentDaily'], 100)
   ..bankLookChance = _rdOr(j['bankLookChance'], 0.005)
   ..bankSwitchGain = _rdOr(j['bankSwitchGain'], 0.005)
-  ..bankLossDays = (j['bankLossDays'] as int?) ?? 365;
+  ..bankLossDays = (j['bankLossDays'] as int?) ?? 365
+  ..bankFoundRate = _rdOr(j['bankFoundRate'], 0.0005)
+  ..bankMinCapital = _rdOr(j['bankMinCapital'], 100000)
+  ..bankEntryCost = _rdOr(j['bankEntryCost'], 20000);
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
@@ -916,6 +922,7 @@ extension SimSnapshot on Sim {
         if (bankingActive) 'bankingActive': true,
         if (banks.isNotEmpty) 'banks': [for (final b in banks) _bankObjJson(b)],
         if (bankCountHist.isNotEmpty) 'bankCountHist': bankCountHist,
+        if (banksFounded + banksClosed > 0) 'banksEntryExit': [banksFounded, banksClosed],
         if (consumerLent > 0 || consumerBankruptcies > 0)
           'consumerCredit': [
             _d(consumerLent), _d(consumerWrittenOff), consumerBankruptcies, _d(consumerLossEma), _d(consumerLossToday)
@@ -1053,6 +1060,9 @@ extension SimSnapshot on Sim {
     bankCountHist
       ..clear()
       ..addAll(_ril(j['bankCountHist'] ?? const []));
+    final ee = (j['banksEntryExit'] as List?) ?? const [0, 0];
+    banksFounded = ee[0] as int;
+    banksClosed = ee[1] as int;
     final cc = (j['consumerCredit'] as List?) ?? const [0, 0, 0, 0, 0];
     consumerLent = _rd(cc[0]);
     consumerWrittenOff = _rd(cc[1]);

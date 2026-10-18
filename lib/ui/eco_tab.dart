@@ -698,6 +698,33 @@ Widget _banksSection(BuildContext context, SimController ctrl, void Function(voi
         format: money0,
         hint: 'Loyer du local, versé chaque jour à un bailleur.',
         onChanged: (v) => upd(() => p.bankRentDaily = (v / 10).round() * 10.0)),
+    ParamSlider(
+        label: 'Fondation de banques : taux',
+        value: p.bankFoundRate * 10000,
+        min: 0,
+        max: 50,
+        format: (v) => '${fmtNum(v / 100, 2)} %/j',
+        hint: 'Chance quotidienne qu’un citoyen candidat (désir de posséder, ambition, tolérance au risque) examine un projet '
+            'de banque ; il ne fonde que si le profit espéré sur la part de marché restante couvre le risque.',
+        onChanged: (v) => upd(() => p.bankFoundRate = v.round() / 10000)),
+    ParamSlider(
+        label: 'Capital minimum d’une banque',
+        value: p.bankMinCapital,
+        min: 0,
+        max: 1000000,
+        format: money0,
+        hint: 'Montant absolu, en dollars, que le fondateur verse de sa poche (pas proportionnel à la population).',
+        onChanged: (v) => upd(() => p.bankMinCapital = (v / 5000).round() * 5000.0)),
+    ParamSlider(
+        label: 'Coût d’entrée irrécupérable',
+        value: p.bankEntryCost,
+        min: 0,
+        max: 200000,
+        format: money0,
+        hint: 'Permis et systèmes, versés à l’État à la fondation : perdus même si la banque ferme.',
+        onChanged: (v) => upd(() => p.bankEntryCost = (v / 1000).round() * 1000.0)),
+    KV('Banques fondées · fermées (total)', '${sim.banksFounded} · ${sim.banksClosed}'),
+    KV('Profit espéré d’une nouvelle banque', sim.banks.isEmpty ? '—' : '${money0(sim.bankEntrantProfit())}/j'),
     const SizedBox(height: 6),
     if (sim.banks.isEmpty)
       Text(sim.modules.banking ? 'La Caisse populaire seule (une banque).' : 'Module coupé.',

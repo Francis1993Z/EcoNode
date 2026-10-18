@@ -184,7 +184,7 @@ extension SimBanking on Sim {
     }
     // arriérés : payés dès que possible, sans entamer le coût d'une journée de survie
     if (c.arrears > 0) {
-      final pay = math.min(c.arrears, c.money - needCost);
+      final pay = math.min(math.min(c.arrears, c.consumerDebt), c.money - needCost);
       if (pay > 0) {
         final a = _repayCitizen(c, pay);
         _reduceBalances(c, a);
@@ -252,7 +252,8 @@ extension SimBanking on Sim {
     }
     final unpaidP = quantize(principal - paidP);
     if (unpaidP > 0 || unpaidI > 0) {
-      c.arrears += unpaidP;
+      // les arriérés sont une part des soldes : une échéance impayée deux fois ne compte pas deux fois le même capital
+      c.arrears = math.min(c.arrears + unpaidP, c.consumerDebt);
       if (c.arrearsSince == null) {
         c.arrearsSince = day;
         _log('warn', 'Paiement manqué : ${c.name} (${card ? 'carte de crédit' : 'prêt personnel'}, '
@@ -680,6 +681,7 @@ extension SimBanks on Sim {
       if (failing && b.id != 0) _resolveBank(b);
     }
     _switchBanks();
+    if (modules.banking) _bankFounding();
     bankCountHist.add(banks.where((b) => b.alive).length);
   }
 
@@ -761,8 +763,95 @@ extension SimBanks on Sim {
       ..alive = false
       ..closed = day
       ..state = 'fermée';
+    banksClosed++;
     _log('warn', 'Banque fermée : ${b.name} — reprise par ${acq.name} (fonds propres ${fmtMoney0(lost)} : les actionnaires '
         'perdent leur mise, les déposants ne perdent rien).');
     _banksMeasure();
+  }
+}
+
+
+// ==================================================================== phase C : des citoyens fondent des banques
+//
+// Même décision que l'entrepreneuriat (désir de posséder, ambition, tolérance au risque, connaissance du secteur : les jours
+// travaillés dans un cabinet de services comptables, qui fait le travail des banques), avec cinq freins d'entrée qui sont des
+// mécanismes : (1) capital minimum absolu bankMinCapital ; (2) coût fixe d'existence : le travail de bankStaff employés et un
+// loyer chaque jour ; (3) coût d'entrée irrécupérable bankEntryCost, versé à l'État ; (4) le profit espéré se calcule sur la
+// part de marché restante, 1 / (banques + 1) des intérêts nets du marché : plus il y a de banques, plus il est faible ; (5) le
+// fondateur verse son propre capital, par transfer() : aucune création d'argent. Sortie : faillite et résolution (la reprise
+// par une autre banque est la fusion).
+
+extension SimBankFounders on Sim {
+  /// Coût fixe quotidien d'une banque : le travail de bankStaff employés de services comptables et le loyer.
+  double bankFixedCost() {
+    final t = templates['comptable']!;
+    return params.bankStaff * t.rate * t.outputs['compta']! * bestPrice('compta') + params.bankRentDaily;
+  }
+
+  /// Profit quotidien qu'espère une nouvelle banque : sa part des intérêts nets du marché (1 / (banques vivantes + 1)) moins
+  /// son coût fixe.
+  double bankEntrantProfit() {
+    final fixed = bankFixedCost();
+    var net = 0.0;
+    var n = 0;
+    for (final b in banks) {
+      if (!b.alive) continue;
+      n++;
+      net += b.incomeEma - math.max(0.0, b.costEma - fixed); // intérêts reçus moins intérêts versés sur les dépôts
+    }
+    return net / (n + 1) - fixed;
+  }
+
+  void _bankFounding() {
+    final p = params;
+    final buffer = p.bufferDays * (needCost > 0 ? needCost : 140);
+    final need = p.bankMinCapital + p.bankEntryCost;
+    Set<int>? owners;
+    double? expected;
+    for (final c in List<Citizen>.of(citizens)) {
+      if (draw(Flux.banques, c.id, 6) >= p.bankFoundRate || c.money - buffer < need) continue;
+      owners ??= {
+        for (final f in firms)
+          if (f.ownerId != null) f.ownerId!,
+        for (final b in banks)
+          if (b.alive && b.ownerId != null) b.ownerId!,
+      };
+      if (foundingBlocker(c, owners) != null) continue;
+      expected ??= bankEntrantProfit();
+      final tol = riskTolerance(c);
+      final k = sectorKnowledge(c, 'comptable');
+      final pS = (p.entSurviveBase + p.entSurviveKnowledge * k).clamp(0.05, 0.95).toDouble();
+      final stake = p.bankMinCapital + p.bankEntryCost;
+      final gain = pS * expected * (1 - p.taxRate) -
+          2 * (1 - tol) * (1 - pS) * stake / 365 -
+          p.bankMinCapital * p.policyRate / 365; // ce que son capital rapporterait placé au taux directeur
+      entryFunnel['banque_projet'] = (entryFunnel['banque_projet'] ?? 0) + 1;
+      if (gain <= 0) continue;
+      final fee = transfer(c, state, p.bankEntryCost); // irrécupérable
+      final cap = transfer(c, bank, p.bankMinCapital); // son capital : de l'argent du public, aucune création
+      bank.equity += cap;
+      dayFlows.bankIn += cap;
+      _flow('M', 'B', '\$capital des banques', 1, cap);
+      final b = Bank(banks.length, 'Banque ${c.name.split(' ').last}');
+      if (usedNames.contains(b.name)) b.name = '${b.name} ${b.id}';
+      usedNames.add(b.name);
+      final alive = banks.where((x) => x.alive).toList();
+      double avg(double Function(Bank) f) => alive.isEmpty ? 0 : alive.map(f).reduce((x, y) => x + y) / alive.length;
+      b
+        ..ownerId = c.id
+        ..equity = cap
+        ..capital = cap
+        ..founded = day
+        ..loanSpread = avg((x) => x.loanSpread)
+        ..cardSpread = avg((x) => x.cardSpread)
+        ..depositRate = math.min(p.policyRate, avg((x) => x.depositRate) + 0.0025); // pour attirer des clients
+      banks.add(b);
+      owners.add(c.id);
+      banksFounded++;
+      entryFunnel['banque_creation'] = (entryFunnel['banque_creation'] ?? 0) + 1;
+      _log('info', 'Banque fondée : ${c.name} fonde ${b.name} (capital ${fmtMoney0(cap)}, frais d’entrée ${fmtMoney0(fee)}, '
+          'profit espéré ${fmtMoney0(expected)}/j sur ${alive.length + 1} banques).');
+      expected = bankEntrantProfit();
+    }
   }
 }
