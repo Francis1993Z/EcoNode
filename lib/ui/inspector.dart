@@ -10,6 +10,7 @@ import '../engine/sim.dart';
 import 'charts.dart';
 import 'controller.dart';
 import 'format.dart';
+import 'housing.dart';
 import 'palette.dart';
 import 'widgets.dart';
 
@@ -29,6 +30,8 @@ class InspectorTab extends StatelessWidget {
         final c = ctrl.sim.citizen(s.id!);
         if (c == null) return const _Empty();
         return _CitizenView(ctrl, c);
+      case 'building':
+        return BuildingView(ctrl);
       case 'E':
         return _StateView(ctrl);
       case 'B':
@@ -126,6 +129,7 @@ class _FirmView extends StatelessWidget {
               child: Text('⚠ Production limitée par manque d’intrants.', style: TextStyle(color: pal.warn, fontSize: 12))),
       ]),
       if (sim.publicService(f)) _publicSection(context, ctrl, f),
+      if (sim.modules.buildings && f.type == 'immobilier') landlordSection(context, ctrl, f),
       _StaffSection(ctrl, f),
       if (sim.modules.jobs) _orgChart(context, ctrl, f),
       if (sim.modules.jobs && f.talks.isNotEmpty) _talksSection(context, ctrl, f),
@@ -781,6 +785,7 @@ class _CitizenViewState extends State<_CitizenView> {
     final job = c.employer != null ? sim.firm(c.employer!) : null;
     final role = sim.roleOf(c);
     final owned = sim.firms.where((f) => f.ownerId == c.id).toList();
+    final home = c.homeId != null ? sim.building(c.homeId!) : null;
     final aids = (sim.nets.byAgent['famine']?[c.name] ?? 0) + (sim.nets.byAgent['shelter']?[c.name] ?? 0);
     return ListView(padding: const EdgeInsets.all(12), children: [
       _title(context, c.name),
@@ -794,15 +799,31 @@ class _CitizenViewState extends State<_CitizenView> {
         KV('Bonheur', pct(c.happiness)),
         KV('Jours de faim', '${c.hungerDays}', color: c.hungerDays > 0 ? pal.bad : null),
         KV('Logement', c.homeless ? 'sans logis (${c.homelessDays} j)' : 'logé', color: c.homeless ? pal.bad : null),
+        if (sim.modules.buildings && home != null)
+          Row(children: [
+            Text('Propriétaire de son logement', style: TextStyle(color: pal.ink2, fontSize: 12.5)),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                    onPressed: () => widget.ctrl.select(Selection('building', home.id)),
+                    child: Text('n° ${home.id}${home.listedDay != null ? ' · en vente' : ''}', overflow: TextOverflow.ellipsis)),
+              ),
+            ),
+          ]),
+        if (sim.modules.buildings && home == null) KV('Statut', c.wantsToOwn ? 'locataire, voudrait acheter' : 'locataire'),
         KV('Ordinateur', c.computerDays > 0 ? 'oui (${c.computerDays} j)' : 'non'),
         if (aids > 0) KV('Aides d’urgence reçues (filets)', '$aids', color: pal.warn),
         if (job == null) KV('Emploi', 'sans emploi (${c.daysUnemployed} j)', color: pal.warn),
         if (job != null)
           Row(children: [
-            Expanded(child: Text('Employeur', style: TextStyle(color: pal.ink2, fontSize: 12.5))),
-            TextButton(
-                onPressed: () => widget.ctrl.select(Selection('firm', job.id)),
-                child: Text('${job.name} · ${money0(sim.modules.jobs ? c.wage : job.wage)}')),
+            Text('Employeur', style: TextStyle(color: pal.ink2, fontSize: 12.5)),
+            const Spacer(),
+            Flexible(
+              child: TextButton(
+                  onPressed: () => widget.ctrl.select(Selection('firm', job.id)),
+                  child: Text('${job.name} · ${money0(sim.modules.jobs ? c.wage : job.wage)}', overflow: TextOverflow.ellipsis)),
+            ),
           ]),
         if (job != null && role != null) ...[
           KV('Rôle', role.label),

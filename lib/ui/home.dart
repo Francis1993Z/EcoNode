@@ -10,6 +10,7 @@ import 'eco_tab.dart';
 import 'format.dart';
 import 'god_tab.dart';
 import 'graph.dart';
+import 'housing.dart';
 import 'inspector.dart';
 import 'palette.dart';
 
@@ -321,29 +322,31 @@ class SidePanel extends StatelessWidget {
       case Tabs.model:
         body = ModelTab(ctrl);
         break;
+      case Tabs.housing:
+        body = HousingTab(ctrl);
+        break;
       default:
         body = InspectorTab(ctrl);
     }
     return Column(children: [
-      SizedBox(
-        height: 46,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+        // tous les onglets restent visibles, sur deux lignes si le panneau est étroit (la souris ne fait pas défiler une liste)
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 0,
           children: [
             for (var i = 0; i < Tabs.labels.length; i++)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: ChoiceChip(
-                  label: Text(
-                      i == Tabs.diagnostic && ctrl.sim.monitor.active.isNotEmpty
-                          ? '${Tabs.labels[i]} (${ctrl.sim.monitor.active.length})'
-                          : Tabs.labels[i],
-                      style: const TextStyle(fontSize: 12.5)),
-                  selected: ctrl.panelTab == i,
-                  selectedColor: pal.accentSoft,
-                  onSelected: (_) => ctrl.setTab(i),
-                ),
+              ChoiceChip(
+                label: Text(
+                    i == Tabs.diagnostic && ctrl.sim.monitor.active.isNotEmpty
+                        ? '${Tabs.labels[i]} (${ctrl.sim.monitor.active.length})'
+                        : Tabs.labels[i],
+                    style: const TextStyle(fontSize: 12.5)),
+                visualDensity: VisualDensity.compact,
+                selected: ctrl.panelTab == i,
+                selectedColor: pal.accentSoft,
+                onSelected: (_) => ctrl.setTab(i),
               ),
           ],
         ),

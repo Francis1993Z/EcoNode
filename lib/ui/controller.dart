@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../engine/model.dart';
 import '../engine/sim.dart';
+import 'housing.dart';
 import 'layout.dart';
 
 /// Calque « argent » : tous les flux monétaires, même si leur affichage est coupé.
@@ -10,7 +11,7 @@ const String kMoneyLayer = r'$';
 
 /// Ce qui est sélectionné dans le graphe.
 class Selection {
-  final String kind; // M | E | B | X | firm | citizen
+  final String kind; // M | E | B | X | firm | citizen | building
   final int? id;
   const Selection(this.kind, [this.id]);
 
@@ -28,7 +29,8 @@ class Tabs {
   static const economy = 3;
   static const journal = 4;
   static const model = 5;
-  static const labels = ['Inspecteur', 'Diagnostic', 'God mode', 'Économie', 'Journal', 'Modèle'];
+  static const housing = 6;
+  static const labels = ['Inspecteur', 'Diagnostic', 'God mode', 'Économie', 'Journal', 'Modèle', 'Immobilier'];
 }
 
 /// Pilote la simulation : boucle de temps, vitesse, sélection, notifications d'interface.
@@ -46,6 +48,9 @@ class SimController extends ChangeNotifier {
 
   /// Calque du graphe : un bien (ou [kMoneyLayer]) mis en avant, les autres flux estompés ; null = tous.
   String? layer;
+
+  /// Relevé quotidien du marché immobilier (courbes de l'onglet Immobilier) ; vide si le module est coupé.
+  final HousingLog housing = HousingLog();
 
   /// Augmente à chaque notification : le graphe garde son dessin tant qu'elle ne change pas.
   int rev = 0;
@@ -81,6 +86,7 @@ class SimController extends ChangeNotifier {
       var n = 0;
       while (_acc >= 1 && n < 120 && sw.elapsedMicroseconds < _budgetUs) {
         sim.step();
+        housing.sample(sim);
         _acc -= 1;
         n++;
       }
@@ -119,6 +125,7 @@ class SimController extends ChangeNotifier {
   void stepOnce() {
     playing = false;
     sim.step();
+    housing.sample(sim);
     notifyListeners();
   }
 
@@ -177,6 +184,7 @@ class SimController extends ChangeNotifier {
   void newGame(int seed, {Params? params}) {
     realSpeed = 0;
     sim = Sim(seed: seed, params: params, modules: sim.modules.copy(), safeguards: sim.safeguards.copy());
+    housing.clear();
     autoLayout(sim);
     selection = const Selection('M');
     _acc = 0;
