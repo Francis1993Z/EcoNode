@@ -688,6 +688,30 @@ class Params {
   double landlordBuildAbove = 0.96;
   // Un ménage achète si son coût mensuel de propriétaire (versement + entretien) ne dépasse pas ce multiple du loyer.
   double buyRentRatio = 1.2;
+
+  // ---- Entrepreneuriat des citoyens (Modules.entrepreneurship). Aucune de ces valeurs n'est réglée sur une cible : ce sont
+  // des ordres de grandeur a priori, exposés pour être changés. Repère (non visé) : au Canada, environ 10 % d'entrées et 9 %
+  // de sorties d'entreprises par an (Statistique Canada).
+  // Multiplicateur du taux de fondation : chance quotidienne qu'un candidat éligible examine un projet, × cette valeur.
+  double entFoundRate = 1.0;
+  // Chance quotidienne de base qu'un candidat éligible examine la possibilité de fonder (avant le multiplicateur).
+  double entConsiderRate = 0.001;
+  // Tolérance au risque = clamp(moyenne + écart × (2u − 1)), u tiré à la naissance (uniforme). Avec 0,5 et 0,5 : uniforme sur
+  // [0, 1]. Le tirage est gardé : changer ces deux valeurs déplace la distribution de tous les citoyens, présents compris.
+  double entRiskMean = 0.5;
+  double entRiskSpread = 0.5;
+  // Seuils d'éligibilité : ambition et tolérance au risque minimales (avec le désir de posséder, Params.ownerShare).
+  double entMinAmbition = 0.3;
+  double entMinTolerance = 0.25;
+  // Exigence de capital : multiple du capital de démarrage d'une entreprise (10 jours de salaires + 5 jours d'intrants).
+  double entCapitalMult = 1.0;
+  // Part du capital que le fondateur doit mettre de sa poche (le reste vient de la Caisse, selon ses règles prudentielles).
+  double entMinOwnShare = 0.3;
+  // Jours travaillés dans un secteur pour connaître 63 % de ce qu'il y a à savoir (connaissance = 1 − exp(−jours / valeur)).
+  double entKnowledgeDays = 365;
+  // Chance de survie sans connaissance du secteur, et gain maximal que la connaissance y ajoute.
+  double entSurviveBase = 0.5;
+  double entSurviveKnowledge = 0.35;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
@@ -739,6 +763,10 @@ class Modules {
   // relevé par une contre-offre quand un concurrent veut le débaucher ; promotions internes. Coupé par défaut : un seul
   // salaire par entreprise (comportement historique). L'interface lance ses parties avec le module actif.
   bool jobs = false;
+  // Entrepreneuriat des citoyens : des citoyens ambitieux et peu averses au risque fondent des entreprises avec leur épargne
+  // et un prêt de la Caisse, au lieu de créations mécaniques de clones. Coupé par défaut. Suppose « Entrée et sortie
+  // d'entreprises » (les fermetures) : seule la fondation change.
+  bool entrepreneurship = false;
 
   Modules();
 
@@ -765,7 +793,15 @@ class Modules {
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
     'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation', 'bankruptcy', 'buildings', 'jobs',
+    'entrepreneurship',
   ];
+
+  /// Les modules sous forme de table pour les instantanés et les empreintes. Un module apparu après la référence du moteur
+  /// n'y figure que lorsqu'il est actif : coupé, la sérialisation est celle d'avant lui.
+  Map<String, bool> toJson() => {
+        for (final k in keys)
+          if (k != 'entrepreneurship' || entrepreneurship) k: get(k),
+      };
   static const Map<String, String> labels = {
     'credit': 'Crédit bancaire (Caisse)',
     'capital': 'Machines et entretien',
@@ -784,6 +820,7 @@ class Modules {
     'bankruptcy': 'Faillite ordonnée',
     'buildings': 'Bâtiments, construction et hypothèques',
     'jobs': 'Rôles, contrats et négociation salariale',
+    'entrepreneurship': 'Entrepreneuriat des citoyens',
   };
 
   bool get(String k) {
@@ -822,6 +859,8 @@ class Modules {
         return buildings;
       case 'jobs':
         return jobs;
+      case 'entrepreneurship':
+        return entrepreneurship;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -862,6 +901,8 @@ class Modules {
         buildings = v;
       case 'jobs':
         jobs = v;
+      case 'entrepreneurship':
+        entrepreneurship = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -1185,6 +1226,8 @@ class Citizen extends Account {
   int role = -1; // rang du rôle dans roles[type de l'employeur] ; -1 : aucun
   double wage = 0; // salaire du contrat (brut, par jour) ; après une fin d'emploi, celui du dernier contrat
   double aplomb = 0.5; // trait : aplomb en négociation, de 0 à 1
+  // Entrepreneuriat : jours travaillés dans chaque type d'entreprise (connaissance du secteur ; tenu seulement avec le module).
+  final Map<String, int> sectorDays = {};
   Citizen(this.id, this.name, super.money, this.skill, this.ambition);
 
   /// 0 manœuvre, 1 technicien, 2 professionnel.
@@ -1276,6 +1319,10 @@ class Firm extends Account {
   double dividends = 0;
   int lastDistressLog = -99;
   int lastRecapLog = -99;
+  // Entrepreneuriat : le citoyen qui a fondé l'entreprise, le jour, et le capital de départ (épargne + prêt).
+  int? founderId;
+  int foundedDay = 0;
+  double startCapital = 0;
   double lastBatches = 0;
   double outputEma = 0; // production lissée (~20 jours) : base du coût du travail réellement payé
   double effWorkers = 0;

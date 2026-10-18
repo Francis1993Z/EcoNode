@@ -14,6 +14,7 @@ import 'monitor.dart';
 part 'snapshot.dart';
 part 'buildings.dart';
 part 'jobs.dart';
+part 'entrepreneuriat.dart';
 
 /// mulberry32 (arithmétique 32 bits non signée) : même graine, même partie.
 class Mulberry32 {
@@ -77,8 +78,8 @@ int hash32(int a, int b) {
 /// Flux de hasard : un par décision. Un tirage ne dépend que de (graine, flux, jour, agent, sous-tirage), jamais de
 /// l'ordre des appels : deux parties qui ne diffèrent que par une règle gardent les mêmes tirages partout ailleurs
 /// (nombres aléatoires communs ; Klein et al. 2024, arXiv 2409.02086). Chaque flux a un code fixe : en ajouter un ne
-/// change pas les tirages des autres. La création d'entreprise n'a pas de flux : elle ne tire rien (le fondateur est
-/// le citoyen le plus riche).
+/// change pas les tirages des autres. La création mécanique d'entreprise n'a pas de flux : elle ne tire rien (le fondateur est
+/// le citoyen le plus riche) ; avec le module entrepreneurship, c'est le flux `entrepreneuriat`.
 enum Flux {
   traits(1), // traits à la naissance : qualification, argent, ambition, ordinateur, nom
   classes(2), // répartition des qualifications au départ
@@ -98,7 +99,8 @@ enum Flux {
   divin(16), // actions du god mode (épidémie)
   logement(17), // bâtiments : état à la naissance, déménagement, regard sur le marché
   vendeurs(18), // recherche limitée : vendeurs examinés par un achat de ménage (Params.sellerSample)
-  anciennete(19); // ancienneté des employés au départ de la partie (affichage ; module jobs : promotions, révisions)
+  anciennete(19), // ancienneté des employés au départ de la partie (affichage ; module jobs : promotions, révisions)
+  entrepreneuriat(20); // un citoyen examine-t-il aujourd'hui la possibilité de fonder une entreprise (module entrepreneurship)
 
   const Flux(this.code);
   final int code;
@@ -575,6 +577,9 @@ class Sim {
   final Map<String, List<double>> _slots = {}; // place laissée dans le graphe par une entreprise fermée, par type
   int firmsCreated = 0;
   int firmsClosed = 0;
+  /// Entrepreneuriat : fondations par des citoyens et fermetures, par année de partie (jour ÷ 365). Vides sans le module.
+  final Map<int, int> foundedByYear = {};
+  final Map<int, int> closedByYear = {};
   double householdSpend = 0;
   // positions des nodes spéciaux (ménages, État, Caisse, extérieur) ; l'interface les dispose
   final Map<String, List<double>> nodePos = {
@@ -711,6 +716,8 @@ class Sim {
     _slots.clear();
     firmsCreated = 0;
     firmsClosed = 0;
+    foundedByYear.clear();
+    closedByYear.clear();
     householdSpend = 0;
     hype = {};
     adsBoost = 1;
@@ -1680,6 +1687,7 @@ class Sim {
     if (params.sellerSample > 0 || _availValid) _rebuildAvail(); // liste des vendeurs : reconstruite chaque matin
     if (modules.buildings) _buildingsMorning();
     _laborMarket();
+    if (modules.entrepreneurship) _learnSectors();
     if (modules.publicBudget) _publicBudget();
     _produce();
     _payWages();
@@ -1749,7 +1757,7 @@ class Sim {
           if (b.vacancies <= 0 || c.skill + eps < b.template.skill) continue;
           if (best == null || b.wage > best.wage) best = b;
         }
-        if (cur != null && best != null && !identical(best, cur) && best.wage > cur.wage * 1.08) {
+        if (cur != null && best != null && !identical(best, cur) && best.wage > cur.wage * 1.08 && cur.founderId != c.id) {
           _hire(best, c, 'mobilité : salaire plus de 8 % au-dessus');
           best.vacancies--;
         }
@@ -3005,6 +3013,10 @@ class Sim {
       if (f.idleDays >= p.exitIdleDays && !publicService(f)) _close(f); // un établissement public ne ferme pas
     }
     if (day < 30) return; // pas pendant le démarrage
+    if (modules.entrepreneurship) {
+      _entrepreneurship(); // ce sont les citoyens qui fondent, plus la création mécanique ci-dessous
+      return;
+    }
     // Entonnoir (mesure) : les conditions sont lues dans un ordre qui permet de nommer la première qui manque ; la
     // décision est la même qu'avant (toutes les conditions sont requises, une seule création par jour).
     var created = false;
@@ -3177,6 +3189,10 @@ class Sim {
     _rebuildSellers();
     _flowPurge.add(f.id.toString()); // ses flux lissés sont retirés en une passe à la fin de _entryExit (_purgeFlows)
     firmsClosed++;
+    if (modules.entrepreneurship) {
+      _entClosed(f, cause, left, owner);
+      return;
+    }
     _log('info', '${f.name} ferme ses portes : aucun employé depuis ${params.exitIdleDays} jours'
         '${left > 0 ? ' (${fmtMoney0(left)} rendus à ${owner?.name ?? 'l’État'})' : ''}.');
   }
