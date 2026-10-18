@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 
-import '../engine/model.dart';
 
 import 'controller.dart';
 import 'diag_tab.dart';
@@ -13,6 +12,7 @@ import 'graph.dart';
 import 'housing.dart';
 import 'inspector.dart';
 import 'palette.dart';
+import 'start_params.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -50,8 +50,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         builder: (context, set) => AlertDialog(
           title: const Text('Nouvelle partie'),
           content: SizedBox(
-            width: 360,
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            width: 380,
+            child: SingleChildScrollView(
+                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Population : ${pop.round()} citoyens', style: const TextStyle(fontWeight: FontWeight.w600)),
               Slider(
                 value: pop,
@@ -115,7 +116,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: 'Graine', isDense: true),
               ),
-            ]),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 8),
+                title: const Text('Paramètres de départ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Argent, salaires, État, crédit, banques… (aussi dans l’onglet Modèle)',
+                    style: TextStyle(fontSize: 12)),
+                children: [StartParamsEditor(ctrl.startParams, onChanged: () => set(() {}))],
+              ),
+            ])),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Partie par défaut')),
@@ -137,7 +146,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ctrl.sim.modules.entrepreneurship = founders;
       ctrl.sim.modules.products = varieties;
       ctrl.sim.modules.banking = banking;
-      ctrl.newGame(seed, params: Params()..population = pop.round());
+      ctrl.newGame(seed, params: freshParams(ctrl.startParams, pop.round()));
     }
     seedCtl.dispose();
     ctrl.playing = true;

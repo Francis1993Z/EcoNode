@@ -189,6 +189,9 @@ class SimController extends ChangeNotifier {
   }
 
   /// Nouvelle partie : les modules et les filets en cours sont conservés.
+  /// Paramètres de départ de la prochaine partie (écran de départ, onglet Modèle).
+  final Params startParams = Params();
+
   void newGame(int seed, {Params? params}) {
     realSpeed = 0;
     sim = Sim(seed: seed, params: params, modules: sim.modules.copy(), safeguards: sim.safeguards.copy());

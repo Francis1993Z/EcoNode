@@ -8,6 +8,7 @@ import 'charts.dart';
 import 'controller.dart';
 import 'format.dart';
 import 'palette.dart';
+import 'start_params.dart';
 import 'widgets.dart';
 
 class EconomyTab extends StatelessWidget {
@@ -203,7 +204,6 @@ class ModelTab extends StatefulWidget {
 class _ModelTabState extends State<ModelTab> {
   double seed = 42;
   double pop = 240;
-  double wallet = 3000;
 
   SimController get ctrl => widget.ctrl;
 
@@ -331,21 +331,18 @@ class _ModelTabState extends State<ModelTab> {
                   value: pop,
                   decimals: 0,
                   onSubmit: (v) => setState(() => pop = v.abs().clamp(40, 1000).toDouble()))),
-          const SizedBox(width: 8),
-          Expanded(
-              child: NumField(
-                  label: 'Capital initial',
-                  value: wallet,
-                  suffix: '\$',
-                  decimals: 0,
-                  onSubmit: (v) => setState(() => wallet = v.abs()))),
         ]),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(bottom: 8),
+          title: const Text('Paramètres de départ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          subtitle: const Text('Pris en compte au prochain « Recommencer » (les mêmes que l’écran de départ).',
+              style: TextStyle(fontSize: 11)),
+          children: [StartParamsEditor(ctrl.startParams, onChanged: () => setState(() {}))],
+        ),
         const SizedBox(height: 8),
         Btn('Recommencer', () {
-          final np = Params()
-            ..population = pop.round()
-            ..startWallet = wallet;
-          ctrl.newGame(seed.round(), params: np);
+          ctrl.newGame(seed.round(), params: freshParams(ctrl.startParams, pop.round()));
         }, primary: true, icon: Icons.restart_alt),
         Text(
             'Même graine, mêmes réglages : la simulation se déroule toujours de la même façon. '
