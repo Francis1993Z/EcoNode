@@ -3496,6 +3496,10 @@ class Sim {
       // distribution de l'excédent de trésorerie (Params.excessCashReturn, coupé par défaut) : ce que l'entreprise garde
       // au-delà de excessCashDays jours de coûts, de sa dette et de son réinvestissement revient peu à peu à son propriétaire
       if (p.excessCashReturn && owner != null && !publicService(f)) {
+        // le fonds de reconstruction d'un bailleur (produit de ses ventes de logements) ne garde que de quoi mener ses deux
+        // chantiers simultanés au plus (_construction) : au-delà, il n'en construira jamais, et cet argent dormirait
+        final cap = 2 * replacementCost();
+        if (f.reinvest > cap) f.reinvest = cap;
         final keep = p.excessCashDays * (f.wage * f.workers.length + f.inputSpendEma + f.overheadEma) + f.debt + f.reinvest;
         final excess = f.money - keep;
         if (excess > eps) {
