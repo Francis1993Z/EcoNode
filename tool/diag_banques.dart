@@ -109,4 +109,11 @@ void main(List<String> args) {
   } else {
     stdout.write(b);
   }
+  // les 8 entreprises qui détiennent le plus d'argent à la fin, sur la sortie d'erreur
+  final top = List<Firm>.of(s.firms)..sort((a, c) => c.money.compareTo(a.money));
+  for (final x in top.take(8)) {
+    stderr.writeln('${x.type.padRight(12)} ${x.name.padRight(28)} argent ${x.money.toStringAsFixed(0).padLeft(9)} '
+        'profit lissé ${x.profitEma.toStringAsFixed(1).padLeft(8)} non répartis ${x.retained.toStringAsFixed(0).padLeft(9)} '
+        'dividende ${x.dividends.toStringAsFixed(1)} employés ${x.workers.length} dette ${x.debt.toStringAsFixed(0)}');
+  }
 }
