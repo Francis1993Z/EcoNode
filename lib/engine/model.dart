@@ -792,6 +792,15 @@ class Params {
   double bankFoundRate = 0.0005; // chance quotidienne qu'un candidat examine un projet de banque
   double bankMinCapital = 100000; // capital minimum absolu, en dollars (pas proportionnel à la population)
   double bankEntryCost = 20000; // coût d'entrée irrécupérable (permis, systèmes), versé à l'État
+
+  // ---- Distribution de l'excédent de trésorerie (stabilisation, 2026-10-20). Coupé par défaut.
+  // Une entreprise qui garde plus que excessCashDays jours de coûts (salaires, intrants, frais), plus sa dette et ses
+  // fonds de réinvestissement, en reverse chaque jour la part excessCashRate de l'excédent à son propriétaire (imposée comme
+  // un dividende). Sans elle, l'argent d'une vente de logements financée par hypothèque reste dans la caisse du bailleur :
+  // ce n'est pas un bénéfice, le dividende (I1) ne le distribue pas, et les ménages s'appauvrissent en remboursant.
+  bool excessCashReturn = false;
+  double excessCashDays = 60;
+  double excessCashRate = 0.02;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

@@ -184,6 +184,9 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.bankFoundRate != d.bankFoundRate) 'bankFoundRate': _d(p.bankFoundRate),
     if (p.bankMinCapital != d.bankMinCapital) 'bankMinCapital': _d(p.bankMinCapital),
     if (p.bankEntryCost != d.bankEntryCost) 'bankEntryCost': _d(p.bankEntryCost),
+    if (p.excessCashReturn != d.excessCashReturn) 'excessCashReturn': p.excessCashReturn,
+    if (p.excessCashDays != d.excessCashDays) 'excessCashDays': _d(p.excessCashDays),
+    if (p.excessCashRate != d.excessCashRate) 'excessCashRate': _d(p.excessCashRate),
   };
 }
 
@@ -324,7 +327,10 @@ Params _paramsFrom(Map j) => Params()
   ..bankLossDays = (j['bankLossDays'] as int?) ?? 365
   ..bankFoundRate = _rdOr(j['bankFoundRate'], 0.0005)
   ..bankMinCapital = _rdOr(j['bankMinCapital'], 100000)
-  ..bankEntryCost = _rdOr(j['bankEntryCost'], 20000);
+  ..bankEntryCost = _rdOr(j['bankEntryCost'], 20000)
+  ..excessCashReturn = (j['excessCashReturn'] as bool?) ?? false
+  ..excessCashDays = _rdOr(j['excessCashDays'], 60)
+  ..excessCashRate = _rdOr(j['excessCashRate'], 0.02);
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),

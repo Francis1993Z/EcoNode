@@ -3493,6 +3493,27 @@ class Sim {
           }
         }
       }
+      // distribution de l'excédent de trésorerie (Params.excessCashReturn, coupé par défaut) : ce que l'entreprise garde
+      // au-delà de excessCashDays jours de coûts, de sa dette et de son réinvestissement revient peu à peu à son propriétaire
+      if (p.excessCashReturn && owner != null && !publicService(f)) {
+        final keep = p.excessCashDays * (f.wage * f.workers.length + f.inputSpendEma + f.overheadEma) + f.debt + f.reinvest;
+        final excess = f.money - keep;
+        if (excess > eps) {
+          final x = excess * p.excessCashRate;
+          final net = transfer(f, owner, x * (1 - p.taxRate));
+          final tax = transfer(f, state, x * p.taxRate);
+          state.taxes += tax;
+          state.taxesToday += tax;
+          owner.income += net;
+          f.dividends += net + tax;
+          _flow(f.id.toString(), 'M', '\$distributions', 1, net);
+          if (tax > 0) _flow('M', 'E', '\$impôts', 1, tax);
+          if (trace != null) {
+            _t('compta', 'distribution', f.name, f.id, 'distribution de l’excédent de trésorerie',
+                'à ${owner.name}', net + tax, 'excédent ${fmtMoney0(excess)}, réserve ${fmtMoney0(keep)}');
+          }
+        }
+      }
     }
 
     // pénuries notables
