@@ -623,7 +623,10 @@ class Params {
   bool healthWearIfDeprived = false;
   // A2. Travail divisible : une équipe sous-employée travaille, et est payée, à temps partiel selon la production du
   // jour (au moins 20 % du temps, un jour par semaine) ; le coût de revient ne répartit plus les heures oisives.
-  bool partTime = false;
+  // ACTIF PAR DÉFAUT depuis le 2026-10-21 (décision de Francis) : sans lui, à 240 citoyens, les petites filières
+  // (plastique, électronique, bijoux, machines…) font faillite faute de pouvoir payer un employé entier, et l'hôpital sans
+  // plastique ne soigne plus personne (anomalies A2 et A1). L'ancien comportement se rejoue avec --param partTime=0.
+  bool partTime = true;
   // Recherche limitée des vendeurs : chaque achat d'un ménage n'examine que k vendeurs tirés parmi ceux qui ont une unité
   // en stock, plus celui de son dernier achat de ce bien (habitude), et prend le meilleur de cet échantillon selon la
   // règle habituelle (prix, notoriété). 0 : chaque achat compare tous les vendeurs du bien.
@@ -809,6 +812,33 @@ class Params {
   // que la banque centrale ne bouge pas son taux. Sans module banques, policyRate n'a pas d'autre effet.
   bool policyPassThrough = false;
   double policySpread = 0.03;
+
+  // ---- Douane : prix mondiaux en vagues et droit de douane (2026-10-21). Neutres par défaut. Voir MODELE.md § 6.21.
+  // Avec tradeWaves, les prix d'import et d'export de chaque bien sont multipliés par un facteur qui suit une vague
+  // (amplitude tradeWaveAmp, période tradeWavePeriod jours, phase et période propres à chaque bien, tirées de la graine)
+  // et un bruit quotidien AR(1) d'écart tradeNoise. Le droit de douane `tariff` majore le prix des importations ; la
+  // part du droit va à l'État (comme une taxe), le reste sort de l'économie. Sans commerce (trade), rien ne change.
+  bool tradeWaves = false;
+  double tradeWaveAmp = 0.3;
+  double tradeWavePeriod = 365;
+  double tradeNoise = 0.02;
+  double tariff = 0;
+  // Taux de change flottant (floatingFx) : prix d'une unité de monnaie étrangère, 1 au départ. Chaque soir, frontières
+  // ouvertes, il varie de fxSpeed × (importations − exportations) / (importations + exportations), moyennes lissées sur
+  // une vingtaine de jours : un déficit commercial déprécie la monnaie (import plus cher, export mieux payé).
+  bool floatingFx = false;
+  double fxSpeed = 0.05;
+  // Demande étrangère active (foreignDemand) : chaque entreprise d'un bien exportable a un carnet de commandes de
+  // l'étranger. Tant que le prix à l'export couvre son coût unitaire + fdMinMargin et au moins 95 % de son prix d'ici, la
+  // commande quotidienne grossit de fdGrowth par jour (si elle a été livrée à 90 % ou plus) ; sinon elle fond de 10 % par
+  // jour. Elle démarre à fdStart de sa demande d'ici et plafonne à fdMaxCap fois cette demande (10 % de la production de
+  // l'équipe pour une entreprise presque sans clients ici). Les livraisons comptent comme des ventes : la production et
+  // l'embauche les suivent.
+  bool foreignDemand = false;
+  double fdGrowth = 0.02;
+  double fdMinMargin = 0.05;
+  double fdStart = 0.1;
+  double fdMaxCap = 1;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

@@ -234,7 +234,9 @@ void main() {
   test('I1 : une entreprise neuve sans bénéfice ne rend pas son capital en dividendes', () {
     // (une clinique serait aujourd'hui un établissement public, sans dividendes : on prend une bijouterie)
     double paid(bool on) {
-      final s = Sim(seed: 5, modules: Modules()..dividendTest = on);
+      // temps plein : avec le temps partiel (défaut), l'entreprise neuve ne paie que ses heures et devient rentable, et un
+      // dividende pris sur ce bénéfice est permis ; le scénario du test est celui d'une entreprise sans bénéfice
+      final s = Sim(seed: 5, params: Params()..partTime = false, modules: Modules()..dividendTest = on);
       run(s, 50);
       final f = s.addFirm('bijouterie', 'Bijouterie test', 20000, s.citizens.first.id, 600, 300);
       var total = 0.0;

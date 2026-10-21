@@ -258,7 +258,13 @@ void main() {
       for (final x in w.negativeEquityDividends) {
         dividends.add('cas $n, $x');
       }
-      final bankruptDays = {for (final sh in c.shocks) if (sh.$3 == 'faillite') sh.$1};
+      // la faillite du god mode vide la caisse ; l'entreprise met à pied un employé par jour, et avec le temps partiel
+      // (défaut) l'écart connu peut durer quelques jours : on admet les 5 jours qui suivent la faillite
+      final bankruptDays = {
+        for (final sh in c.shocks)
+          if (sh.$3 == 'faillite')
+            for (var k = 0; k <= 5; k++) sh.$1 + k
+      };
       for (final d in w.unpaidInsuredDays) {
         if (!bankruptDays.contains(d)) unpaid.add('cas $n, jour $d (${c.label})');
       }

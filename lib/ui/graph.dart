@@ -138,19 +138,10 @@ List<NodeBox> allBoxes(Sim sim) {
   // banque centrale : sous la Caisse ; un instantané d'avant ce nœud n'a pas sa position, on la crée
   final bc = sim.nodePos['BC'] ??= [sim.nodePos['B']![0], sim.nodePos['B']![1] + kSmallH + kGapY];
   out.add(NodeBox(const Selection('BC'), Rect.fromLTWH(bc[0], bc[1], kNodeW, kSmallH), {}, {}));
-  if (showsExterior(sim)) {
-    final x = sim.nodePos['X']!;
-    out.add(NodeBox(const Selection('X'), Rect.fromLTWH(x[0], x[1], kNodeW, kSmallH), {}, {}));
-  }
+  // douane : toujours visible, pour ouvrir ou fermer les frontières en cours de partie
+  final x = sim.nodePos['X']!;
+  out.add(NodeBox(const Selection('X'), Rect.fromLTWH(x[0], x[1], kNodeW, kSmallH), {}, {}));
   return out;
-}
-
-bool showsExterior(Sim sim) {
-  if (sim.params.trade) return true;
-  for (final e in sim.flowsEma.values) {
-    if ((e.from == 'X' || e.to == 'X') && e.value > 1) return true;
-  }
-  return false;
 }
 
 // ---------------------------------------------------------------- zoom stratégique
@@ -1144,7 +1135,7 @@ class GraphPainter extends CustomPainter {
         (accent, code, title) = (pal.money, 'BC', 'Banque centrale');
         break;
       default:
-        (accent, code, title) = (pal.ink3, 'X', 'Extérieur');
+        (accent, code, title) = (pal.ink3, 'X', 'Douane');
     }
     canvas.drawRRect(RRect.fromRectAndRadius(r.deflate(1), const Radius.circular(10)),
         Paint()..color = accent.withValues(alpha: 0.08));
@@ -1323,7 +1314,12 @@ class GraphPainter extends CustomPainter {
 
   void _worldNode(Canvas canvas, NodeBox b) {
     final r = b.rect;
-    _header(canvas, r, pal.ink3, 'X', 'Extérieur', sim.params.trade ? 'frontières ouvertes' : 'frontières fermées');
+    final p = sim.params;
+    _header(canvas, r, pal.ink3, 'X', 'Douane',
+        p.trade
+            ? 'frontières ouvertes${p.tariff > 0 ? ' · droit ${pct(p.tariff)}' : ''}'
+                '${p.floatingFx ? ' · change ${fmtNum(sim.fxRate, 2)}' : ''}'
+            : 'frontières fermées');
     _footer(canvas, r, 'import ${kmoney(sim.ledgerImports)}', 'export ${kmoney(sim.ledgerExports)}');
   }
 }

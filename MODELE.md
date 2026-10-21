@@ -265,6 +265,7 @@ variable de tirages et décalait toute la suite de la partie.
 | 24 | `noms` | générateur de noms de variétés, de marques et d'entreprises (tiré au jour 0) | `produits.dart:_uniqueName` |
 | 25 | `credit` | achat important à crédit d'un citoyen (module `banking`, § 6.19) | `banques.dart:_citizenCredit` |
 | 26 | `banques` | banque d'un nouveau client, comparaison de banques, projet de banque d'un citoyen | `banques.dart` |
+| 27 | `commerce` | bruit quotidien du prix mondial de chaque bien (`Params.tradeWaves`, § 6.21) | `douane.dart` |
 
 La création d'entreprise ne tire rien : le fondateur est le citoyen le plus riche.
 
@@ -365,6 +366,9 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `mpcIncome` | 0,6 | propension à consommer le revenu discrétionnaire (α₁) | modèle SIM de Godley et Lavoie |
 | `wealthTargetDays` | 20 | richesse visée T, en jours de revenu discrétionnaire ; α₂ = (1 − α₁)/T | calibration interne : reproduit la richesse de départ (2 750 $ ≈ 21 jours) |
 | `trade`, `importMarkup`, `exportDiscount` | non, 1,3, 0,7 | commerce extérieur : import au prix mondial × 1,3, export × 0,7 | choix de jeu |
+| `tradeWaves`, `tradeWaveAmp`, `tradeWavePeriod`, `tradeNoise`, `tariff` | non, 0,3, 365 j, 0,02, 0 | douane (§ 6.21) : prix mondiaux en vagues, droit sur les importations | choix de jeu |
+| `floatingFx`, `fxSpeed` | non, 0,05 | douane (§ 6.21) : taux de change flottant et sa vitesse d'ajustement par jour | mesure § 6.21 |
+| `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
 | `priceStep`, `wageStep` | 0,02, 0,015 | pas d'ajustement de la marge et du salaire | choix de jeu (tâche 3 du plan : lissage) |
 | `priceMaxDaily`, `wageMaxDaily` | 1,5 %/j | variation quotidienne maximale décidée par l'entreprise | coûts d'étiquetage, contrats, réputation ; sous le plafond de 2 %/j du filet |
@@ -402,7 +406,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `eiDaysLow`, `eiDaysHigh` | 252, 315 | I3 : 36 semaines (chômage ≤ 6 %) à 45 semaines (≥ 16 %) | Loi sur l'assurance-emploi, annexe I, emploi à plein temps |
 | `eiQualifyingDays` | 84 | I3 : jours d'emploi assurable pour être admissible | minimum de 420 heures = 12 semaines à 35 h |
 | `healthWearIfDeprived` | non | variante de test A1 (§ 6.15) | jamais active par défaut |
-| `partTime` | non | variante de test A2 (§ 6.15) | jamais active par défaut |
+| `partTime` | **oui** (depuis le 2026-10-21) | travail divisible (§ 6.15, A2) | décision de Francis : sans lui, les petites filières meurent à 240 citoyens et l'hôpital, sans plastique, ne soigne plus (A1) ; `--param partTime=0` rejoue l'ancien comportement |
 | `reservationDecay`, `reservationFloor` | 0,01/j, 0 | module `jobs` : le salaire demandé par un chômeur baisse de 1 % de son dernier salaire par jour, jusqu'à la prestation | Krueger et Mueller 2016 (le salaire de réserve baisse avec la durée du chômage, beaucoup plus lentement) ; plancher à 0 mesuré (§ 6.16) |
 | `switchPremium` | 0,08 | `jobs` : hausse exigée pour changer d'emploi, plus 1 % par année d'ancienneté (au plus 10 %) | règle de mobilité sans le module (8 %) |
 | `bargainBase`, `bargainTrait`, `bargainTight` | 0,1, 0,3, 0,3 | `jobs` : pouvoir de négociation β = base + trait × aplomb + tension × θ/(1+θ), borné à [0,05 ; 0,7] | Pissarides 2000 (partage du surplus) ; valeurs : choix de jeu |
@@ -765,7 +769,7 @@ Choix de jeu : c'est le débouché de la filière informatique.
 | `Sim.sansHasard` | tirages à 0,5, ordres par identifiant | `draw`, `orderKey`, `buy` | cas extrêmes (§ 4) |
 | `Sim.verifyFastPaths` | recalcule chaque meilleur prix mis en cache pendant la consommation par le parcours complet et lève une erreur à la moindre différence | `quote`, `bestPrice` | vérification des optimisations (journal, § 7) |
 | `Params.healthWearIfDeprived` (A1) | la santé ne s'use que les jours de faim ou sans logis ; les maladies restent | `_health` | variante de l'usure de la santé (décision réservée à Francis) |
-| `Params.partTime` (A2) | travail divisible : l'équipe est payée pour la part de sa capacité produite ce jour, au moins 20 % ; le coût de revient ne compte plus les heures oisives | `hoursToday`, `_payWages`, `unitCost` | variante du travail indivisible (décision réservée à Francis) |
+| `Params.partTime` (A2) | travail divisible : l'équipe est payée pour la part de sa capacité produite ce jour, au moins 20 % ; le coût de revient ne compte plus les heures oisives | `hoursToday`, `_payWages`, `unitCost` | **actif par défaut depuis le 2026-10-21** (décision de Francis) |
 
 Les résultats de ces variantes sont au journal (tâche 4). Les règles prudentielles fondées sur le salaire contractuel
 (embauche, réserve des dividendes, mise à pied sous 2 jours de salaires) ne sont pas modifiées par A2.
@@ -905,6 +909,38 @@ prêts aux entreprises (`loanRate`), hypothèques, prêts personnels, test de pa
 valeurs par défaut, 3 % + 3 % = 6 % = `interestRate` exactement : l'activer ne change rien tant que le taux ne bouge pas.
 Le taux directeur garde ses autres rôles (marché interbancaire, plafond des taux de dépôt). Pas de bilan propre ni de
 création de monnaie : c'est un levier de prix du crédit.
+
+### 6.21 Douane : prix mondiaux en vagues et droit de douane (`douane.dart`)
+
+Le nœud « Douane » (X) est toujours affiché ; sa fiche ouvre ou ferme les frontières (`trade`) en cours de partie. Deux
+réglages s'ajoutent, neutres par défaut dans le moteur. `tradeWaves` (activé par l'interface) multiplie les prix d'import
+et d'export de chaque bien par un facteur (1 + a · sin 2π(jour / T + φ)) · (1 + bruit), où φ, T (`tradeWavePeriod` ± 30 %)
+et a (`tradeWaveAmp` ± 30 %) sont tirés de la graine et le bruit suit un AR(1) quotidien (0,97 · bruit + `tradeNoise` · u,
+borné à ±0,6 ; flux 27) ; le facteur est borné à [0,25 ; 4]. Le sinus est l'approximation de Bhaskara (parité VM/web).
+`worldPrice` lui-même ne bouge pas (coûts de remplacement, sensibilité aux prix). `tariff` majore le prix de tout bien
+importé ; la part t / (1 + t) du prix payé va à l'État (`state.taxes`, `ledgerTariffs`), le reste sort de l'économie.
+Constat (240 citoyens, 600 j, 3 graines) : frontières ouvertes sans droit, les importations (~1,5 M$) dépassent de loin
+les exportations (~0,15 M$, surplus de stock seulement) et la masse monétaire fond ; un droit de 50 % limite la fuite.
+
+Taux de change flottant (`floatingFx`, activé par l'interface) : `fxRate` ($ d'ici pour une unité étrangère, 1 au départ)
+multiplie les prix d'import et d'export. Chaque soir, frontières ouvertes, les importations sorties de l'économie (droit
+exclu) et les exportations du jour sont lissées (α = 0,05), puis `fxRate` × (1 + `fxSpeed` · (I − X) / (I + X)), borné à
+[0,1 ; 10]. Mesure (240 citoyens, 1 500 j, 3 graines, vagues actives) : avec `fxSpeed` = 5 %/j, importations ≈
+exportations (1,4 M$ contre 1,3 M$), masse monétaire 1,36 à 1,52 M$ au lieu de 0,2 M$, chômage 28 à 38 % ; à 1 %/j le
+taux arrive trop tard (2 graines sur 3 au plafond de 10, économie effondrée).
+
+Demande étrangère active (`foreignDemand`, activée par l'interface) : chaque entreprise d'un bien exportable a une commande
+quotidienne de l'étranger (`Sim.foreignOrders`). Après les ventes du jour, elle livre au prix à l'export ce qui dépasse
+deux jours de sa demande d'ici, jusqu'à la commande ; les livraisons comptent dans `sold` (production et embauche les
+suivent). Si l'export est rentable (prix ≥ coût unitaire × (1 + `fdMinMargin`)) et paie au moins 95 % du prix d'ici, la
+commande grossit de `fdGrowth` par jour quand elle a été livrée à 90 % ; sinon elle fond de 10 % par jour. Elle démarre à
+`fdStart` et plafonne à `fdMaxCap` fois la demande d'ici (10 % de la production de l'équipe pour une entreprise presque
+sans clients ici). Les deux bornes sont nécessaires : sans la condition de prix, l'export fait monter le prix d'ici au-dessus
+du prix d'import et les clients d'ici importent ce qui est exporté (aller-retour perdant, taux au plafond) ; sans plafond
+lié à la demande d'ici, une entreprise de transformation (restaurant : intrants importés, repas exportés) grossit sans fin.
+Mesure (240 citoyens, 5 graines, chômage moyen des jours 1000 à 1500) : frontières fermées 23 %, change seul 38 %,
+change + demande étrangère 30 % (15 à 20 % dans 4 graines ; la cinquième s'effondre vers le jour 900 : des filières
+d'intrants disparaissent, les intrants importés rendent l'export non rentable, et le taux au plafond n'y peut rien).
 
 ---
 

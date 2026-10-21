@@ -122,6 +122,10 @@ class _FirmView extends StatelessWidget {
           KV('Salaire', money0(f.wage)),
         KV('Productivité par employé', '${fmtNum(sim.perWorker(f), 2)} lots/j'),
         KV('Capacité', f.capacity == null ? 'illimitée' : '${fmtNum(f.capacity!, 0)} lots/j'),
+        for (final g in f.outputs.keys)
+          if (sim.foreignOrderOf(f, g) > 0)
+            KV('Commande de l’étranger (${goods[g]!.label.toLowerCase()})',
+                '${fmtNum(sim.foreignOrderOf(f, g), 1)} ${goods[g]!.unit}/j à ${money(sim.exportPrice(g))}'),
         if (owner != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -1211,52 +1215,239 @@ class _WorldView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pal = Pal.of(context);
     final sim = ctrl.sim;
     final p = sim.params;
+    void upd(void Function() f) {
+      f();
+      ctrl.touch();
+    }
+
+    final traded = [for (final e in goods.entries) if (e.value.tradable && !e.value.perish) e];
+    TextStyle head() => TextStyle(color: pal.ink3, fontSize: 11);
     return ListView(padding: const EdgeInsets.all(12), children: [
-      _title(context, 'Extérieur'),
-      const SizedBox(height: 10),
-      Section('Commerce', [
+      _title(context, 'Douane'),
+      const SizedBox(height: 4),
+      Text(
+          'Le poste-frontière entre l’économie et le reste du monde. Frontières ouvertes, les ménages et les entreprises '
+          'achètent à l’étranger quand c’est moins cher qu’ici, et les entreprises vendent à l’étranger leurs surplus. Les '
+          'biens périssables et les services ne voyagent pas.',
+          style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+      Section('Frontière', [
         SwitchListTile(
+          dense: true,
           contentPadding: EdgeInsets.zero,
-          title: const Text('Frontières ouvertes'),
-          subtitle:
-              const Text('Importer et exporter aux prix mondiaux (les biens périssables et les services ne voyagent pas).'),
+          title: const Text('Frontières ouvertes', style: TextStyle(fontSize: 13)),
+          subtitle: Text(
+              p.trade
+                  ? 'Import et export permis, dès le jour suivant pour tous les acheteurs et vendeurs.'
+                  : 'Fermées : économie autarcique, personne n’achète ni ne vend à l’étranger.',
+              style: const TextStyle(fontSize: 11)),
           value: p.trade,
-          onChanged: (v) {
-            sim.setTrade(v);
-            ctrl.touch();
-          },
+          onChanged: (v) => upd(() => sim.setTrade(v)),
         ),
         ParamSlider(
-            label: 'Majoration à l’import',
+            label: 'Droit de douane sur les importations',
+            value: p.tariff,
+            min: 0,
+            max: 1,
+            format: pct,
+            hint: 'Majoration du prix de tout bien importé. La part du droit est versée à l’État comme une taxe ; le reste '
+                'du prix sort de l’économie.',
+            onChanged: (v) => upd(() => p.tariff = (v * 100).round() / 100)),
+        ParamSlider(
+            label: 'Majoration à l’import (transport, intermédiaires)',
             value: p.importMarkup,
             min: 1,
             max: 3,
             format: (v) => '×${fmtNum(v, 2)}',
-            onChanged: (v) {
-              p.importMarkup = v;
-              ctrl.touch();
-            }),
+            onChanged: (v) => upd(() => p.importMarkup = v)),
         ParamSlider(
             label: 'Prix à l’export (part du prix mondial)',
             value: p.exportDiscount,
             min: 0.2,
             max: 1,
             format: pct,
-            onChanged: (v) {
-              p.exportDiscount = v;
-              ctrl.touch();
-            }),
+            onChanged: (v) => upd(() => p.exportDiscount = v)),
+      ]),
+      Section('Prix mondiaux en vagues', [
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Les prix mondiaux varient', style: TextStyle(fontSize: 13)),
+          subtitle: const Text(
+              'Chaque bien suit sa propre vague (phase et durée tirées au hasard) plus un bruit de jour en jour. Coupé : '
+              'prix mondiaux fixes.',
+              style: TextStyle(fontSize: 11)),
+          value: p.tradeWaves,
+          onChanged: (v) => upd(() => p.tradeWaves = v),
+        ),
+        if (p.tradeWaves) ...[
+          ParamSlider(
+              label: 'Amplitude des vagues',
+              value: p.tradeWaveAmp,
+              min: 0,
+              max: 0.8,
+              format: (v) => '± ${pct(v)}',
+              onChanged: (v) => upd(() => p.tradeWaveAmp = (v * 100).round() / 100)),
+          ParamSlider(
+              label: 'Durée d’une vague',
+              value: p.tradeWavePeriod,
+              min: 30,
+              max: 1500,
+              format: (v) => '${v.round()} j',
+              hint: 'Durée moyenne d’un cycle complet (hausse puis baisse) ; chaque bien a la sienne, ± 30 %.',
+              onChanged: (v) => upd(() => p.tradeWavePeriod = v.roundToDouble())),
+          ParamSlider(
+              label: 'Bruit quotidien',
+              value: p.tradeNoise,
+              min: 0,
+              max: 0.1,
+              format: pct,
+              onChanged: (v) => upd(() => p.tradeNoise = (v * 1000).round() / 1000)),
+        ],
+      ]),
+      Section('Taux de change', [
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Taux de change flottant', style: TextStyle(fontSize: 13)),
+          subtitle: const Text(
+              'Un déficit commercial fait baisser la monnaie d’ici : les importations coûtent plus cher, les exportations '
+              'rapportent plus, et les échanges se rééquilibrent. Coupé : taux fixe.',
+              style: TextStyle(fontSize: 11)),
+          value: p.floatingFx,
+          onChanged: (v) => upd(() => p.floatingFx = v),
+        ),
+        if (p.floatingFx) ...[
+          ParamSlider(
+              label: 'Vitesse d’ajustement',
+              value: p.fxSpeed,
+              min: 0,
+              max: 0.15,
+              format: (v) => '${fmtNum(v * 100, 1)} %/j',
+              hint: 'Variation quotidienne du taux quand tout le commerce va dans un seul sens. Trop lent, les entreprises '
+                  'd’ici disparaissent avant que le taux ne les protège ; trop rapide, le taux oscille.',
+              onChanged: (v) => upd(() => p.fxSpeed = (v * 200).round() / 200)),
+          KV('Une unité de monnaie étrangère', money(sim.fxRate)),
+          KV(
+              'Monnaie d’ici',
+              sim.fxRate > 1.005
+                  ? 'dépréciée de ${pct(1 - 1 / sim.fxRate)}'
+                  : sim.fxRate < 0.995
+                      ? 'appréciée de ${pct(1 / sim.fxRate - 1)}'
+                      : 'à parité',
+              color: sim.fxRate > 1.005 ? pal.warn : null),
+          KV('Importations · exportations (moyenne / j)',
+              '${money0(sim.fxImportsEma)} · ${money0(sim.fxExportsEma)}'),
+          if (!p.trade) Text('Frontières fermées : le taux ne bouge pas.', style: TextStyle(color: pal.ink3, fontSize: 11)),
+        ],
+      ]),
+      Section('Demande étrangère', [
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Les entreprises prennent des commandes de l’étranger', style: TextStyle(fontSize: 13)),
+          subtitle: const Text(
+              'Quand le prix à l’export couvre son coût et vaut au moins son prix d’ici, une entreprise reçoit une commande '
+              'qui grossit chaque jour ; elle produit et embauche pour la servir. Coupé : seuls les surplus de stock '
+              'partent à l’étranger.',
+              style: TextStyle(fontSize: 11)),
+          value: p.foreignDemand,
+          onChanged: (v) => upd(() => p.foreignDemand = v),
+        ),
+        if (p.foreignDemand) ...[
+          ParamSlider(
+              label: 'Croissance des commandes',
+              value: p.fdGrowth,
+              min: 0,
+              max: 0.1,
+              format: (v) => '${fmtNum(v * 100, 1)} %/j',
+              onChanged: (v) => upd(() => p.fdGrowth = (v * 200).round() / 200)),
+          ParamSlider(
+              label: 'Commande maximale (part de la demande d’ici)',
+              value: p.fdMaxCap,
+              min: 0.1,
+              max: 3,
+              format: (v) => '×${fmtNum(v, 1)}',
+              hint: 'Le marché étranger d’une entreprise ne dépasse pas cette part de ses ventes d’ici.',
+              onChanged: (v) => upd(() => p.fdMaxCap = (v * 10).round() / 10)),
+          if (sim.foreignOrders.isEmpty)
+            Text('Aucune commande en cours.', style: TextStyle(color: pal.ink3, fontSize: 12))
+          else
+            for (final e in (sim.foreignOrders.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).take(12))
+              () {
+                final i = e.key.indexOf(':');
+                final f = sim.firm(int.parse(e.key.substring(0, i)));
+                final g = e.key.substring(i + 1);
+                return Row(children: [
+                  Expanded(
+                      child: f == null
+                          ? Text('entreprise fermée', style: TextStyle(color: pal.ink3, fontSize: 12))
+                          : InkWell(
+                              onTap: () => ctrl.select(Selection('firm', f.id)),
+                              child: Text(f.name,
+                                  overflow: TextOverflow.ellipsis, style: TextStyle(color: pal.accent, fontSize: 12)))),
+                  Text('${fmtNum(e.value, 1)} ${goods[g]?.unit ?? ''}/j de ${(goods[g]?.label ?? g).toLowerCase()}',
+                      style: TextStyle(color: pal.ink2, fontSize: 12)),
+                ]);
+              }(),
+        ],
+      ]),
+      Section('Échanges', [
         KV('Importé (total)', money0(sim.ledgerImports)),
         KV('Exporté (total)', money0(sim.ledgerExports)),
+        KV('Solde commercial', money0(sim.ledgerExports - sim.ledgerImports),
+            color: sim.ledgerExports >= sim.ledgerImports ? pal.ok : pal.warn),
+        KV('Droits de douane perçus', money0(sim.ledgerTariffs)),
       ]),
-      Section('Prix mondiaux', [
-        for (final e in goods.entries) KV(e.value.label, '${money(sim.worldPrice[e.key] ?? 0.0)} / ${e.value.unit}'),
+      Section('Prix du jour à la frontière', [
+        Row(children: [
+          Expanded(child: Text('Bien', style: head())),
+          SizedBox(width: 58, child: Text('vague', textAlign: TextAlign.right, style: head())),
+          SizedBox(width: 76, child: Text('achat', textAlign: TextAlign.right, style: head())),
+          SizedBox(width: 76, child: Text('vente', textAlign: TextAlign.right, style: head())),
+        ]),
+        for (final e in traded)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 1.5),
+            child: Row(children: [
+              Expanded(
+                  child: Text(e.value.label, overflow: TextOverflow.ellipsis, style: TextStyle(color: pal.ink2, fontSize: 12))),
+              SizedBox(
+                  width: 58,
+                  child: Text(_factorLabel(sim.tradeFactorOf(e.key)),
+                      textAlign: TextAlign.right, style: TextStyle(fontSize: 12, color: _factorColor(pal, sim.tradeFactorOf(e.key))))),
+              SizedBox(
+                  width: 76,
+                  child: Text(money(sim.importPrice(e.key)),
+                      textAlign: TextAlign.right, style: TextStyle(color: pal.ink, fontSize: 12))),
+              SizedBox(
+                  width: 76,
+                  child: Text(money(sim.exportPrice(e.key)),
+                      textAlign: TextAlign.right, style: TextStyle(color: pal.ink, fontSize: 12))),
+            ]),
+          ),
+        const SizedBox(height: 4),
+        Text(
+            '« achat » : ce que paie un acheteur d’ici pour une unité importée, droit compris ; « vente » : ce que reçoit '
+            'une entreprise d’ici pour une unité exportée. Les prix s’entendent par unité de chaque bien.',
+            style: TextStyle(color: pal.ink3, fontSize: 11)),
       ]),
       const SizedBox(height: 24),
     ]);
   }
+
+  static String _factorLabel(double f) {
+    final d = ((f - 1) * 100).round();
+    return d == 0 ? '—' : (d > 0 ? '+$d %' : '−${-d} %');
+  }
+
+  static Color _factorColor(Pal pal, double f) => f > 1.005
+      ? pal.warn
+      : f < 0.995
+          ? pal.ok
+          : pal.ink3;
 }
 
 
