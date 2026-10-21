@@ -52,7 +52,8 @@ final List<StartParam> startParamDefs = [
 Params freshParams(Params start, int population) {
   final n = Params()
     ..population = population
-    ..trade = start.trade;
+    ..trade = start.trade
+    ..partTime = start.partTime;
   for (final d in startParamDefs) {
     d.set(n, d.get(start));
   }
@@ -106,6 +107,18 @@ class StartParamsEditor extends StatelessWidget {
       SwitchListTile(
         dense: true,
         contentPadding: EdgeInsets.zero,
+        title: const Text('Travail à temps partiel', style: TextStyle(fontSize: 13)),
+        subtitle: const Text('Une équipe sous-employée n’est payée que pour ses heures travaillées : une petite filière '
+            'survit sans employé entier. Coupé : chaque employé coûte une journée complète.', style: TextStyle(fontSize: 11)),
+        value: p.partTime,
+        onChanged: (v) {
+          p.partTime = v;
+          onChanged();
+        },
+      ),
+      SwitchListTile(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
         title: const Text('Commerce extérieur', style: TextStyle(fontSize: 13)),
         subtitle: const Text('Importations et exportations au prix mondial.', style: TextStyle(fontSize: 11)),
         value: p.trade,
@@ -121,6 +134,7 @@ class StartParamsEditor extends StatelessWidget {
             x.set(p, x.get(d));
           }
           p.trade = d.trade;
+          p.partTime = d.partTime;
           onChanged();
         },
         icon: const Icon(Icons.restore, size: 16),

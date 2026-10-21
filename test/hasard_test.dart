@@ -33,14 +33,16 @@ void main() {
       s.step();
     }
     final h = s.history.last;
-    expect(h.total, 1554280.650390625);
-    expect(h.mH, 612390.296875);
-    expect(h.mF, 781337.3544921875);
-    expect(h.cpi, 2.5159360376256);
-    expect(h.gini, 0.228082077519016);
-    expect(h.wage, 210.03488148880768);
-    expect(h.unemp, 0.12083333333333333);
-    expect(s.firms.length, 27);
+    // valeurs relevées le 2026-10-21, avec le temps partiel par défaut (Params.partTime) ; la même partie sur le web est
+    // vérifiée par tool/reference.sh (sortie de tool/parite.dart)
+    expect(h.total, 1554063.1123046875);
+    expect(h.mH, 547089.96484375);
+    expect(h.mF, 832165.8330078125);
+    expect(h.cpi, 2.837976506196682);
+    expect(h.gini, 0.23538316938730075);
+    expect(h.wage, 212.97802653411452);
+    expect(h.unemp, 0.1);
+    expect(s.firms.length, 30);
     expect(s.firms.first.id, 100001); // identifiant stable : 100 000 + 10 000 × rang du type + rang de création
   });
 

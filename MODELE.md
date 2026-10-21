@@ -402,7 +402,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `eiDaysLow`, `eiDaysHigh` | 252, 315 | I3 : 36 semaines (chômage ≤ 6 %) à 45 semaines (≥ 16 %) | Loi sur l'assurance-emploi, annexe I, emploi à plein temps |
 | `eiQualifyingDays` | 84 | I3 : jours d'emploi assurable pour être admissible | minimum de 420 heures = 12 semaines à 35 h |
 | `healthWearIfDeprived` | non | variante de test A1 (§ 6.15) | jamais active par défaut |
-| `partTime` | non | variante de test A2 (§ 6.15) | jamais active par défaut |
+| `partTime` | **oui** (depuis le 2026-10-21) | travail divisible (§ 6.15, A2) | décision de Francis : sans lui, les petites filières meurent à 240 citoyens et l'hôpital, sans plastique, ne soigne plus (A1) ; `--param partTime=0` rejoue l'ancien comportement |
 | `reservationDecay`, `reservationFloor` | 0,01/j, 0 | module `jobs` : le salaire demandé par un chômeur baisse de 1 % de son dernier salaire par jour, jusqu'à la prestation | Krueger et Mueller 2016 (le salaire de réserve baisse avec la durée du chômage, beaucoup plus lentement) ; plancher à 0 mesuré (§ 6.16) |
 | `switchPremium` | 0,08 | `jobs` : hausse exigée pour changer d'emploi, plus 1 % par année d'ancienneté (au plus 10 %) | règle de mobilité sans le module (8 %) |
 | `bargainBase`, `bargainTrait`, `bargainTight` | 0,1, 0,3, 0,3 | `jobs` : pouvoir de négociation β = base + trait × aplomb + tension × θ/(1+θ), borné à [0,05 ; 0,7] | Pissarides 2000 (partage du surplus) ; valeurs : choix de jeu |
@@ -765,7 +765,7 @@ Choix de jeu : c'est le débouché de la filière informatique.
 | `Sim.sansHasard` | tirages à 0,5, ordres par identifiant | `draw`, `orderKey`, `buy` | cas extrêmes (§ 4) |
 | `Sim.verifyFastPaths` | recalcule chaque meilleur prix mis en cache pendant la consommation par le parcours complet et lève une erreur à la moindre différence | `quote`, `bestPrice` | vérification des optimisations (journal, § 7) |
 | `Params.healthWearIfDeprived` (A1) | la santé ne s'use que les jours de faim ou sans logis ; les maladies restent | `_health` | variante de l'usure de la santé (décision réservée à Francis) |
-| `Params.partTime` (A2) | travail divisible : l'équipe est payée pour la part de sa capacité produite ce jour, au moins 20 % ; le coût de revient ne compte plus les heures oisives | `hoursToday`, `_payWages`, `unitCost` | variante du travail indivisible (décision réservée à Francis) |
+| `Params.partTime` (A2) | travail divisible : l'équipe est payée pour la part de sa capacité produite ce jour, au moins 20 % ; le coût de revient ne compte plus les heures oisives | `hoursToday`, `_payWages`, `unitCost` | **actif par défaut depuis le 2026-10-21** (décision de Francis) |
 
 Les résultats de ces variantes sont au journal (tâche 4). Les règles prudentielles fondées sur le salaire contractuel
 (embauche, réserve des dividendes, mise à pied sous 2 jours de salaires) ne sont pas modifiées par A2.
