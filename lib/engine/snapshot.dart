@@ -196,6 +196,11 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.tariff != d.tariff) 'tariff': _d(p.tariff),
     if (p.floatingFx != d.floatingFx) 'floatingFx': p.floatingFx,
     if (p.fxSpeed != d.fxSpeed) 'fxSpeed': _d(p.fxSpeed),
+    if (p.foreignDemand != d.foreignDemand) 'foreignDemand': p.foreignDemand,
+    if (p.fdGrowth != d.fdGrowth) 'fdGrowth': _d(p.fdGrowth),
+    if (p.fdMinMargin != d.fdMinMargin) 'fdMinMargin': _d(p.fdMinMargin),
+    if (p.fdStart != d.fdStart) 'fdStart': _d(p.fdStart),
+    if (p.fdMaxCap != d.fdMaxCap) 'fdMaxCap': _d(p.fdMaxCap),
   };
 }
 
@@ -348,7 +353,12 @@ Params _paramsFrom(Map j) => Params()
   ..tradeNoise = _rdOr(j['tradeNoise'], 0.02)
   ..tariff = _rdOr(j['tariff'], 0)
   ..floatingFx = (j['floatingFx'] as bool?) ?? false
-  ..fxSpeed = _rdOr(j['fxSpeed'], 0.05);
+  ..fxSpeed = _rdOr(j['fxSpeed'], 0.05)
+  ..foreignDemand = (j['foreignDemand'] as bool?) ?? false
+  ..fdGrowth = _rdOr(j['fdGrowth'], 0.02)
+  ..fdMinMargin = _rdOr(j['fdMinMargin'], 0.05)
+  ..fdStart = _rdOr(j['fdStart'], 0.1)
+  ..fdMaxCap = _rdOr(j['fdMaxCap'], 1);
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
@@ -950,6 +960,7 @@ extension SimSnapshot on Sim {
         if (tradeNoiseState.isNotEmpty) 'tradeNoise': _dm(tradeNoiseState),
         if (ledgerTariffs != 0) 'ledgerTariffs': _d(ledgerTariffs),
         if (fxRate != 1 || fxImportsEma != 0 || fxExportsEma != 0) 'fx': [_d(fxRate), _d(fxImportsEma), _d(fxExportsEma)],
+        if (foreignOrders.isNotEmpty) 'foreignOrders': _dm(foreignOrders),
         if (banksFounded + banksClosed > 0) 'banksEntryExit': [banksFounded, banksClosed],
         if (consumerLent > 0 || consumerBankruptcies > 0)
           'consumerCredit': [
@@ -1031,9 +1042,10 @@ extension SimSnapshot on Sim {
       ])),
       if (buildings.isNotEmpty || mortgages.isNotEmpty) 'batiments': _fnv(j(_buildingsState())),
       if (jobsActive) 'travail': _fnv(j(_labourJson(labour))),
-      if (tradeFactor.isNotEmpty || ledgerTariffs != 0 || fxRate != 1 || fxImportsEma != 0)
+      if (tradeFactor.isNotEmpty || ledgerTariffs != 0 || fxRate != 1 || fxImportsEma != 0 || foreignOrders.isNotEmpty)
         'douane': _fnv(j([
-          _dm(tradeFactor), _dm(tradeNoiseState), _d(ledgerTariffs), _d(fxRate), _d(fxImportsEma), _d(fxExportsEma)
+          _dm(tradeFactor), _dm(tradeNoiseState), _d(ledgerTariffs), _d(fxRate), _d(fxImportsEma), _d(fxExportsEma),
+          _dm(foreignOrders)
         ])),
       if (products.isNotEmpty) 'produits': _fnv(j([for (final p in products.values) _productJson(p), _dm(poorEma)])),
       'moniteur': _fnv(j(monitor.toJson())),
@@ -1103,6 +1115,9 @@ extension SimSnapshot on Sim {
     fxRate = _rd(fx[0]);
     fxImportsEma = _rd(fx[1]);
     fxExportsEma = _rd(fx[2]);
+    foreignOrders
+      ..clear()
+      ..addAll(j['foreignOrders'] == null ? const {} : _rdm(j['foreignOrders']));
     final ee = (j['banksEntryExit'] as List?) ?? const [0, 0];
     banksFounded = ee[0] as int;
     banksClosed = ee[1] as int;

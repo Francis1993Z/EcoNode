@@ -122,6 +122,10 @@ class _FirmView extends StatelessWidget {
           KV('Salaire', money0(f.wage)),
         KV('Productivité par employé', '${fmtNum(sim.perWorker(f), 2)} lots/j'),
         KV('Capacité', f.capacity == null ? 'illimitée' : '${fmtNum(f.capacity!, 0)} lots/j'),
+        for (final g in f.outputs.keys)
+          if (sim.foreignOrderOf(f, g) > 0)
+            KV('Commande de l’étranger (${goods[g]!.label.toLowerCase()})',
+                '${fmtNum(sim.foreignOrderOf(f, g), 1)} ${goods[g]!.unit}/j à ${money(sim.exportPrice(g))}'),
         if (owner != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -1337,6 +1341,57 @@ class _WorldView extends StatelessWidget {
           KV('Importations · exportations (moyenne / j)',
               '${money0(sim.fxImportsEma)} · ${money0(sim.fxExportsEma)}'),
           if (!p.trade) Text('Frontières fermées : le taux ne bouge pas.', style: TextStyle(color: pal.ink3, fontSize: 11)),
+        ],
+      ]),
+      Section('Demande étrangère', [
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Les entreprises prennent des commandes de l’étranger', style: TextStyle(fontSize: 13)),
+          subtitle: const Text(
+              'Quand le prix à l’export couvre son coût et vaut au moins son prix d’ici, une entreprise reçoit une commande '
+              'qui grossit chaque jour ; elle produit et embauche pour la servir. Coupé : seuls les surplus de stock '
+              'partent à l’étranger.',
+              style: TextStyle(fontSize: 11)),
+          value: p.foreignDemand,
+          onChanged: (v) => upd(() => p.foreignDemand = v),
+        ),
+        if (p.foreignDemand) ...[
+          ParamSlider(
+              label: 'Croissance des commandes',
+              value: p.fdGrowth,
+              min: 0,
+              max: 0.1,
+              format: (v) => '${fmtNum(v * 100, 1)} %/j',
+              onChanged: (v) => upd(() => p.fdGrowth = (v * 200).round() / 200)),
+          ParamSlider(
+              label: 'Commande maximale (part de la demande d’ici)',
+              value: p.fdMaxCap,
+              min: 0.1,
+              max: 3,
+              format: (v) => '×${fmtNum(v, 1)}',
+              hint: 'Le marché étranger d’une entreprise ne dépasse pas cette part de ses ventes d’ici.',
+              onChanged: (v) => upd(() => p.fdMaxCap = (v * 10).round() / 10)),
+          if (sim.foreignOrders.isEmpty)
+            Text('Aucune commande en cours.', style: TextStyle(color: pal.ink3, fontSize: 12))
+          else
+            for (final e in (sim.foreignOrders.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).take(12))
+              () {
+                final i = e.key.indexOf(':');
+                final f = sim.firm(int.parse(e.key.substring(0, i)));
+                final g = e.key.substring(i + 1);
+                return Row(children: [
+                  Expanded(
+                      child: f == null
+                          ? Text('entreprise fermée', style: TextStyle(color: pal.ink3, fontSize: 12))
+                          : InkWell(
+                              onTap: () => ctrl.select(Selection('firm', f.id)),
+                              child: Text(f.name,
+                                  overflow: TextOverflow.ellipsis, style: TextStyle(color: pal.accent, fontSize: 12)))),
+                  Text('${fmtNum(e.value, 1)} ${goods[g]?.unit ?? ''}/j de ${(goods[g]?.label ?? g).toLowerCase()}',
+                      style: TextStyle(color: pal.ink2, fontSize: 12)),
+                ]);
+              }(),
         ],
       ]),
       Section('Échanges', [

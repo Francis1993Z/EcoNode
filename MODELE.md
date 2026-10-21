@@ -368,6 +368,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `trade`, `importMarkup`, `exportDiscount` | non, 1,3, 0,7 | commerce extérieur : import au prix mondial × 1,3, export × 0,7 | choix de jeu |
 | `tradeWaves`, `tradeWaveAmp`, `tradeWavePeriod`, `tradeNoise`, `tariff` | non, 0,3, 365 j, 0,02, 0 | douane (§ 6.21) : prix mondiaux en vagues, droit sur les importations | choix de jeu |
 | `floatingFx`, `fxSpeed` | non, 0,05 | douane (§ 6.21) : taux de change flottant et sa vitesse d'ajustement par jour | mesure § 6.21 |
+| `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
 | `priceStep`, `wageStep` | 0,02, 0,015 | pas d'ajustement de la marge et du salaire | choix de jeu (tâche 3 du plan : lissage) |
 | `priceMaxDaily`, `wageMaxDaily` | 1,5 %/j | variation quotidienne maximale décidée par l'entreprise | coûts d'étiquetage, contrats, réputation ; sous le plafond de 2 %/j du filet |
@@ -927,6 +928,19 @@ exclu) et les exportations du jour sont lissées (α = 0,05), puis `fxRate` × (
 [0,1 ; 10]. Mesure (240 citoyens, 1 500 j, 3 graines, vagues actives) : avec `fxSpeed` = 5 %/j, importations ≈
 exportations (1,4 M$ contre 1,3 M$), masse monétaire 1,36 à 1,52 M$ au lieu de 0,2 M$, chômage 28 à 38 % ; à 1 %/j le
 taux arrive trop tard (2 graines sur 3 au plafond de 10, économie effondrée).
+
+Demande étrangère active (`foreignDemand`, activée par l'interface) : chaque entreprise d'un bien exportable a une commande
+quotidienne de l'étranger (`Sim.foreignOrders`). Après les ventes du jour, elle livre au prix à l'export ce qui dépasse
+deux jours de sa demande d'ici, jusqu'à la commande ; les livraisons comptent dans `sold` (production et embauche les
+suivent). Si l'export est rentable (prix ≥ coût unitaire × (1 + `fdMinMargin`)) et paie au moins 95 % du prix d'ici, la
+commande grossit de `fdGrowth` par jour quand elle a été livrée à 90 % ; sinon elle fond de 10 % par jour. Elle démarre à
+`fdStart` et plafonne à `fdMaxCap` fois la demande d'ici (10 % de la production de l'équipe pour une entreprise presque
+sans clients ici). Les deux bornes sont nécessaires : sans la condition de prix, l'export fait monter le prix d'ici au-dessus
+du prix d'import et les clients d'ici importent ce qui est exporté (aller-retour perdant, taux au plafond) ; sans plafond
+lié à la demande d'ici, une entreprise de transformation (restaurant : intrants importés, repas exportés) grossit sans fin.
+Mesure (240 citoyens, 5 graines, chômage moyen des jours 1000 à 1500) : frontières fermées 23 %, change seul 38 %,
+change + demande étrangère 30 % (15 à 20 % dans 4 graines ; la cinquième s'effondre vers le jour 900 : des filières
+d'intrants disparaissent, les intrants importés rendent l'export non rentable, et le taux au plafond n'y peut rien).
 
 ---
 

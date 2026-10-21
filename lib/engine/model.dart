@@ -828,6 +828,17 @@ class Params {
   // une vingtaine de jours : un déficit commercial déprécie la monnaie (import plus cher, export mieux payé).
   bool floatingFx = false;
   double fxSpeed = 0.05;
+  // Demande étrangère active (foreignDemand) : chaque entreprise d'un bien exportable a un carnet de commandes de
+  // l'étranger. Tant que le prix à l'export couvre son coût unitaire + fdMinMargin et au moins 95 % de son prix d'ici, la
+  // commande quotidienne grossit de fdGrowth par jour (si elle a été livrée à 90 % ou plus) ; sinon elle fond de 10 % par
+  // jour. Elle démarre à fdStart de sa demande d'ici et plafonne à fdMaxCap fois cette demande (10 % de la production de
+  // l'équipe pour une entreprise presque sans clients ici). Les livraisons comptent comme des ventes : la production et
+  // l'embauche les suivent.
+  bool foreignDemand = false;
+  double fdGrowth = 0.02;
+  double fdMinMargin = 0.05;
+  double fdStart = 0.1;
+  double fdMaxCap = 1;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

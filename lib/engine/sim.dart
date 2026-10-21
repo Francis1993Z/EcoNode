@@ -585,6 +585,8 @@ class Sim {
   /// Taux de change (Params.floatingFx) : $ d'ici pour une unité de monnaie étrangère ; importations et exportations
   /// lissées qui le font varier.
   double fxRate = 1, fxImportsEma = 0, fxExportsEma = 0;
+  /// Commandes quotidiennes de l'étranger (Params.foreignDemand), en unités, par « identifiant d'entreprise:bien ».
+  final Map<String, double> foreignOrders = {};
   double ledgerCredit = 0; // monnaie créée par le crédit, nette des remboursements
   final List<SimEvent> events = [];
   final List<HistPoint> history = [];
@@ -755,6 +757,7 @@ class Sim {
     fxRate = 1;
     fxImportsEma = 0;
     fxExportsEma = 0;
+    foreignOrders.clear();
     ledgerCredit = 0;
     events.clear();
     history.clear();
@@ -2858,6 +2861,7 @@ class Sim {
   }
 
   void _export() {
+    if (params.foreignDemand) _foreignOrders(); // commandes de l'étranger d'abord, puis surplus de stock
     for (final f in firms) {
       for (final g in f.outputs.keys) {
         if (goods[g]!.perish || !goods[g]!.tradable) continue;

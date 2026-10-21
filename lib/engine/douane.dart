@@ -10,6 +10,7 @@ part of 'sim.dart';
 // Le droit de douane (Params.tariff) majore ensuite le prix d'import ; il ne touche pas les exportations.
 // Taux de change flottant (Params.floatingFx) : les deux prix sont aussi multipliés par fxRate, qui suit chaque soir le
 // solde commercial lissé (voir _updateFx).
+// Demande étrangère active (Params.foreignDemand) : carnet de commandes par entreprise et par bien (voir _foreignOrders).
 //
 // Pas de math.sin (résultats différents entre la VM et le web) : approximation de Bhaskara, en opérations élémentaires.
 
@@ -45,6 +46,59 @@ extension Douane on Sim {
     final sum = fxImportsEma + fxExportsEma;
     if (sum <= 0) return;
     fxRate = (fxRate * (1 + params.fxSpeed * (fxImportsEma - fxExportsEma) / sum)).clamp(0.1, 10.0).toDouble();
+  }
+
+  /// Commande quotidienne de l'étranger pour un bien d'une entreprise (0 sans commande).
+  double foreignOrderOf(Firm f, String good) => foreignOrders['${f.id}:$good'] ?? 0.0;
+
+  /// Livraisons aux clients étrangers, après les ventes du jour. L'entreprise garde deux jours de sa demande d'ici en stock
+  /// et livre le reste, jusqu'à la commande, au prix à l'export. La commande grossit tant que l'export est rentable et
+  /// qu'elle a été livrée ; elle fond sinon. Une entreprise sans employé perd ses commandes.
+  void _foreignOrders() {
+    final p = params;
+    final next = <String, double>{};
+    for (final f in firms) {
+      if (f.workers.isEmpty || publicService(f)) continue;
+      for (final e in f.outputs.entries) {
+        final g = e.key;
+        if (goods[g]!.perish || !goods[g]!.tradable) continue;
+        final key = '${f.id}:$g';
+        var order = foreignOrders[key] ?? 0.0;
+        final cost = f.unitCostCache[g];
+        final price = exportPrice(g);
+        // rentable, et pas moins payé qu'ici : sinon le prix local monterait vers le prix d'import et les clients d'ici
+        // importeraient ce que l'entreprise exporte (aller-retour perdant, la monnaie s'effondrerait)
+        final ok = cost != null && cost > 0 && price >= cost * (1 + p.fdMinMargin) && price >= 0.95 * f.price[g]!;
+        if (order <= 0 && !ok) continue;
+        // taille de référence : la demande d'ici (ventes lissées moins la commande), ou 10 % de ce que l'équipe produit
+        // pour une entreprise qui n'a presque pas de clients ici
+        final local = math.max(0.0, (f.demandEma[g] ?? 0) - order);
+        final base = math.max(local, 0.1 * math.max(1, f.workers.length) * perWorker(f) * e.value);
+        if (order <= 0) order = p.fdStart * base;
+        final keep = 2 * math.max(local, 0.5);
+        final q = math.min(order, math.max(0.0, (f.inv[g] ?? 0) - keep));
+        if (q > eps) {
+          final value = transfer(null, f, q * price);
+          _setStock(f, g, (f.inv[g] ?? 0) - q);
+          f.revenue += value;
+          f.sold[g] = (f.sold[g] ?? 0) + q; // une vraie vente : la production et l'embauche la suivent
+          ledgerExports += value;
+          bank.reserves += value;
+          dayFlows.exports += value;
+          _flow(f.id.toString(), 'X', g, q, value);
+        }
+        if (!ok) {
+          order *= 0.9;
+        } else if (q >= 0.9 * order) {
+          order *= 1 + p.fdGrowth;
+        }
+        order = math.min(order, p.fdMaxCap * base);
+        if (order >= 0.01) next[key] = order;
+      }
+    }
+    foreignOrders
+      ..clear()
+      ..addAll(next);
   }
 
   /// Caractéristiques fixes de la vague d'un bien, tirées de la graine : (phase en tours, période en jours, amplitude).
