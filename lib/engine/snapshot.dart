@@ -189,6 +189,11 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.excessCashRate != d.excessCashRate) 'excessCashRate': _d(p.excessCashRate),
     if (p.policyPassThrough != d.policyPassThrough) 'policyPassThrough': p.policyPassThrough,
     if (p.policySpread != d.policySpread) 'policySpread': _d(p.policySpread),
+    if (p.tradeWaves != d.tradeWaves) 'tradeWaves': p.tradeWaves,
+    if (p.tradeWaveAmp != d.tradeWaveAmp) 'tradeWaveAmp': _d(p.tradeWaveAmp),
+    if (p.tradeWavePeriod != d.tradeWavePeriod) 'tradeWavePeriod': _d(p.tradeWavePeriod),
+    if (p.tradeNoise != d.tradeNoise) 'tradeNoise': _d(p.tradeNoise),
+    if (p.tariff != d.tariff) 'tariff': _d(p.tariff),
   };
 }
 
@@ -334,7 +339,12 @@ Params _paramsFrom(Map j) => Params()
   ..excessCashDays = _rdOr(j['excessCashDays'], 60)
   ..excessCashRate = _rdOr(j['excessCashRate'], 0.02)
   ..policyPassThrough = (j['policyPassThrough'] as bool?) ?? false
-  ..policySpread = _rdOr(j['policySpread'], 0.03);
+  ..policySpread = _rdOr(j['policySpread'], 0.03)
+  ..tradeWaves = (j['tradeWaves'] as bool?) ?? false
+  ..tradeWaveAmp = _rdOr(j['tradeWaveAmp'], 0.3)
+  ..tradeWavePeriod = _rdOr(j['tradeWavePeriod'], 365)
+  ..tradeNoise = _rdOr(j['tradeNoise'], 0.02)
+  ..tariff = _rdOr(j['tariff'], 0);
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
@@ -932,6 +942,9 @@ extension SimSnapshot on Sim {
         if (bankingActive) 'bankingActive': true,
         if (banks.isNotEmpty) 'banks': [for (final b in banks) _bankObjJson(b)],
         if (bankCountHist.isNotEmpty) 'bankCountHist': bankCountHist,
+        if (tradeFactor.isNotEmpty) 'tradeFactor': _dm(tradeFactor),
+        if (tradeNoiseState.isNotEmpty) 'tradeNoise': _dm(tradeNoiseState),
+        if (ledgerTariffs != 0) 'ledgerTariffs': _d(ledgerTariffs),
         if (banksFounded + banksClosed > 0) 'banksEntryExit': [banksFounded, banksClosed],
         if (consumerLent > 0 || consumerBankruptcies > 0)
           'consumerCredit': [
@@ -1013,6 +1026,8 @@ extension SimSnapshot on Sim {
       ])),
       if (buildings.isNotEmpty || mortgages.isNotEmpty) 'batiments': _fnv(j(_buildingsState())),
       if (jobsActive) 'travail': _fnv(j(_labourJson(labour))),
+      if (tradeFactor.isNotEmpty || ledgerTariffs != 0)
+        'douane': _fnv(j([_dm(tradeFactor), _dm(tradeNoiseState), _d(ledgerTariffs)])),
       if (products.isNotEmpty) 'produits': _fnv(j([for (final p in products.values) _productJson(p), _dm(poorEma)])),
       'moniteur': _fnv(j(monitor.toJson())),
       'historique': _fnv(j(history.isEmpty ? null : _histJson(history.last))),
@@ -1070,6 +1085,13 @@ extension SimSnapshot on Sim {
     bankCountHist
       ..clear()
       ..addAll(_ril(j['bankCountHist'] ?? const []));
+    tradeFactor
+      ..clear()
+      ..addAll(j['tradeFactor'] == null ? const {} : _rdm(j['tradeFactor']));
+    tradeNoiseState
+      ..clear()
+      ..addAll(j['tradeNoise'] == null ? const {} : _rdm(j['tradeNoise']));
+    ledgerTariffs = _rdOr(j['ledgerTariffs'], 0);
     final ee = (j['banksEntryExit'] as List?) ?? const [0, 0];
     banksFounded = ee[0] as int;
     banksClosed = ee[1] as int;

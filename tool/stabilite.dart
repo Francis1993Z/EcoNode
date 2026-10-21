@@ -260,6 +260,18 @@ const Map<String, String> funnelLabels = {
 void applyParam(Params p, String k, String v) {
   bool b() => v == '1' || v == 'true';
   switch (k) {
+    case 'trade': // commerce extérieur (frontières ouvertes)
+      p.trade = b();
+    case 'tradeWaves': // douane : prix mondiaux en vagues
+      p.tradeWaves = b();
+    case 'tradeWaveAmp':
+      p.tradeWaveAmp = double.parse(v);
+    case 'tradeWavePeriod':
+      p.tradeWavePeriod = double.parse(v);
+    case 'tradeNoise':
+      p.tradeNoise = double.parse(v);
+    case 'tariff': // douane : droit sur les importations
+      p.tariff = double.parse(v);
     case 'policyPassThrough': // banque centrale : le taux de base des prêts suit le taux directeur
       p.policyPassThrough = b();
     case 'policyRate':

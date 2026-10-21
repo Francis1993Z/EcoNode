@@ -328,7 +328,7 @@ extension SimProducts on Sim {
     if (offers.isEmpty) return null;
     final p = params;
     if (p.trade && !goods[g]!.perish && goods[g]!.tradable) {
-      final price = worldPrice[g]! * p.importMarkup;
+      final price = importPrice(g);
       offers.add(_Offer(null, price, 0.5, 1));
       keys.add(-(p.prodQualityWeight * (uses[g]?.taste[c.level] ?? 1.0) - priceSensitivity(c) * price / worldPrice[g]!));
     }

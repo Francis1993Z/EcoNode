@@ -17,6 +17,7 @@ part 'jobs.dart';
 part 'entrepreneuriat.dart';
 part 'produits.dart';
 part 'banques.dart';
+part 'douane.dart';
 
 /// mulberry32 (arithmétique 32 bits non signée) : même graine, même partie.
 class Mulberry32 {
@@ -108,7 +109,9 @@ enum Flux {
   connaissance(23), // découvertes du jour : vitrine et publicité, bouche-à-oreille, fabricants de machines
   noms(24), // générateur de noms de variétés, de marques et d'entreprises (tiré « au jour 0 »)
   credit(25), // crédit aux particuliers : achat important à crédit (module banking)
-  banques(26); // choix d'une banque, fondation d'une banque par un citoyen (module banking)
+  banques(26), // choix d'une banque, fondation d'une banque par un citoyen (module banking)
+
+  commerce(27); // bruit quotidien des prix mondiaux (Params.tradeWaves)
 
   const Flux(this.code);
   final int code;
@@ -169,7 +172,7 @@ class _BestOffers {
     final list = List<Firm>.of(sellers)..sort((a, b) => a.price[good]!.compareTo(b.price[good]!));
     final p = s.params;
     final g = goods[good]!;
-    final imported = p.trade && !g.perish && g.tradable ? s.worldPrice[good]! * p.importMarkup : double.infinity;
+    final imported = p.trade && !g.perish && g.tradable ? s.importPrice(good) : double.infinity;
     final fallback = list.isEmpty ? s.worldPrice[good]! : list.first.price[good]!;
     return _BestOffers._(good, sellers, list, imported, fallback);
   }
@@ -246,7 +249,7 @@ class _AllOffers {
     final p = s.params;
     if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
       offers.add(
-          _Offer(null, s.worldPrice[good]! * p.importMarkup, s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), 1));
+          _Offer(null, s.importPrice(good), s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), 1));
     }
     keys = [for (final o in offers) o.p * (1 + 0.03 * o.r) * o.pull];
     used = List<bool>.filled(offers.length, false);
@@ -281,7 +284,7 @@ class _AllOffers {
     final p = s.params;
     if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
       offers.add(
-          _Offer(null, s.worldPrice[good]! * p.importMarkup, s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), 1));
+          _Offer(null, s.importPrice(good), s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), 1));
     }
     keys = [for (final o in offers) o.p * (1 + 0.03 * o.r) * o.pull];
     used = List<bool>.filled(offers.length, false);
@@ -332,7 +335,7 @@ class _LazyOffers {
       : idx = bo.priceIdx,
         _import = s.params.trade && !goods[good]!.perish && goods[good]!.tradable,
         _importPrice = s.params.trade && !goods[good]!.perish && goods[good]!.tradable
-            ? s.worldPrice[good]! * s.params.importMarkup
+            ? s.importPrice(good)
             : double.infinity;
 
   bool _less(int a, int b) => _keys[a] < _keys[b] || (_keys[a] == _keys[b] && _place[a] < _place[b]);
@@ -576,6 +579,9 @@ class Sim {
   double ledgerGod = 0;
   double ledgerImports = 0;
   double ledgerExports = 0;
+  double ledgerTariffs = 0; // droits de douane perçus par l'État (part des importations qui reste dans l'économie)
+  /// Facteur des prix mondiaux par bien (Params.tradeWaves) et son bruit AR(1) ; vides tant que les vagues n'ont pas servi.
+  final Map<String, double> tradeFactor = {}, tradeNoiseState = {};
   double ledgerCredit = 0; // monnaie créée par le crédit, nette des remboursements
   final List<SimEvent> events = [];
   final List<HistPoint> history = [];
@@ -740,6 +746,9 @@ class Sim {
     ledgerGod = 0;
     ledgerImports = 0;
     ledgerExports = 0;
+    ledgerTariffs = 0;
+    tradeFactor.clear();
+    tradeNoiseState.clear();
     ledgerCredit = 0;
     events.clear();
     history.clear();
@@ -1524,7 +1533,7 @@ class Sim {
     }
     if (verifyFastPaths && best != _quoteScan(good)) throw StateError('Meilleur prix (tableaux) différent au jour $day ($good)');
     if (params.trade && !goods[good]!.perish && goods[good]!.tradable) {
-      best = math.min(best, worldPrice[good]! * params.importMarkup);
+      best = math.min(best, importPrice(good));
     }
     return best;
   }
@@ -1663,10 +1672,20 @@ class Sim {
       final cost = math.min(q * o.p, buyer.money);
       double paid;
       if (o.firm == null) {
-        paid = transfer(buyer, null, cost);
-        ledgerImports += paid;
-        bank.reserves -= paid;
-        dayFlows.imports += paid;
+        paid = 0;
+        if (params.tariff > 0) {
+          // droit de douane : la part t / (1 + t) du prix payé va à l'État
+          final duty = transfer(buyer, state, cost * params.tariff / (1 + params.tariff));
+          state.taxes += duty;
+          state.taxesToday += duty;
+          ledgerTariffs += duty;
+          paid += duty;
+        }
+        final out = transfer(buyer, null, cost - paid);
+        paid += out;
+        ledgerImports += out;
+        bank.reserves -= out;
+        dayFlows.imports += out;
       } else {
         final s = o.firm!;
         paid = transfer(buyer, s, cost);
@@ -1737,6 +1756,7 @@ class Sim {
   void step() {
     final p = params;
     day++;
+    if (p.tradeWaves) _updateTradeFactors(); // avant tout achat : les offres d'import du jour en dépendent
     _buySeq.clear();
     flows = {};
     unmet = {};
@@ -2836,7 +2856,7 @@ class Sim {
         if (goods[g]!.perish || !goods[g]!.tradable) continue;
         final excess = (f.inv[g] ?? 0) - 8 * math.max(f.demandEma[g] ?? 0, 0.5);
         if (excess <= eps) continue;
-        final value = transfer(null, f, excess * worldPrice[g]! * params.exportDiscount);
+        final value = transfer(null, f, excess * exportPrice(g));
         _setStock(f, g, (f.inv[g] ?? 0) - excess);
         f.revenue += value;
         ledgerExports += value;

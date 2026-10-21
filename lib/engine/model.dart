@@ -812,6 +812,17 @@ class Params {
   // que la banque centrale ne bouge pas son taux. Sans module banques, policyRate n'a pas d'autre effet.
   bool policyPassThrough = false;
   double policySpread = 0.03;
+
+  // ---- Douane : prix mondiaux en vagues et droit de douane (2026-10-21). Neutres par défaut. Voir MODELE.md § 6.21.
+  // Avec tradeWaves, les prix d'import et d'export de chaque bien sont multipliés par un facteur qui suit une vague
+  // (amplitude tradeWaveAmp, période tradeWavePeriod jours, phase et période propres à chaque bien, tirées de la graine)
+  // et un bruit quotidien AR(1) d'écart tradeNoise. Le droit de douane `tariff` majore le prix des importations ; la
+  // part du droit va à l'État (comme une taxe), le reste sort de l'économie. Sans commerce (trade), rien ne change.
+  bool tradeWaves = false;
+  double tradeWaveAmp = 0.3;
+  double tradeWavePeriod = 365;
+  double tradeNoise = 0.02;
+  double tariff = 0;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

@@ -265,6 +265,7 @@ variable de tirages et décalait toute la suite de la partie.
 | 24 | `noms` | générateur de noms de variétés, de marques et d'entreprises (tiré au jour 0) | `produits.dart:_uniqueName` |
 | 25 | `credit` | achat important à crédit d'un citoyen (module `banking`, § 6.19) | `banques.dart:_citizenCredit` |
 | 26 | `banques` | banque d'un nouveau client, comparaison de banques, projet de banque d'un citoyen | `banques.dart` |
+| 27 | `commerce` | bruit quotidien du prix mondial de chaque bien (`Params.tradeWaves`, § 6.21) | `douane.dart` |
 
 La création d'entreprise ne tire rien : le fondateur est le citoyen le plus riche.
 
@@ -365,6 +366,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `mpcIncome` | 0,6 | propension à consommer le revenu discrétionnaire (α₁) | modèle SIM de Godley et Lavoie |
 | `wealthTargetDays` | 20 | richesse visée T, en jours de revenu discrétionnaire ; α₂ = (1 − α₁)/T | calibration interne : reproduit la richesse de départ (2 750 $ ≈ 21 jours) |
 | `trade`, `importMarkup`, `exportDiscount` | non, 1,3, 0,7 | commerce extérieur : import au prix mondial × 1,3, export × 0,7 | choix de jeu |
+| `tradeWaves`, `tradeWaveAmp`, `tradeWavePeriod`, `tradeNoise`, `tariff` | non, 0,3, 365 j, 0,02, 0 | douane (§ 6.21) : prix mondiaux en vagues, droit sur les importations | choix de jeu |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
 | `priceStep`, `wageStep` | 0,02, 0,015 | pas d'ajustement de la marge et du salaire | choix de jeu (tâche 3 du plan : lissage) |
 | `priceMaxDaily`, `wageMaxDaily` | 1,5 %/j | variation quotidienne maximale décidée par l'entreprise | coûts d'étiquetage, contrats, réputation ; sous le plafond de 2 %/j du filet |
@@ -905,6 +907,18 @@ prêts aux entreprises (`loanRate`), hypothèques, prêts personnels, test de pa
 valeurs par défaut, 3 % + 3 % = 6 % = `interestRate` exactement : l'activer ne change rien tant que le taux ne bouge pas.
 Le taux directeur garde ses autres rôles (marché interbancaire, plafond des taux de dépôt). Pas de bilan propre ni de
 création de monnaie : c'est un levier de prix du crédit.
+
+### 6.21 Douane : prix mondiaux en vagues et droit de douane (`douane.dart`)
+
+Le nœud « Douane » (X) est toujours affiché ; sa fiche ouvre ou ferme les frontières (`trade`) en cours de partie. Deux
+réglages s'ajoutent, neutres par défaut dans le moteur. `tradeWaves` (activé par l'interface) multiplie les prix d'import
+et d'export de chaque bien par un facteur (1 + a · sin 2π(jour / T + φ)) · (1 + bruit), où φ, T (`tradeWavePeriod` ± 30 %)
+et a (`tradeWaveAmp` ± 30 %) sont tirés de la graine et le bruit suit un AR(1) quotidien (0,97 · bruit + `tradeNoise` · u,
+borné à ±0,6 ; flux 27) ; le facteur est borné à [0,25 ; 4]. Le sinus est l'approximation de Bhaskara (parité VM/web).
+`worldPrice` lui-même ne bouge pas (coûts de remplacement, sensibilité aux prix). `tariff` majore le prix de tout bien
+importé ; la part t / (1 + t) du prix payé va à l'État (`state.taxes`, `ledgerTariffs`), le reste sort de l'économie.
+Constat (240 citoyens, 600 j, 3 graines) : frontières ouvertes sans droit, les importations (~1,5 M$) dépassent de loin
+les exportations (~0,15 M$, surplus de stock seulement) et la masse monétaire fond ; un droit de 50 % limite la fuite.
 
 ---
 
