@@ -369,7 +369,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `tradeWaves`, `tradeWaveAmp`, `tradeWavePeriod`, `tradeNoise`, `tariff` | non, 0,3, 365 j, 0,02, 0 | douane (§ 6.21) : prix mondiaux en vagues, droit sur les importations | choix de jeu |
 | `floatingFx`, `fxSpeed` | non, 0,05 | douane (§ 6.21) : taux de change flottant et sa vitesse d'ajustement par jour | mesure § 6.21 |
 | `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
-| `revival`, `revivalHours` | non, non | renaissance des filières (§ 6.22) : signal d'entrée d'un bien sans producteur actif ; relance à temps partiel | mesure § 6.22 |
+| `revival`, `revivalHours`, `revivalFullCost`, `revivalPlannedDemand` | non, non, non, non | renaissance des filières (§ 6.22) : signal d'entrée d'un bien sans producteur actif ; relance à temps partiel ; viabilité d'une relance au coût complet et prix de départ face à l'import ; demande dérivée au plan de production de l'aval | mesure § 6.22 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
 | `priceStep`, `wageStep` | 0,02, 0,015 | pas d'ajustement de la marge et du salaire | choix de jeu (tâche 3 du plan : lissage) |
 | `priceMaxDaily`, `wageMaxDaily` | 1,5 %/j | variation quotidienne maximale décidée par l'entreprise | coûts d'étiquetage, contrats, réputation ; sous le plafond de 2 %/j du filet |
@@ -987,6 +987,30 @@ coût du travail (gain espéré du fondateur compris).
     2 à 3 mois, leur prix dépassant le prix d'import.
 - Économie fermée : chômage non concluant (−0,6 pt et −1,3 pt) ; petits gains concluants avec filets (sans-abri,
   jours-alerte critiques, trésor de l'État).
+
+**Variantes contre les relances vouées à l'échec** (coupées par défaut, seulement avec `revival` et pour un bien sans
+producteur actif ; `rapports/renaissance-filieres.md` § 5) :
+
+- `revivalFullCost` : la viabilité d'une relance (`_found`, et `_bestProject` avec le gain espéré du fondateur) compte
+  aussi les frais fixes attendus (`entryFixedCost`) : comptabilité (0,1 + 0,03 × équipe unités de `compta`), entretien
+  des opérations de l'industrie lourde (0,06 × équipe), intérêts du prêt de fondation. Une entreprise neuve n'a pas de
+  machines : ni entretien de machines ni usure. Frontières ouvertes, le prix de départ de chaque extrant importable
+  (coût complet par unité × `markup`, le travail compté comme dans `unitCost`) ne doit pas dépasser son prix d'import.
+  Refus `viabilite` ou `prix_import` (`revivalCostRefusal`).
+- `revivalPlannedDemand` : la demande dérivée compte, pour chaque entreprise d'aval, au plus son plan de production
+  (`_plannedBatches`), au lieu de la seule capacité de son équipe.
+
+Diagnostic (5 graines, frontières ouvertes) : le prix de départ d'une relance est déjà sous l'import (médiane 0,79 ×).
+Les relances meurent de faillite, faute de ventes. 150 relances sur 174 viennent de la demande dérivée ; elles vendent
+11 % de ce signal sur leurs 60 premiers jours, et 114 meurent. Mesure (30 graines × 1 500 jours, contre `revival` seul) :
+
+- `revivalFullCost` : −1,6 à −1,8 naissance et autant de morts par an (concluant avec filets seulement) ; le gain de
+  chômage contre l'économie sans règle tombe à −2,6 et −2,2 pt.
+- `revivalPlannedDemand`, frontières ouvertes : naissances 15,7 → 9,6 et morts 16,7 → 10,8 par an sans filets
+  (14,5 → 8,3 et 15,2 → 9,9 avec), faillites divisées par deux. Chômage non concluant contre la règle seule ; contre
+  l'économie sans règle, −4,0 et −4,4 pt. Types actifs en fin : 1,5 à 3 de moins. En économie fermée, les petits gains
+  de la règle disparaissent (jours-alerte critiques +9,5 avec filets).
+- Les deux ensemble ne font pas mieux que la demande au plan seule.
 
 ---
 

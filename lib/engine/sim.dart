@@ -3246,7 +3246,11 @@ class Sim {
       revenue0 += batches * e.value * math.min(bestPrice(e.key), 2 * worldPrice[e.key]!);
     }
     final hours = revivesByHours(g); // Params.revivalHours : relance à temps partiel
-    if (revenue0 < 1.1 * ((hours ? entryLabour(g, w, team, wage) : team * wage) + inputCost)) return 'viabilite';
+    final labour = hours ? entryLabour(g, w, team, wage) : team * wage;
+    if (revenue0 < 1.1 * (labour + inputCost)) return 'viabilite';
+    // Params.revivalFullCost : une relance paie aussi ses frais fixes, et son prix de départ ne dépasse pas l'import
+    final full = revivalCostRefusal(ty, w, team, wage, labour, inputCost, revenue0, 0);
+    if (full != null) return full;
     final capital = 10 * wage * team + 5 * inputCost;
     final buffer = p.bufferDays * needCost;
     Citizen? founder;

@@ -21,7 +21,8 @@ extension SimRevival on Sim {
   bool hasActiveProducer(String g) => sellersOf(g).any((f) => f.workers.isNotEmpty);
 
   /// Demande dérivée d'un bien : ce que les équipes (employés et postes ouverts) des entreprises qui l'utilisent comme
-  /// intrant transformeraient par jour, à leur productivité du moment.
+  /// intrant transformeraient par jour, à leur productivité du moment. Params.revivalPlannedDemand : au plus leur plan de
+  /// production (`_plannedBatches`, tiré de la demande de leurs propres produits), ce qu'elles achèteraient vraiment.
   double derivedWant(String g) {
     var w = 0.0;
     for (final f in firms) {
@@ -29,7 +30,9 @@ extension SimRevival on Sim {
       if (per == null) continue;
       final crew = f.workers.length + f.vacancies;
       if (crew <= 0) continue;
-      w += _capBatches(f, crew * perWorker(f)) * per;
+      var b = _capBatches(f, crew * perWorker(f));
+      if (params.revivalPlannedDemand) b = math.min(b, _plannedBatches(f));
+      w += b * per;
     }
     return w;
   }
@@ -41,6 +44,50 @@ extension SimRevival on Sim {
   /// partiel, les heures nécessaires à [w] employés de productivité nominale (au moins Sim.minHours, au plus l'équipe).
   double entryLabour(String g, double w, int team, double wage) =>
       revivesByHours(g) ? wage * w.clamp(Sim.minHours, team.toDouble()) : team * wage;
+
+  /// Frais fixes quotidiens attendus d'une entreprise de type [ty] qui démarre avec [team] employés et un prêt [loan] :
+  /// comptabilité et entretien des opérations, aux quantités qu'achète `_buyServices`, et intérêts du prêt au taux de
+  /// base. Une entreprise neuve n'a pas de machines : ni entretien de machines ni usure.
+  double entryFixedCost(String ty, int team, double loan) {
+    final t = templates[ty]!;
+    var fixed = loan * baseRate() / 365;
+    if (modules.accounting && !t.outputs.containsKey('compta')) fixed += (0.1 + 0.03 * team) * bestPrice('compta');
+    final mt = t.maint;
+    if (modules.capital && mt != null && t.heavy && !t.outputs.containsKey(mt)) fixed += 0.06 * team * bestPrice(mt);
+    return fixed;
+  }
+
+  /// Params.revivalFullCost : cause du refus d'une relance au coût complet, ou null (relance acceptée, bien qui a un
+  /// producteur actif, ou variante coupée). [w] : employés nécessaires à productivité nominale ; [labour] : coût du
+  /// travail du test de viabilité ordinaire ; [revenue0] : ventes attendues au prix du marché.
+  /// - viabilite : les ventes attendues ne paient pas 1,1 fois l'équipe, ses intrants et ses frais fixes ;
+  /// - prix_import : frontières ouvertes, le prix de départ d'un extrant importable (coût complet par unité × markup,
+  ///   coût du travail compté comme le fera `unitCost`) dépasse son prix d'import.
+  String? revivalCostRefusal(String ty, double w, int team, double wage, double labour, double inputCost,
+      double revenue0, double loan) {
+    final p = params;
+    final t = templates[ty]!;
+    if (!p.revival || !p.revivalFullCost || hasActiveProducer(t.outputs.keys.first)) return null;
+    final fixed = entryFixedCost(ty, team, loan);
+    if (revenue0 < 1.1 * (labour + inputCost + fixed)) return 'viabilite';
+    if (!p.trade) return null;
+    // unitCost, à temps partiel, ne compte que les heures nécessaires (au moins un employé : échelle minimale) ; sans
+    // temps partiel, l'équipe entière
+    final pay = p.partTime ? wage * math.max(w, math.max(1.0, team * Sim.minHours)) : team * wage;
+    final batches = w * t.rate;
+    final perBatch = (pay + inputCost + fixed) / batches;
+    var tot = 0.0;
+    for (final e in t.outputs.entries) {
+      tot += e.value * worldPrice[e.key]!;
+    }
+    for (final e in t.outputs.entries) {
+      final g = goods[e.key]!;
+      if (g.perish || !g.tradable) continue;
+      final share = tot > 0 ? e.value * worldPrice[e.key]! / tot : 1 / t.outputs.length;
+      if (perBatch * share / e.value * p.markup > importPrice(e.key)) return 'prix_import';
+    }
+    return null;
+  }
 
   /// Signal d'entrée d'un bien sans producteur actif (0 si le bien a un producteur actif, ou sans la règle).
   double revivalWant(String g) {

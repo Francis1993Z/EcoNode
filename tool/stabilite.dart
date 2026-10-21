@@ -264,6 +264,10 @@ void applyParam(Params p, String k, String v) {
       p.revival = b();
     case 'revivalHours': // renaissance, variante : temps partiel et productivité nominale de l'entreprise relancée
       p.revivalHours = b();
+    case 'revivalFullCost': // renaissance, variante : viabilité au coût complet et prix de départ face à l'import
+      p.revivalFullCost = b();
+    case 'revivalPlannedDemand': // renaissance, variante : demande dérivée au plan de production de l'aval
+      p.revivalPlannedDemand = b();
     case 'trade': // commerce extérieur (frontières ouvertes)
       p.trade = b();
     case 'tradeWaves': // douane : prix mondiaux en vagues

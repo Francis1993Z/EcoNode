@@ -853,8 +853,17 @@ class Params {
   // taille de la demande (« échelle minimale ») ; sa viabilité compte donc les heures nécessaires (au moins
   // Sim.minHours d'un employé), pas des employés entiers. Variante coupée : mesurée (MODELE.md § 6.22), elle double les
   // créations vouées à la faillite et relève le chômage en économie fermée.
+  // revivalFullCost (avec revival) : la viabilité d'une relance compte aussi les frais fixes attendus (comptabilité,
+  // entretien, intérêts du prêt de fondation ; une entreprise neuve n'a pas de machines, donc pas d'usure), et le prix de
+  // départ (coût complet par unité × markup) ne doit pas dépasser le prix d'import, frontières ouvertes. Voir
+  // Sim.revivalCostRefusal.
+  // revivalPlannedDemand (avec revival) : la demande dérivée d'un bien est comptée au plan de production des entreprises
+  // qui l'utilisent (tiré de la demande de leurs produits), au plus la capacité de leurs équipes ; sans elle, à la seule
+  // capacité des équipes, ce qui surestime ce qu'elles achèteront (Sim.derivedWant).
   bool revival = false;
   bool revivalHours = false;
+  bool revivalFullCost = false;
+  bool revivalPlannedDemand = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

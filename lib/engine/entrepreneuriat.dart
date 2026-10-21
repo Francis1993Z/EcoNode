@@ -183,9 +183,14 @@ extension SimEntrepreneurship on Sim {
       final capital = p.entCapitalMult * (10 * wage * team + 5 * inputCost);
       final own = math.min(c.money - buffer, capital);
       if (own < (modules.credit ? p.entMinOwnShare : 1.0) * capital) continue;
+      // Params.revivalFullCost : une relance paie aussi ses frais fixes (intérêts du prêt compris), et son prix de départ
+      // ne dépasse pas l'import ; le bénéfice attendu les déduit
+      final full = p.revival && p.revivalFullCost && !hasActiveProducer(g);
+      final loan = math.max(0.0, capital - own);
+      if (full && revivalCostRefusal(ty, w, team, wage, labour, inputCost, revenue0, loan) != null) continue;
       final k = sectorKnowledge(c, ty);
       final pS = (p.entSurviveBase + p.entSurviveKnowledge * k).clamp(0.05, 0.95).toDouble();
-      final profit0 = revenue0 - labour - inputCost;
+      final profit0 = revenue0 - labour - inputCost - (full ? entryFixedCost(ty, team, loan) : 0);
       final income = wage + math.max(0.0, profit0) * (1 - p.taxRate); // son salaire et ses dividendes, s'il réussit
       final fallback = p.benefit; // s'il échoue, il retourne au chômage
       final riskCost = aversion * (1 - pS) * own / 365; // sa mise perdue, répartie sur un an, pesée par son aversion

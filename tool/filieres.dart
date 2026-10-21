@@ -14,6 +14,8 @@
 //   signal_aucun    pas de demande non servie, et personne n'en achète (les clients du bien ont disparu aussi)
 //   main_oeuvre     pas assez de chômeurs qualifiés pour l'équipe
 //   viabilite       au prix du marché, les ventes attendues ne paient pas l'équipe et ses intrants
+//   frais_fixes     Params.revivalFullCost : elles les paient, mais pas avec les frais fixes attendus de la relance
+//   prix_import     Params.revivalFullCost : le prix de départ de la relance dépasserait le prix d'import
 //   capital         aucun citoyen n'a l'épargne voulue
 //   possible        toutes les conditions sont remplies (délai entre deux créations, une création par jour, ou création
 //                   du jour même)
@@ -33,7 +35,10 @@ import 'stabilite.dart' show applyParam;
 /// signal en part de la production d'un employé.
 final Map<String, List<double>> viabRatio = {}, viabWant = {};
 
-const _causes = ['signal_import', 'signal_aucun', 'main_oeuvre', 'viabilite', 'capital', 'possible', 'public'];
+const _causes = [
+  'signal_import', 'signal_aucun', 'main_oeuvre', 'viabilite', 'frais_fixes', 'prix_import', 'capital', 'possible',
+  'public',
+];
 
 /// Première condition de la création automatique qui manque pour ce type d'entreprise (voir l'en-tête).
 String entryCause(Sim s, String ty) {
@@ -68,6 +73,9 @@ String entryCause(Sim s, String ty) {
     (viabWant[g] ??= []).add(want / perWorker0);
     return 'viabilite';
   }
+  // Params.revivalFullCost : frais fixes et prix de départ face à l'import
+  final full = s.revivalCostRefusal(ty, w, team, wage, labour, inputCost, revenue0, 0);
+  if (full != null) return full == 'viabilite' ? 'frais_fixes' : full;
   final capital = 10 * wage * team + 5 * inputCost;
   final buffer = p.bufferDays * s.needCost;
   if (!s.citizens.any((c) => c.money - buffer >= 1.5 * capital)) return 'capital';

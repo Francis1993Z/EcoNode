@@ -203,6 +203,8 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.fdMaxCap != d.fdMaxCap) 'fdMaxCap': _d(p.fdMaxCap),
     if (p.revival != d.revival) 'revival': p.revival,
     if (p.revivalHours != d.revivalHours) 'revivalHours': p.revivalHours,
+    if (p.revivalFullCost != d.revivalFullCost) 'revivalFullCost': p.revivalFullCost,
+    if (p.revivalPlannedDemand != d.revivalPlannedDemand) 'revivalPlannedDemand': p.revivalPlannedDemand,
   };
 }
 
@@ -362,7 +364,9 @@ Params _paramsFrom(Map j) => Params()
   ..fdStart = _rdOr(j['fdStart'], 0.1)
   ..fdMaxCap = _rdOr(j['fdMaxCap'], 1)
   ..revival = (j['revival'] as bool?) ?? false
-  ..revivalHours = (j['revivalHours'] as bool?) ?? false;
+  ..revivalHours = (j['revivalHours'] as bool?) ?? false
+  ..revivalFullCost = (j['revivalFullCost'] as bool?) ?? false
+  ..revivalPlannedDemand = (j['revivalPlannedDemand'] as bool?) ?? false;
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
