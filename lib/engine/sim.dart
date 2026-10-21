@@ -971,7 +971,7 @@ class Sim {
     final types = count.keys.toList();
     final price = <String, double>{for (final g in goods.keys) g: goods[g]!.guess};
     final pop = p.population.toDouble();
-    final r = p.interestRate / 365;
+    final r = (p.policyPassThrough ? p.policyRate + p.policySpread : p.interestRate) / 365; // banque centrale
     final b = <String, double>{for (final t in types) t: 1.0};
     final w = <String, double>{for (final t in types) t: 1.0};
     final k = <String, double>{for (final t in types) t: m.capital ? 0.5 * templates[t]!.capital : 0.0};
@@ -1475,12 +1475,16 @@ class Sim {
 
   /// Taux annuel d'une entreprise : taux de base + prime de risque proportionnelle à son endettement,
   /// mesuré par rapport à la valeur de ses machines (garantie maximale : 80 %).
+  /// Taux de base des prêts : le taux fixe interestRate, ou, avec la banque centrale (Params.policyPassThrough), le taux
+  /// directeur plus policySpread.
+  double baseRate() => params.policyPassThrough ? params.policyRate + params.policySpread : params.interestRate;
+
   double loanRate(Firm f, [double? machinePrice]) {
     final p = params;
-    if (f.debt <= 0) return banks.isEmpty ? p.interestRate : p.interestRate + bankLoanSpread(f.bankId);
+    if (f.debt <= 0) return banks.isEmpty ? baseRate() : baseRate() + bankLoanSpread(f.bankId);
     final pm = machinePrice ?? bestPrice('machines');
     final lev = pm > 0 ? (f.debt / (math.max(f.machines, 1.0) * pm)).clamp(0.0, 1.0) : 0.0;
-    final r = p.interestRate + p.riskSpread * lev;
+    final r = baseRate() + p.riskSpread * lev;
     return banks.isEmpty ? r : r + bankLoanSpread(f.bankId); // module banking : la marge de sa banque
   }
 

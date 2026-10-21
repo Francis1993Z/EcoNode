@@ -135,6 +135,9 @@ List<NodeBox> allBoxes(Sim sim) {
     final p = sim.nodePos[k]!;
     out.add(NodeBox(Selection(k), Rect.fromLTWH(p[0], p[1], kNodeW, kSmallH), {}, {}));
   }
+  // banque centrale : sous la Caisse ; un instantané d'avant ce nœud n'a pas sa position, on la crée
+  final bc = sim.nodePos['BC'] ??= [sim.nodePos['B']![0], sim.nodePos['B']![1] + kSmallH + kGapY];
+  out.add(NodeBox(const Selection('BC'), Rect.fromLTWH(bc[0], bc[1], kNodeW, kSmallH), {}, {}));
   if (showsExterior(sim)) {
     final x = sim.nodePos['X']!;
     out.add(NodeBox(const Selection('X'), Rect.fromLTWH(x[0], x[1], kNodeW, kSmallH), {}, {}));
@@ -1096,6 +1099,9 @@ class GraphPainter extends CustomPainter {
       case 'B':
         _bankNode(canvas, b);
         break;
+      case 'BC':
+        _centralBankNode(canvas, b);
+        break;
       default:
         _worldNode(canvas, b);
     }
@@ -1133,6 +1139,9 @@ class GraphPainter extends CustomPainter {
         break;
       case 'B':
         (accent, code, title) = (pal.money, 'C', 'Caisse');
+        break;
+      case 'BC':
+        (accent, code, title) = (pal.money, 'BC', 'Banque centrale');
         break;
       default:
         (accent, code, title) = (pal.ink3, 'X', 'Extérieur');
@@ -1298,9 +1307,18 @@ class GraphPainter extends CustomPainter {
     final loans = sim.totalDebt();
     final ratio = loans > 0 ? sim.bank.equity / loans : double.nan;
     _header(canvas, r, pal.money, 'C', 'Caisse populaire',
-        'taux ${pct(sim.params.interestRate)} · ${sim.modules.credit ? 'prête' : 'crédit coupé'}');
+        'taux ${pct(sim.baseRate())} · ${sim.modules.credit ? 'prête' : 'crédit coupé'}');
     _footer(canvas, r, 'prêts ${kmoney(loans)}', ratio.isNaN ? 'fonds ${kmoney(sim.bank.equity)}' : 'ratio ${pct(ratio)}',
         rightColor: !ratio.isNaN && ratio < sim.safeguards.minCapitalRatio ? pal.bad : null);
+  }
+
+  void _centralBankNode(Canvas canvas, NodeBox b) {
+    final r = b.rect;
+    final p = sim.params;
+    _header(canvas, r, pal.money, 'BC', 'Banque centrale',
+        'taux directeur ${pct(p.policyRate)}${p.policyPassThrough ? '' : ' · non transmis'}');
+    _footer(canvas, r, 'prêts à ${pct(sim.baseRate())}', p.policyPassThrough ? 'transmis aux banques' : 'taux fixe',
+        rightColor: p.policyPassThrough ? null : pal.ink3);
   }
 
   void _worldNode(Canvas canvas, NodeBox b) {

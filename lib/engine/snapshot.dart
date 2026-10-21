@@ -187,6 +187,8 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.excessCashReturn != d.excessCashReturn) 'excessCashReturn': p.excessCashReturn,
     if (p.excessCashDays != d.excessCashDays) 'excessCashDays': _d(p.excessCashDays),
     if (p.excessCashRate != d.excessCashRate) 'excessCashRate': _d(p.excessCashRate),
+    if (p.policyPassThrough != d.policyPassThrough) 'policyPassThrough': p.policyPassThrough,
+    if (p.policySpread != d.policySpread) 'policySpread': _d(p.policySpread),
   };
 }
 
@@ -330,7 +332,9 @@ Params _paramsFrom(Map j) => Params()
   ..bankEntryCost = _rdOr(j['bankEntryCost'], 20000)
   ..excessCashReturn = (j['excessCashReturn'] as bool?) ?? false
   ..excessCashDays = _rdOr(j['excessCashDays'], 60)
-  ..excessCashRate = _rdOr(j['excessCashRate'], 0.02);
+  ..excessCashRate = _rdOr(j['excessCashRate'], 0.02)
+  ..policyPassThrough = (j['policyPassThrough'] as bool?) ?? false
+  ..policySpread = _rdOr(j['policySpread'], 0.03);
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),

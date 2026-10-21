@@ -801,6 +801,14 @@ class Params {
   bool excessCashReturn = false;
   double excessCashDays = 60;
   double excessCashRate = 0.02;
+
+  // ---- Banque centrale : politique monétaire (2026-10-20). Coupée par défaut.
+  // Avec policyPassThrough, le taux de base de tous les prêts (entreprises, hypothèques, particuliers ; plan de départ
+  // compris) est le taux directeur (policyRate) plus policySpread, au lieu du taux fixe interestRate. Aux valeurs par
+  // défaut, 3 % + 3 % = 6 % = interestRate (exactement, en virgule flottante) : activer la transmission ne change rien tant
+  // que la banque centrale ne bouge pas son taux. Sans module banques, policyRate n'a pas d'autre effet.
+  bool policyPassThrough = false;
+  double policySpread = 0.03;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

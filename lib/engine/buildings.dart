@@ -102,7 +102,7 @@ extension SimBuildings on Sim {
 
   /// Taux annuel d'une hypothèque : taux de base + prime croissante avec le levier (0 jusqu'à 50 % de LTV, maximale à 95 %).
   double mortgageRate(double ltv) =>
-      params.interestRate + params.mortgageSpreadMax * ((ltv - 0.5) / 0.45).clamp(0.0, 1.0).toDouble();
+      baseRate() + params.mortgageSpreadMax * ((ltv - 0.5) / 0.45).clamp(0.0, 1.0).toDouble();
 
   /// La Caisse peut-elle prêter ce montant ? Fonds propres ≥ plancher × (exposition pondérée actuelle + prêt pondéré).
   bool _bankAllows(double loan) {
@@ -567,7 +567,7 @@ extension SimBuildings on Sim {
   bool _firmMayBorrow(Firm f, double amount) {
     final p = params;
     if (!modules.credit || day < f.creditBanUntil) return false;
-    var pay = amount * (p.interestRate / 365 + 1 / p.mortgageTermFirm);
+    var pay = amount * (baseRate() / 365 + 1 / p.mortgageTermFirm);
     for (final m in mortgages) {
       if (m.borrowerKind == 0 && m.borrowerId == f.id) pay += m.principal * (m.rate / 365 + 1 / p.mortgageTermFirm);
     }

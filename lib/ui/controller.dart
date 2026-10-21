@@ -72,9 +72,12 @@ class SimController extends ChangeNotifier {
   /// variétés de produits (modules jobs, entrepreneurship et products, coupés par défaut dans le moteur et le protocole).
   /// Le crédit aux citoyens et les banques (module banking) restent coupés : à activer à l'écran de départ ou dans l'onglet
   /// Diagnostic.
+  /// L'interface active aussi la transmission du taux directeur (Params.policyPassThrough) : aux valeurs par défaut elle ne
+  /// change rien (3 % + 3 % = 6 %), et le taux directeur de la banque centrale agit dès qu'on le déplace.
   SimController({int seed = 42})
       : sim = Sim(
             seed: seed,
+            params: Params()..policyPassThrough = true,
             modules: Modules()
               ..jobs = true
               ..entrepreneurship = true
@@ -200,7 +203,11 @@ class SimController extends ChangeNotifier {
 
   void newGame(int seed, {Params? params}) {
     realSpeed = 0;
-    sim = Sim(seed: seed, params: params, modules: sim.modules.copy(), safeguards: sim.safeguards.copy());
+    sim = Sim(
+        seed: seed,
+        params: (params ?? Params())..policyPassThrough = true, // banque centrale : voir le constructeur
+        modules: sim.modules.copy(),
+        safeguards: sim.safeguards.copy());
     housing.clear();
     autoLayout(sim);
     selection = const Selection('M');
