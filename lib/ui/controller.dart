@@ -79,7 +79,8 @@ class SimController extends ChangeNotifier {
             seed: seed,
             params: Params()
               ..policyPassThrough = true
-              ..tradeWaves = true, // douane : prix mondiaux en vagues (sans effet tant que les frontières sont fermées)
+              ..tradeWaves = true // douane : prix mondiaux en vagues (sans effet tant que les frontières sont fermées)
+              ..floatingFx = true, // douane : taux de change flottant (idem)
             modules: Modules()
               ..jobs = true
               ..entrepreneurship = true
@@ -209,7 +210,8 @@ class SimController extends ChangeNotifier {
         seed: seed,
         params: (params ?? Params())
           ..policyPassThrough = true // banque centrale : voir le constructeur
-          ..tradeWaves = true,
+          ..tradeWaves = true
+          ..floatingFx = true,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();

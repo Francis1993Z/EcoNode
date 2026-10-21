@@ -272,6 +272,10 @@ void applyParam(Params p, String k, String v) {
       p.tradeNoise = double.parse(v);
     case 'tariff': // douane : droit sur les importations
       p.tariff = double.parse(v);
+    case 'floatingFx': // douane : taux de change flottant
+      p.floatingFx = b();
+    case 'fxSpeed':
+      p.fxSpeed = double.parse(v);
     case 'policyPassThrough': // banque centrale : le taux de base des prêts suit le taux directeur
       p.policyPassThrough = b();
     case 'policyRate':

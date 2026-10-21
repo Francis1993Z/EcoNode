@@ -582,6 +582,9 @@ class Sim {
   double ledgerTariffs = 0; // droits de douane perçus par l'État (part des importations qui reste dans l'économie)
   /// Facteur des prix mondiaux par bien (Params.tradeWaves) et son bruit AR(1) ; vides tant que les vagues n'ont pas servi.
   final Map<String, double> tradeFactor = {}, tradeNoiseState = {};
+  /// Taux de change (Params.floatingFx) : $ d'ici pour une unité de monnaie étrangère ; importations et exportations
+  /// lissées qui le font varier.
+  double fxRate = 1, fxImportsEma = 0, fxExportsEma = 0;
   double ledgerCredit = 0; // monnaie créée par le crédit, nette des remboursements
   final List<SimEvent> events = [];
   final List<HistPoint> history = [];
@@ -749,6 +752,9 @@ class Sim {
     ledgerTariffs = 0;
     tradeFactor.clear();
     tradeNoiseState.clear();
+    fxRate = 1;
+    fxImportsEma = 0;
+    fxExportsEma = 0;
     ledgerCredit = 0;
     events.clear();
     history.clear();
@@ -1827,6 +1833,7 @@ class Sim {
     }
     _record();
     _netSummary();
+    if (p.floatingFx && p.trade) _updateFx(); // avant la vérification, qui remet les flux du jour à zéro
     _checkInvariants();
     monitor.check(this);
   }

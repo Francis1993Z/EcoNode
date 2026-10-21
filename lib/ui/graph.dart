@@ -1316,7 +1316,10 @@ class GraphPainter extends CustomPainter {
     final r = b.rect;
     final p = sim.params;
     _header(canvas, r, pal.ink3, 'X', 'Douane',
-        p.trade ? 'frontières ouvertes${p.tariff > 0 ? ' · droit ${pct(p.tariff)}' : ''}' : 'frontières fermées');
+        p.trade
+            ? 'frontières ouvertes${p.tariff > 0 ? ' · droit ${pct(p.tariff)}' : ''}'
+                '${p.floatingFx ? ' · change ${fmtNum(sim.fxRate, 2)}' : ''}'
+            : 'frontières fermées');
     _footer(canvas, r, 'import ${kmoney(sim.ledgerImports)}', 'export ${kmoney(sim.ledgerExports)}');
   }
 }

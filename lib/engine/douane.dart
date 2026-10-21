@@ -8,6 +8,8 @@ part of 'sim.dart';
 // où phase, période (± 30 %) et amplitude (± 30 %) sont tirées une fois de la graine, et le bruit suit un AR(1) quotidien
 // (bruit ← 0,97 · bruit + tradeNoise · u, u uniforme dans [−1, 1], borné à ±0,6). Le facteur est borné à [0,25 ; 4].
 // Le droit de douane (Params.tariff) majore ensuite le prix d'import ; il ne touche pas les exportations.
+// Taux de change flottant (Params.floatingFx) : les deux prix sont aussi multipliés par fxRate, qui suit chaque soir le
+// solde commercial lissé (voir _updateFx).
 //
 // Pas de math.sin (résultats différents entre la VM et le web) : approximation de Bhaskara, en opérations élémentaires.
 
@@ -15,10 +17,14 @@ extension Douane on Sim {
   /// Facteur du jour des prix mondiaux d'un bien (1 sans vagues).
   double tradeFactorOf(String good) => params.tradeWaves ? (tradeFactor[good] ?? 1.0) : 1.0;
 
+  /// Taux de change en vigueur (1 sans taux flottant).
+  double get fx => params.floatingFx ? fxRate : 1.0;
+
   /// Prix d'une unité importée, droit de douane compris.
   double importPrice(String good) {
     var v = worldPrice[good]! * params.importMarkup;
     if (params.tradeWaves) v *= tradeFactor[good] ?? 1.0;
+    if (params.floatingFx) v *= fxRate;
     if (params.tariff != 0) v *= 1 + params.tariff;
     return v;
   }
@@ -27,7 +33,18 @@ extension Douane on Sim {
   double exportPrice(String good) {
     var v = worldPrice[good]! * params.exportDiscount;
     if (params.tradeWaves) v *= tradeFactor[good] ?? 1.0;
+    if (params.floatingFx) v *= fxRate;
     return v;
+  }
+
+  /// Fin de journée : moyennes lissées (α = 0,05) des importations sorties de l'économie (droit de douane exclu) et des
+  /// exportations, puis taux de change × (1 + fxSpeed × déséquilibre relatif), borné à [0,1 ; 10].
+  void _updateFx() {
+    fxImportsEma = 0.95 * fxImportsEma + 0.05 * dayFlows.imports;
+    fxExportsEma = 0.95 * fxExportsEma + 0.05 * dayFlows.exports;
+    final sum = fxImportsEma + fxExportsEma;
+    if (sum <= 0) return;
+    fxRate = (fxRate * (1 + params.fxSpeed * (fxImportsEma - fxExportsEma) / sum)).clamp(0.1, 10.0).toDouble();
   }
 
   /// Caractéristiques fixes de la vague d'un bien, tirées de la graine : (phase en tours, période en jours, amplitude).

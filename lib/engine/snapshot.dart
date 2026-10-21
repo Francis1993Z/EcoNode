@@ -194,6 +194,8 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.tradeWavePeriod != d.tradeWavePeriod) 'tradeWavePeriod': _d(p.tradeWavePeriod),
     if (p.tradeNoise != d.tradeNoise) 'tradeNoise': _d(p.tradeNoise),
     if (p.tariff != d.tariff) 'tariff': _d(p.tariff),
+    if (p.floatingFx != d.floatingFx) 'floatingFx': p.floatingFx,
+    if (p.fxSpeed != d.fxSpeed) 'fxSpeed': _d(p.fxSpeed),
   };
 }
 
@@ -344,7 +346,9 @@ Params _paramsFrom(Map j) => Params()
   ..tradeWaveAmp = _rdOr(j['tradeWaveAmp'], 0.3)
   ..tradeWavePeriod = _rdOr(j['tradeWavePeriod'], 365)
   ..tradeNoise = _rdOr(j['tradeNoise'], 0.02)
-  ..tariff = _rdOr(j['tariff'], 0);
+  ..tariff = _rdOr(j['tariff'], 0)
+  ..floatingFx = (j['floatingFx'] as bool?) ?? false
+  ..fxSpeed = _rdOr(j['fxSpeed'], 0.05);
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
@@ -945,6 +949,7 @@ extension SimSnapshot on Sim {
         if (tradeFactor.isNotEmpty) 'tradeFactor': _dm(tradeFactor),
         if (tradeNoiseState.isNotEmpty) 'tradeNoise': _dm(tradeNoiseState),
         if (ledgerTariffs != 0) 'ledgerTariffs': _d(ledgerTariffs),
+        if (fxRate != 1 || fxImportsEma != 0 || fxExportsEma != 0) 'fx': [_d(fxRate), _d(fxImportsEma), _d(fxExportsEma)],
         if (banksFounded + banksClosed > 0) 'banksEntryExit': [banksFounded, banksClosed],
         if (consumerLent > 0 || consumerBankruptcies > 0)
           'consumerCredit': [
@@ -1026,8 +1031,10 @@ extension SimSnapshot on Sim {
       ])),
       if (buildings.isNotEmpty || mortgages.isNotEmpty) 'batiments': _fnv(j(_buildingsState())),
       if (jobsActive) 'travail': _fnv(j(_labourJson(labour))),
-      if (tradeFactor.isNotEmpty || ledgerTariffs != 0)
-        'douane': _fnv(j([_dm(tradeFactor), _dm(tradeNoiseState), _d(ledgerTariffs)])),
+      if (tradeFactor.isNotEmpty || ledgerTariffs != 0 || fxRate != 1 || fxImportsEma != 0)
+        'douane': _fnv(j([
+          _dm(tradeFactor), _dm(tradeNoiseState), _d(ledgerTariffs), _d(fxRate), _d(fxImportsEma), _d(fxExportsEma)
+        ])),
       if (products.isNotEmpty) 'produits': _fnv(j([for (final p in products.values) _productJson(p), _dm(poorEma)])),
       'moniteur': _fnv(j(monitor.toJson())),
       'historique': _fnv(j(history.isEmpty ? null : _histJson(history.last))),
@@ -1092,6 +1099,10 @@ extension SimSnapshot on Sim {
       ..clear()
       ..addAll(j['tradeNoise'] == null ? const {} : _rdm(j['tradeNoise']));
     ledgerTariffs = _rdOr(j['ledgerTariffs'], 0);
+    final fx = (j['fx'] as List?) ?? const [1.0, 0.0, 0.0];
+    fxRate = _rd(fx[0]);
+    fxImportsEma = _rd(fx[1]);
+    fxExportsEma = _rd(fx[2]);
     final ee = (j['banksEntryExit'] as List?) ?? const [0, 0];
     banksFounded = ee[0] as int;
     banksClosed = ee[1] as int;

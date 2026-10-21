@@ -823,6 +823,11 @@ class Params {
   double tradeWavePeriod = 365;
   double tradeNoise = 0.02;
   double tariff = 0;
+  // Taux de change flottant (floatingFx) : prix d'une unité de monnaie étrangère, 1 au départ. Chaque soir, frontières
+  // ouvertes, il varie de fxSpeed × (importations − exportations) / (importations + exportations), moyennes lissées sur
+  // une vingtaine de jours : un déficit commercial déprécie la monnaie (import plus cher, export mieux payé).
+  bool floatingFx = false;
+  double fxSpeed = 0.05;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

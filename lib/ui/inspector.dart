@@ -1303,6 +1303,42 @@ class _WorldView extends StatelessWidget {
               onChanged: (v) => upd(() => p.tradeNoise = (v * 1000).round() / 1000)),
         ],
       ]),
+      Section('Taux de change', [
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Taux de change flottant', style: TextStyle(fontSize: 13)),
+          subtitle: const Text(
+              'Un déficit commercial fait baisser la monnaie d’ici : les importations coûtent plus cher, les exportations '
+              'rapportent plus, et les échanges se rééquilibrent. Coupé : taux fixe.',
+              style: TextStyle(fontSize: 11)),
+          value: p.floatingFx,
+          onChanged: (v) => upd(() => p.floatingFx = v),
+        ),
+        if (p.floatingFx) ...[
+          ParamSlider(
+              label: 'Vitesse d’ajustement',
+              value: p.fxSpeed,
+              min: 0,
+              max: 0.15,
+              format: (v) => '${fmtNum(v * 100, 1)} %/j',
+              hint: 'Variation quotidienne du taux quand tout le commerce va dans un seul sens. Trop lent, les entreprises '
+                  'd’ici disparaissent avant que le taux ne les protège ; trop rapide, le taux oscille.',
+              onChanged: (v) => upd(() => p.fxSpeed = (v * 200).round() / 200)),
+          KV('Une unité de monnaie étrangère', money(sim.fxRate)),
+          KV(
+              'Monnaie d’ici',
+              sim.fxRate > 1.005
+                  ? 'dépréciée de ${pct(1 - 1 / sim.fxRate)}'
+                  : sim.fxRate < 0.995
+                      ? 'appréciée de ${pct(1 / sim.fxRate - 1)}'
+                      : 'à parité',
+              color: sim.fxRate > 1.005 ? pal.warn : null),
+          KV('Importations · exportations (moyenne / j)',
+              '${money0(sim.fxImportsEma)} · ${money0(sim.fxExportsEma)}'),
+          if (!p.trade) Text('Frontières fermées : le taux ne bouge pas.', style: TextStyle(color: pal.ink3, fontSize: 11)),
+        ],
+      ]),
       Section('Échanges', [
         KV('Importé (total)', money0(sim.ledgerImports)),
         KV('Exporté (total)', money0(sim.ledgerExports)),

@@ -367,6 +367,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `wealthTargetDays` | 20 | richesse visée T, en jours de revenu discrétionnaire ; α₂ = (1 − α₁)/T | calibration interne : reproduit la richesse de départ (2 750 $ ≈ 21 jours) |
 | `trade`, `importMarkup`, `exportDiscount` | non, 1,3, 0,7 | commerce extérieur : import au prix mondial × 1,3, export × 0,7 | choix de jeu |
 | `tradeWaves`, `tradeWaveAmp`, `tradeWavePeriod`, `tradeNoise`, `tariff` | non, 0,3, 365 j, 0,02, 0 | douane (§ 6.21) : prix mondiaux en vagues, droit sur les importations | choix de jeu |
+| `floatingFx`, `fxSpeed` | non, 0,05 | douane (§ 6.21) : taux de change flottant et sa vitesse d'ajustement par jour | mesure § 6.21 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
 | `priceStep`, `wageStep` | 0,02, 0,015 | pas d'ajustement de la marge et du salaire | choix de jeu (tâche 3 du plan : lissage) |
 | `priceMaxDaily`, `wageMaxDaily` | 1,5 %/j | variation quotidienne maximale décidée par l'entreprise | coûts d'étiquetage, contrats, réputation ; sous le plafond de 2 %/j du filet |
@@ -919,6 +920,13 @@ borné à ±0,6 ; flux 27) ; le facteur est borné à [0,25 ; 4]. Le sinus est l
 importé ; la part t / (1 + t) du prix payé va à l'État (`state.taxes`, `ledgerTariffs`), le reste sort de l'économie.
 Constat (240 citoyens, 600 j, 3 graines) : frontières ouvertes sans droit, les importations (~1,5 M$) dépassent de loin
 les exportations (~0,15 M$, surplus de stock seulement) et la masse monétaire fond ; un droit de 50 % limite la fuite.
+
+Taux de change flottant (`floatingFx`, activé par l'interface) : `fxRate` ($ d'ici pour une unité étrangère, 1 au départ)
+multiplie les prix d'import et d'export. Chaque soir, frontières ouvertes, les importations sorties de l'économie (droit
+exclu) et les exportations du jour sont lissées (α = 0,05), puis `fxRate` × (1 + `fxSpeed` · (I − X) / (I + X)), borné à
+[0,1 ; 10]. Mesure (240 citoyens, 1 500 j, 3 graines, vagues actives) : avec `fxSpeed` = 5 %/j, importations ≈
+exportations (1,4 M$ contre 1,3 M$), masse monétaire 1,36 à 1,52 M$ au lieu de 0,2 M$, chômage 28 à 38 % ; à 1 %/j le
+taux arrive trop tard (2 graines sur 3 au plafond de 10, économie effondrée).
 
 ---
 
