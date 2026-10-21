@@ -18,6 +18,7 @@ part 'entrepreneuriat.dart';
 part 'produits.dart';
 part 'banques.dart';
 part 'douane.dart';
+part 'renaissance.dart';
 
 /// mulberry32 (arithmétique 32 bits non signée) : même graine, même partie.
 class Mulberry32 {
@@ -596,6 +597,8 @@ class Sim {
   final Map<String, MarketStat> marketStats = {};
   final Map<String, int> lastShortage = {};
   final Map<String, double> unmetEma = {}; // demande non servie lissée (~10 jours), par bien
+  /// Importations lissées (~10 jours), par bien (Params.revival seulement ; vide sans la règle).
+  final Map<String, double> importEma = {};
   final Map<String, int> _lastEntry = {}; // dernier jour de création, par type d'entreprise
   /// Entonnoir de création (mesure seulement) : projets envisagés (un type dont le bien a une demande non servie
   /// suffisante, un jour donné), refus par cause, créations ; cumulé depuis le début de la partie.
@@ -767,6 +770,7 @@ class Sim {
     marketStats.clear();
     lastShortage.clear();
     unmetEma.clear();
+    importEma.clear();
     _lastEntry.clear();
     entryFunnel.clear();
     lastSeller.clear();
@@ -1827,6 +1831,7 @@ class Sim {
     for (final g in goods.keys) {
       unmetEma[g] = 0.9 * (unmetEma[g] ?? 0) + 0.1 * (unmet[g] ?? 0);
     }
+    if (p.revival) _revivalEvening();
     if (productsActive) _productsEndOfDay();
     if (bankingActive || consumerLent > 0) _creditEndOfDay();
     if (banks.isNotEmpty) _banksDay();
@@ -3167,7 +3172,8 @@ class Sim {
       // module products, catégorie différenciée : demande non servie ou faiblement servie (voir entryWant)
       final diff = productsActive && isDifferentiated(g);
       final wantD = diff ? entryWant(g) : 0.0;
-      final want = diff ? math.max(0.0, wantD) : (unmetEma[g] ?? 0); // unités par jour non servies
+      var want = diff ? math.max(0.0, wantD) : (unmetEma[g] ?? 0); // unités par jour non servies
+      if (p.revival) want = math.max(want, revivalWant(g)); // bien sans producteur actif : signal de renaissance
       final perWorker0 = t.rate * t.outputs[g]!; // unités par employé et par jour, sans machines
       if (want < p.entryMinShare * perWorker0) continue; // pas de signal : pas de projet
       String? refused;
@@ -3239,7 +3245,8 @@ class Sim {
     for (final e in t.outputs.entries) {
       revenue0 += batches * e.value * math.min(bestPrice(e.key), 2 * worldPrice[e.key]!);
     }
-    if (revenue0 < 1.1 * (team * wage + inputCost)) return 'viabilite';
+    final hours = revivesByHours(g); // Params.revivalHours : relance à temps partiel
+    if (revenue0 < 1.1 * ((hours ? entryLabour(g, w, team, wage) : team * wage) + inputCost)) return 'viabilite';
     final capital = 10 * wage * team + 5 * inputCost;
     final buffer = p.bufferDays * needCost;
     Citizen? founder;
@@ -3252,7 +3259,7 @@ class Sim {
     final f = _newFirm(ty, '${t.label} ${founder.name.split(' ').last}', 0, founder.id, slot[0], slot[1]);
     // échelle minimale si la demande n'occupe pas un employé ; module products, catégorie différenciée : pas de fraction
     // d'employé, la variété doit faire vivre un employé entier
-    f.rate = productsActive && isDifferentiated(g) ? t.rate : t.rate * _minScale(w, 1);
+    f.rate = (productsActive && isDifferentiated(g)) || hours ? t.rate : t.rate * _minScale(w, 1);
     f.wage = wage;
     if (modules.jobs) {
       f.offer = marketOffer(t.skill);
