@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 
+import 'citizens_view.dart';
 import 'controller.dart';
 import 'diag_tab.dart';
 import 'eco_tab.dart';
@@ -180,7 +181,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 final panelW = (w * 0.38).clamp(300.0, 460.0).toDouble();
                 final kb = MediaQuery.of(context).viewInsets.bottom;
                 return Row(children: [
-                  Expanded(child: GraphView(ctrl: ctrl)),
+                  Expanded(child: ctrl.citizenView ? CitizenExplorer(ctrl) : GraphView(ctrl: ctrl)),
                   if (ctrl.panelOpen) ...[
                     VerticalDivider(width: 1, color: pal.rule),
                     SizedBox(
@@ -273,6 +274,11 @@ class TopBar extends StatelessWidget {
               Text('Flux \$', style: TextStyle(color: pal.ink2, fontSize: 11)),
               Switch(value: ctrl.showMoneyFlows, onChanged: ctrl.toggleMoneyFlows),
             ]),
+            IconButton(
+              tooltip: ctrl.citizenView ? 'Revenir au graphe des entreprises' : 'Explorateur de citoyens',
+              onPressed: ctrl.toggleCitizenView,
+              icon: Icon(ctrl.citizenView ? Icons.account_tree_outlined : Icons.groups_outlined),
+            ),
             IconButton(
               tooltip: ctrl.panelOpen ? 'Masquer le panneau' : 'Afficher le panneau',
               onPressed: ctrl.togglePanel,
