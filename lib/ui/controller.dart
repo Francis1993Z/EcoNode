@@ -45,6 +45,7 @@ class SimController extends ChangeNotifier {
   bool bundleEdges = true; // flux regroupés en troncs entre colonnes éloignées
   bool panelOpen = true;
   int panelTab = Tabs.inspector;
+  bool citizenView = false; // vue principale : l'explorateur de citoyens au lieu du graphe
 
   /// Calque du graphe : un bien (ou [kMoneyLayer]) mis en avant, les autres flux estompés ; null = tous.
   String? layer;
@@ -154,6 +155,11 @@ class SimController extends ChangeNotifier {
   void setTab(int t) {
     panelTab = t;
     panelOpen = true;
+    notifyListeners();
+  }
+
+  void toggleCitizenView() {
+    citizenView = !citizenView;
     notifyListeners();
   }
 
