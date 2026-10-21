@@ -34,7 +34,7 @@ extension SimRevival on Sim {
     return w;
   }
 
-  /// Relance à temps partiel (Params.revivalHours) : la création de ce bien en est-elle une ?
+  /// Relance à temps partiel (Params.revivalHours, variante coupée par défaut) : la création de ce bien en est-elle une ?
   bool revivesByHours(String g) => params.revival && params.revivalHours && params.partTime && !hasActiveProducer(g);
 
   /// Coût quotidien du travail d'une création, pour sa viabilité : [team] employés entiers, ou, pour une relance à temps

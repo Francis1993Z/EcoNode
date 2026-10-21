@@ -362,7 +362,7 @@ Params _paramsFrom(Map j) => Params()
   ..fdStart = _rdOr(j['fdStart'], 0.1)
   ..fdMaxCap = _rdOr(j['fdMaxCap'], 1)
   ..revival = (j['revival'] as bool?) ?? false
-  ..revivalHours = (j['revivalHours'] as bool?) ?? true;
+  ..revivalHours = (j['revivalHours'] as bool?) ?? false;
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),

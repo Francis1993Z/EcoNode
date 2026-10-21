@@ -1,0 +1,91 @@
+graine 1 : acier          éteint au jour 25 (de nouveau produit à la fin)
+graine 1 : or             éteint au jour 30
+graine 1 : cpu            éteint au jour 256 (de nouveau produit à la fin)
+graine 1 : bauxite        éteint au jour 411 (de nouveau produit à la fin)
+graine 1 : fer            éteint au jour 568 (de nouveau produit à la fin)
+graine 1 : ordinateur     éteint au jour 872 (de nouveau produit à la fin)
+graine 1 : poisson        éteint au jour 1250 (de nouveau produit à la fin)
+graine 1 : plastique      éteint au jour 1259 (de nouveau produit à la fin)
+graine 1 : cuivre         éteint au jour 1273 (de nouveau produit à la fin)
+graine 2 : or             éteint au jour 12 (de nouveau produit à la fin)
+graine 2 : cuivre         éteint au jour 22
+graine 2 : cpu            éteint au jour 39
+graine 2 : fer            éteint au jour 254
+graine 2 : bauxite        éteint au jour 280
+graine 2 : ordinateur     éteint au jour 317
+graine 2 : poisson        éteint au jour 486
+graine 2 : aluminium      éteint au jour 678
+graine 2 : cours          éteint au jour 927 (de nouveau produit à la fin)
+graine 2 : machines       éteint au jour 1218 (de nouveau produit à la fin)
+graine 3 : cpu            éteint au jour 16 (de nouveau produit à la fin)
+graine 3 : bauxite        éteint au jour 25 (de nouveau produit à la fin)
+graine 3 : or             éteint au jour 33 (de nouveau produit à la fin)
+graine 3 : fer            éteint au jour 48 (de nouveau produit à la fin)
+graine 3 : cuivre         éteint au jour 55 (de nouveau produit à la fin)
+graine 3 : poisson        éteint au jour 346 (de nouveau produit à la fin)
+graine 3 : reparation     éteint au jour 1086 (de nouveau produit à la fin)
+graine 3 : repas          éteint au jour 1108 (de nouveau produit à la fin)
+graine 3 : aluminium      éteint au jour 1169 (de nouveau produit à la fin)
+graine 3 : electronique   éteint au jour 1201 (de nouveau produit à la fin)
+graine 3 : conception     éteint au jour 1203 (de nouveau produit à la fin)
+graine 3 : plastique      éteint au jour 1221 (de nouveau produit à la fin)
+graine 4 : compta         éteint au jour 36 (de nouveau produit à la fin)
+graine 4 : cpu            éteint au jour 37
+graine 4 : aluminium      éteint au jour 57 (de nouveau produit à la fin)
+graine 4 : or             éteint au jour 122
+graine 4 : cuivre         éteint au jour 453 (de nouveau produit à la fin)
+graine 4 : bauxite        éteint au jour 469 (de nouveau produit à la fin)
+graine 4 : fer            éteint au jour 633 (de nouveau produit à la fin)
+graine 4 : ordinateur     éteint au jour 788
+graine 4 : plastique      éteint au jour 1080 (de nouveau produit à la fin)
+graine 4 : electronique   éteint au jour 1089 (de nouveau produit à la fin)
+graine 4 : conception     éteint au jour 1125
+graine 5 : or             éteint au jour 25 (de nouveau produit à la fin)
+graine 5 : cpu            éteint au jour 199
+graine 5 : fer            éteint au jour 335 (de nouveau produit à la fin)
+graine 5 : aluminium      éteint au jour 358 (de nouveau produit à la fin)
+graine 5 : ordinateur     éteint au jour 505
+graine 5 : cuivre         éteint au jour 828 (de nouveau produit à la fin)
+graine 5 : bauxite        éteint au jour 840 (de nouveau produit à la fin)
+graine 5 : bijoux         éteint au jour 1054 (de nouveau produit à la fin)
+
+Résumé (240 citoyens, 5 graines × 1500 jours, filets actifs, modules coupés buildings, jobs, entrepreneurship, products, banking) :
+  Or                     éteint dans 5/5 graines, jours 12 / 30 / 122 (min / médiane / max), revenu à la fin dans 3
+  Processeurs            éteint dans 5/5 graines, jours 16 / 39 / 256 (min / médiane / max), revenu à la fin dans 2
+  Bauxite                éteint dans 5/5 graines, jours 25 / 411 / 840 (min / médiane / max), revenu à la fin dans 4
+  Minerai de fer         éteint dans 5/5 graines, jours 48 / 335 / 633 (min / médiane / max), revenu à la fin dans 4
+  Cuivre                 éteint dans 5/5 graines, jours 22 / 453 / 1273 (min / médiane / max), revenu à la fin dans 4
+  Ordinateurs            éteint dans 4/5 graines, jours 317 / 788 / 872 (min / médiane / max), revenu à la fin dans 1
+  Aluminium              éteint dans 4/5 graines, jours 57 / 678 / 1169 (min / médiane / max), revenu à la fin dans 3
+  Poisson                éteint dans 3/5 graines, jours 346 / 486 / 1250 (min / médiane / max), revenu à la fin dans 2
+  Plastique              éteint dans 3/5 graines, jours 1080 / 1221 / 1259 (min / médiane / max), revenu à la fin dans 3
+  Électronique           éteint dans 2/5 graines, jours 1089 / 1201 / 1201 (min / médiane / max), revenu à la fin dans 2
+  Conception de puces    éteint dans 2/5 graines, jours 1125 / 1203 / 1203 (min / médiane / max), revenu à la fin dans 1
+  Acier                  éteint dans 1/5 graines, jours 25 / 25 / 25 (min / médiane / max), revenu à la fin dans 1
+  Formation              éteint dans 1/5 graines, jours 927 / 927 / 927 (min / médiane / max), revenu à la fin dans 1
+  Machines               éteint dans 1/5 graines, jours 1218 / 1218 / 1218 (min / médiane / max), revenu à la fin dans 1
+  Réparations            éteint dans 1/5 graines, jours 1086 / 1086 / 1086 (min / médiane / max), revenu à la fin dans 1
+  Repas                  éteint dans 1/5 graines, jours 1108 / 1108 / 1108 (min / médiane / max), revenu à la fin dans 1
+  Comptabilité           éteint dans 1/5 graines, jours 36 / 36 / 36 (min / médiane / max), revenu à la fin dans 1
+  Bijoux                 éteint dans 1/5 graines, jours 1054 / 1054 / 1054 (min / médiane / max), revenu à la fin dans 1
+
+Jours sans producteur actif et causes (part des jours sans producteur) ; total 261.9 jours-biens pour 100 jours :
+  bien                    jours     % renais.  signal_import signal_aucun  main_oeuvre    viabilite      capital     possible       public    coproduit
+  Or                       6086    81       4            0 %         80 %          3 %         17 %            ·          0 %            ·            ·
+  Processeurs              4675    62      22            1 %         81 %          0 %          8 %          9 %          0 %            ·            ·
+  Ordinateurs              2933    39       1            0 %          4 %         16 %         51 %         29 %          0 %            ·            ·
+  Poisson                  2028    27       2            0 %         86 %          1 %         13 %            ·          0 %            ·            ·
+  Bauxite                  1221    16      21            2 %         83 %          1 %         12 %          1 %          1 %            ·            ·
+  Cuivre                    876    12      23           25 %         59 %          1 %         12 %            ·          2 %            ·            ·
+  Minerai de fer            648     9      14            7 %         79 %          0 %         13 %            ·          1 %            ·            ·
+  Aluminium                 422     6       8            5 %         78 %          1 %         16 %            ·          1 %            ·            ·
+  Conception de puces       379     5       1              ·         89 %          0 %         10 %            ·            ·            ·            ·
+  Repas                     195     3       1              ·         98 %            ·          1 %            ·          1 %            ·            ·
+  Formation                  83     1       5              ·            ·            ·            ·            ·            ·        100 %            ·
+  Plastique                  28     0       4           25 %          4 %         14 %         21 %            ·         36 %            ·            ·
+  Électronique               19     0       2           26 %            ·          5 %         68 %            ·            ·            ·            ·
+  Machines                   13     0       1              ·         92 %            ·          8 %            ·            ·            ·            ·
+  Acier                      12     0       2           33 %            ·         17 %         50 %            ·            ·            ·            ·
+  Réparations                12     0       1              ·            ·         33 %         67 %            ·            ·            ·            ·
+  Comptabilité                5     0       1              ·            ·         80 %         20 %            ·            ·            ·            ·
+  Bijoux                      4     0       1              ·            ·        100 %            ·            ·            ·            ·            ·

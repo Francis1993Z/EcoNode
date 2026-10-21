@@ -262,7 +262,7 @@ void applyParam(Params p, String k, String v) {
   switch (k) {
     case 'revival': // renaissance des filières : signal d'entrée d'un bien sans producteur actif
       p.revival = b();
-    case 'revivalHours': // renaissance : temps partiel et productivité nominale de l'entreprise relancée
+    case 'revivalHours': // renaissance, variante : temps partiel et productivité nominale de l'entreprise relancée
       p.revivalHours = b();
     case 'trade': // commerce extérieur (frontières ouvertes)
       p.trade = b();

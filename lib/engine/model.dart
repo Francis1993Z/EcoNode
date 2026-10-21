@@ -851,9 +851,10 @@ class Params {
   // revivalHours (avec revival et le temps partiel, partTime) : l'entreprise qui relance un bien sans producteur garde la
   // productivité nominale de son type et travaille à temps partiel, au lieu d'être créée à productivité réduite à la
   // taille de la demande (« échelle minimale ») ; sa viabilité compte donc les heures nécessaires (au moins
-  // Sim.minHours d'un employé), pas des employés entiers. Sans lui, un marché de moins d'un employé reste sans producteur.
+  // Sim.minHours d'un employé), pas des employés entiers. Variante coupée : mesurée (MODELE.md § 6.22), elle double les
+  // créations vouées à la faillite et relève le chômage en économie fermée.
   bool revival = false;
-  bool revivalHours = true;
+  bool revivalHours = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

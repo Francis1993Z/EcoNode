@@ -1,0 +1,168 @@
+graine 1 : petrole        éteint au jour 90
+graine 1 : cuivre         éteint au jour 139
+graine 1 : fer            éteint au jour 141
+graine 1 : cpu            éteint au jour 141
+graine 1 : conception     éteint au jour 157
+graine 1 : bauxite        éteint au jour 159
+graine 1 : viande         éteint au jour 167
+graine 1 : aluminium      éteint au jour 169
+graine 1 : or             éteint au jour 178
+graine 1 : ordinateur     éteint au jour 180
+graine 1 : genie          éteint au jour 180 (de nouveau produit à la fin)
+graine 1 : plastique      éteint au jour 230
+graine 1 : electronique   éteint au jour 334
+graine 1 : machines       éteint au jour 347
+graine 1 : cours          éteint au jour 464 (de nouveau produit à la fin)
+graine 1 : soins          éteint au jour 470 (de nouveau produit à la fin)
+graine 1 : acier          éteint au jour 928
+graine 1 : poisson        éteint au jour 1469
+graine 2 : cpu            éteint au jour 143
+graine 2 : or             éteint au jour 185
+graine 2 : bauxite        éteint au jour 197
+graine 2 : cuivre         éteint au jour 212
+graine 2 : fer            éteint au jour 275
+graine 2 : aluminium      éteint au jour 301
+graine 2 : conception     éteint au jour 333
+graine 2 : plastique      éteint au jour 353
+graine 2 : acier          éteint au jour 355
+graine 2 : machines       éteint au jour 578
+graine 2 : petrole        éteint au jour 596
+graine 2 : poisson        éteint au jour 1056
+graine 2 : electronique   éteint au jour 1056
+graine 2 : ordinateur     éteint au jour 1083
+graine 2 : bijoux         éteint au jour 1108
+graine 2 : cours          éteint au jour 1123 (de nouveau produit à la fin)
+graine 2 : carburant      éteint au jour 1132
+graine 2 : soins          éteint au jour 1415 (de nouveau produit à la fin)
+graine 3 : fer            éteint au jour 20
+graine 3 : bauxite        éteint au jour 104
+graine 3 : cpu            éteint au jour 155
+graine 3 : or             éteint au jour 187
+graine 3 : cuivre         éteint au jour 215
+graine 3 : conception     éteint au jour 247
+graine 3 : plastique      éteint au jour 271
+graine 3 : aluminium      éteint au jour 335
+graine 3 : cours          éteint au jour 415 (de nouveau produit à la fin)
+graine 3 : soins          éteint au jour 428 (de nouveau produit à la fin)
+graine 3 : poisson        éteint au jour 432
+graine 3 : electronique   éteint au jour 640
+graine 3 : acier          éteint au jour 654
+graine 3 : machines       éteint au jour 765
+graine 3 : ordinateur     éteint au jour 946
+graine 3 : repas          éteint au jour 1108
+graine 3 : reparation     éteint au jour 1135 (de nouveau produit à la fin)
+graine 3 : genie          éteint au jour 1149
+graine 3 : bijoux         éteint au jour 1169
+graine 3 : petrole        éteint au jour 1174
+graine 4 : cpu            éteint au jour 154
+graine 4 : bauxite        éteint au jour 159
+graine 4 : or             éteint au jour 215
+graine 4 : cuivre         éteint au jour 253
+graine 4 : aluminium      éteint au jour 278
+graine 4 : conception     éteint au jour 298
+graine 4 : fer            éteint au jour 301
+graine 4 : bijoux         éteint au jour 367
+graine 4 : repas          éteint au jour 367
+graine 4 : poisson        éteint au jour 371
+graine 4 : plastique      éteint au jour 374
+graine 4 : acier          éteint au jour 377
+graine 4 : petrole        éteint au jour 382
+graine 4 : ordinateur     éteint au jour 384
+graine 4 : carburant      éteint au jour 385
+graine 4 : genie          éteint au jour 433
+graine 4 : cours          éteint au jour 487 (de nouveau produit à la fin)
+graine 4 : soins          éteint au jour 499 (de nouveau produit à la fin)
+graine 4 : voyage         éteint au jour 627 (de nouveau produit à la fin)
+graine 4 : machines       éteint au jour 720
+graine 4 : electronique   éteint au jour 1354
+graine 5 : bauxite        éteint au jour 130
+graine 5 : cours          éteint au jour 143 (de nouveau produit à la fin)
+graine 5 : cpu            éteint au jour 146
+graine 5 : soins          éteint au jour 159 (de nouveau produit à la fin)
+graine 5 : conception     éteint au jour 171
+graine 5 : aluminium      éteint au jour 208
+graine 5 : cuivre         éteint au jour 227
+graine 5 : grain          éteint au jour 252
+graine 5 : betail         éteint au jour 252
+graine 5 : plastique      éteint au jour 282
+graine 5 : compta         éteint au jour 428 (de nouveau produit à la fin)
+graine 5 : or             éteint au jour 456
+graine 5 : machines       éteint au jour 501
+graine 5 : logement       éteint au jour 601 (de nouveau produit à la fin)
+graine 5 : voyage         éteint au jour 673 (de nouveau produit à la fin)
+graine 5 : pub            éteint au jour 711 (de nouveau produit à la fin)
+graine 5 : fer            éteint au jour 901
+graine 5 : ordinateur     éteint au jour 1041
+graine 5 : repas          éteint au jour 1064
+graine 5 : pain           éteint au jour 1097
+graine 5 : viande         éteint au jour 1099
+graine 5 : petrole        éteint au jour 1100
+graine 5 : loisirs        éteint au jour 1133
+graine 5 : electronique   éteint au jour 1177
+graine 5 : carburant      éteint au jour 1277
+graine 5 : genie          éteint au jour 1361
+
+Résumé (240 citoyens, 5 graines × 1500 jours, filets actifs, modules coupés buildings, jobs, entrepreneurship, products, banking, trade=1, tradeWaves=1, floatingFx=1, foreignDemand=1) :
+  Pétrole                éteint dans 5/5 graines, jours 90 / 596 / 1174 (min / médiane / max), revenu à la fin dans 0
+  Cuivre                 éteint dans 5/5 graines, jours 139 / 215 / 253 (min / médiane / max), revenu à la fin dans 0
+  Minerai de fer         éteint dans 5/5 graines, jours 20 / 275 / 901 (min / médiane / max), revenu à la fin dans 0
+  Processeurs            éteint dans 5/5 graines, jours 141 / 146 / 155 (min / médiane / max), revenu à la fin dans 0
+  Conception de puces    éteint dans 5/5 graines, jours 157 / 247 / 333 (min / médiane / max), revenu à la fin dans 0
+  Bauxite                éteint dans 5/5 graines, jours 104 / 159 / 197 (min / médiane / max), revenu à la fin dans 0
+  Aluminium              éteint dans 5/5 graines, jours 169 / 278 / 335 (min / médiane / max), revenu à la fin dans 0
+  Or                     éteint dans 5/5 graines, jours 178 / 187 / 456 (min / médiane / max), revenu à la fin dans 0
+  Ordinateurs            éteint dans 5/5 graines, jours 180 / 946 / 1083 (min / médiane / max), revenu à la fin dans 0
+  Plastique              éteint dans 5/5 graines, jours 230 / 282 / 374 (min / médiane / max), revenu à la fin dans 0
+  Électronique           éteint dans 5/5 graines, jours 334 / 1056 / 1354 (min / médiane / max), revenu à la fin dans 0
+  Machines               éteint dans 5/5 graines, jours 347 / 578 / 765 (min / médiane / max), revenu à la fin dans 0
+  Formation              éteint dans 5/5 graines, jours 143 / 464 / 1123 (min / médiane / max), revenu à la fin dans 5
+  Soins de santé         éteint dans 5/5 graines, jours 159 / 470 / 1415 (min / médiane / max), revenu à la fin dans 5
+  Ingénierie             éteint dans 4/5 graines, jours 180 / 1149 / 1361 (min / médiane / max), revenu à la fin dans 1
+  Acier                  éteint dans 4/5 graines, jours 355 / 654 / 928 (min / médiane / max), revenu à la fin dans 0
+  Poisson                éteint dans 4/5 graines, jours 371 / 1056 / 1469 (min / médiane / max), revenu à la fin dans 0
+  Bijoux                 éteint dans 3/5 graines, jours 367 / 1108 / 1169 (min / médiane / max), revenu à la fin dans 0
+  Carburant              éteint dans 3/5 graines, jours 385 / 1132 / 1277 (min / médiane / max), revenu à la fin dans 0
+  Repas                  éteint dans 3/5 graines, jours 367 / 1064 / 1108 (min / médiane / max), revenu à la fin dans 0
+  Viande                 éteint dans 2/5 graines, jours 167 / 1099 / 1099 (min / médiane / max), revenu à la fin dans 0
+  Voyages                éteint dans 2/5 graines, jours 627 / 673 / 673 (min / médiane / max), revenu à la fin dans 2
+  Réparations            éteint dans 1/5 graines, jours 1135 / 1135 / 1135 (min / médiane / max), revenu à la fin dans 1
+  Céréales               éteint dans 1/5 graines, jours 252 / 252 / 252 (min / médiane / max), revenu à la fin dans 0
+  Bétail                 éteint dans 1/5 graines, jours 252 / 252 / 252 (min / médiane / max), revenu à la fin dans 0
+  Comptabilité           éteint dans 1/5 graines, jours 428 / 428 / 428 (min / médiane / max), revenu à la fin dans 1
+  Logement               éteint dans 1/5 graines, jours 601 / 601 / 601 (min / médiane / max), revenu à la fin dans 1
+  Publicité              éteint dans 1/5 graines, jours 711 / 711 / 711 (min / médiane / max), revenu à la fin dans 1
+  Pain                   éteint dans 1/5 graines, jours 1097 / 1097 / 1097 (min / médiane / max), revenu à la fin dans 0
+  Loisirs                éteint dans 1/5 graines, jours 1133 / 1133 / 1133 (min / médiane / max), revenu à la fin dans 0
+
+Jours sans producteur actif et causes (part des jours sans producteur) ; total 1176.8 jours-biens pour 100 jours :
+  bien                    jours     % renais.  signal_import signal_aucun  main_oeuvre    viabilite      capital     possible       public    coproduit
+  Processeurs              6766    90       0            0 %        100 %            ·            ·            ·            ·            ·            ·
+  Bauxite                  6655    89       1            1 %         99 %            ·            ·            ·            ·            ·            ·
+  Cuivre                   6459    86       0           16 %         84 %            ·            ·            ·            ·            ·            ·
+  Conception de puces      6299    84       0            2 %         98 %            ·            ·            ·            ·            ·            ·
+  Or                       6284    84       0           11 %         89 %            ·            ·            ·            ·            ·            ·
+  Aluminium                6214    83       0            0 %        100 %            ·            ·            ·            ·            ·            ·
+  Plastique                5995    80       0           86 %         14 %            ·            ·            ·            ·            ·            ·
+  Minerai de fer           5668    76       1            9 %         91 %            ·            ·            ·            ·            ·            ·
+  Machines                 4594    61       0           35 %         65 %            ·            ·            ·            ·            ·            ·
+  Pétrole                  4163    56       0           37 %         63 %            ·            ·            ·            ·            ·            ·
+  Ordinateurs              3871    52       0            3 %         97 %            ·            ·            ·            ·            ·            ·
+  Acier                    3690    49       0           94 %          6 %            ·            ·            ·            ·            ·            ·
+  Électronique             2944    39       0          100 %          0 %            ·            ·            ·            ·            ·            ·
+  Poisson                  2676    36       0           18 %         82 %            ·            ·            ·            ·            ·            ·
+  Ingénierie               2656    35       1              ·         73 %          2 %         24 %            ·          0 %            ·            ·
+  Repas                    1964    26       0           96 %          4 %            ·            ·            ·            ·            ·            ·
+  Bijoux                   1859    25       0           73 %         27 %            ·            ·            ·            ·            ·            ·
+  Viande                   1736    23       0          100 %          0 %            ·            ·            ·            ·            ·            ·
+  Carburant                1709    23       0           96 %          4 %            ·            ·            ·            ·            ·            ·
+  Céréales                 1249    17       0            7 %         93 %            ·            ·            ·            ·            ·            ·
+  Bétail                   1249    17       0              ·            ·            ·            ·            ·            ·            ·        100 %
+  Formation                1228    16      14              ·            ·            ·            ·            ·            ·        100 %            ·
+  Soins de santé           1091    15      10              ·            ·            ·            ·            ·            ·        100 %            ·
+  Pain                      404     5       0          100 %          0 %            ·            ·            ·            ·            ·            ·
+  Loisirs                   368     5       0              ·        100 %            ·            ·            ·            ·            ·            ·
+  Réparations               240     3       1              ·            ·         19 %         81 %            ·            ·            ·            ·
+  Publicité                  96     1       1              ·         33 %            ·         66 %            ·          1 %            ·            ·
+  Logement                   77     1       2              ·            ·            ·            ·         96 %          4 %            ·            ·
+  Voyages                    31     0       2              ·            ·            ·         48 %         52 %            ·            ·            ·
+  Comptabilité               25     0       2              ·            ·         76 %         20 %            ·          4 %            ·            ·
