@@ -220,3 +220,22 @@ class Pill extends StatelessWidget {
         child: Text(text, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
       );
 }
+
+
+/// Liste de hauteur fixe qui défile à l'intérieur : son contenu peut changer à chaque rafraîchissement (alertes, journaux)
+/// sans que la boîte grandisse ou rétrécisse, donc sans déplacer ce qui est en dessous.
+class FixedScrollBox extends StatelessWidget {
+  final double height;
+  final List<Widget> children;
+  const FixedScrollBox({super.key, required this.height, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      child: Scrollbar(
+        child: ListView(padding: EdgeInsets.zero, primary: false, children: children),
+      ),
+    );
+  }
+}

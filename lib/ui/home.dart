@@ -320,7 +320,8 @@ class _AlertBadge extends StatelessWidget {
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(n == 0 ? Icons.check_circle_outline : Icons.warning_amber_rounded, size: 16, color: col),
               const SizedBox(width: 4),
-              Text('$n', style: mono(col, 12.5, weight: FontWeight.w800)),
+              // largeur fixe : le badge ne change pas de taille avec le nombre d'alertes
+              SizedBox(width: 22, child: Text('$n', textAlign: TextAlign.center, style: mono(col, 12.5, weight: FontWeight.w800))),
             ]),
           ),
         ),
@@ -390,11 +391,17 @@ class SidePanel extends StatelessWidget {
           children: [
             for (var i = 0; i < Tabs.labels.length; i++)
               ChoiceChip(
-                label: Text(
-                    i == Tabs.diagnostic && ctrl.sim.monitor.active.isNotEmpty
-                        ? '${Tabs.labels[i]} (${ctrl.sim.monitor.active.length})'
-                        : Tabs.labels[i],
-                    style: const TextStyle(fontSize: 12.5)),
+                // le compteur de l'onglet Diagnostic a une largeur fixe : sinon l'onglet change de largeur à chaque
+                // alerte, les onglets passent d'une ligne à l'autre et tout le panneau monte et descend
+                label: i == Tabs.diagnostic
+                    ? Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text(Tabs.labels[i], style: const TextStyle(fontSize: 12.5)),
+                        SizedBox(
+                            width: 30,
+                            child: Text(ctrl.sim.monitor.active.isEmpty ? '' : '(${ctrl.sim.monitor.active.length})',
+                                textAlign: TextAlign.right, style: const TextStyle(fontSize: 12.5))),
+                      ])
+                    : Text(Tabs.labels[i], style: const TextStyle(fontSize: 12.5)),
                 visualDensity: VisualDensity.compact,
                 selected: ctrl.panelTab == i,
                 selectedColor: pal.accentSoft,

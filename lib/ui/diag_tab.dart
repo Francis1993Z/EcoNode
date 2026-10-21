@@ -34,9 +34,15 @@ class _DiagnosticTabState extends State<DiagnosticTab> {
     final log = sim.nets.log.reversed.where((e) => netFilter == 'all' || e.net == netFilter).take(40).toList();
 
     return ListView(padding: const EdgeInsets.all(12), children: [
+      // hauteur fixe : l'arrivée ou la fin d'une alerte ne déplace pas le reste du panneau (on défile dans la boîte)
       Section('Alertes actives (${alerts.length})', [
-        if (alerts.isEmpty) Text('Aucune anomalie détectée.', style: TextStyle(color: pal.ok, fontSize: 12.5)),
-        for (final a in alerts) _AlertCard(a, sim.day, ctrl),
+        FixedScrollBox(
+          height: 240,
+          children: [
+            if (alerts.isEmpty) Text('Aucune anomalie détectée.', style: TextStyle(color: pal.ok, fontSize: 12.5)),
+            for (final a in alerts) _AlertCard(a, sim.day, ctrl),
+          ],
+        ),
       ]),
       Section('Filets de sécurité', [
         Text(
@@ -115,18 +121,24 @@ class _DiagnosticTabState extends State<DiagnosticTab> {
               ),
           ]),
         ),
-        if (log.isEmpty) Text('Aucun déclenchement.', style: TextStyle(color: pal.ink3, fontSize: 12)),
-        for (final e in log)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(width: 44, child: Text('j${e.day}', style: mono(pal.ink3, 11))),
-              Expanded(
-                child: Text('${Safeguards.labels[e.net]} · ${e.agent}${e.amount > 0 ? ' · ${money0(e.amount)}' : ''} — ${e.reason}',
-                    style: TextStyle(color: pal.ink2, fontSize: 12)),
+        FixedScrollBox(
+          height: 220,
+          children: [
+            if (log.isEmpty) Text('Aucun déclenchement.', style: TextStyle(color: pal.ink3, fontSize: 12)),
+            for (final e in log)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  SizedBox(width: 44, child: Text('j${e.day}', style: mono(pal.ink3, 11))),
+                  Expanded(
+                    child: Text(
+                        '${Safeguards.labels[e.net]} · ${e.agent}${e.amount > 0 ? ' · ${money0(e.amount)}' : ''} — ${e.reason}',
+                        style: TextStyle(color: pal.ink2, fontSize: 12)),
+                  ),
+                ]),
               ),
-            ]),
-          ),
+          ],
+        ),
       ]),
       Section('Invariants comptables', [
         Text(

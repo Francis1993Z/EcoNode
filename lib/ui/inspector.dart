@@ -59,16 +59,23 @@ Widget _title(BuildContext context, String text) =>
 List<Alert> _alertsFor(SimController ctrl, int firmId) =>
     ctrl.sim.monitor.sorted.where((a) => a.key.endsWith(':$firmId')).toList();
 
+/// Alertes d'une entreprise : une boîte de hauteur fixe, toujours présente (même vide), pour que l'arrivée ou la fin d'une
+/// alerte ne déplace pas le reste de la fiche.
 Widget _alertBox(BuildContext context, List<Alert> alerts) {
   final pal = Pal.of(context);
-  if (alerts.isEmpty) return const SizedBox.shrink();
-  return Section('Alertes', [
-    for (final a in alerts)
-      Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Text('${a.critical ? '⛔' : '⚠'} ${alertLabels[a.type]} : ${a.what} (depuis j${a.since})',
-            style: TextStyle(color: a.critical ? pal.bad : pal.warn, fontSize: 12)),
-      ),
+  return Section('Alertes (${alerts.length})', [
+    FixedScrollBox(
+      height: 54,
+      children: [
+        if (alerts.isEmpty) Text('Aucune alerte.', style: TextStyle(color: pal.ink3, fontSize: 12)),
+        for (final a in alerts)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text('${a.critical ? '⛔' : '⚠'} ${alertLabels[a.type]} : ${a.what} (depuis j${a.since})',
+                style: TextStyle(color: a.critical ? pal.bad : pal.warn, fontSize: 12)),
+          ),
+      ],
+    ),
   ]);
 }
 
