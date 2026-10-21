@@ -260,6 +260,12 @@ const Map<String, String> funnelLabels = {
 void applyParam(Params p, String k, String v) {
   bool b() => v == '1' || v == 'true';
   switch (k) {
+    case 'policyPassThrough': // banque centrale : le taux de base des prêts suit le taux directeur
+      p.policyPassThrough = b();
+    case 'policyRate':
+      p.policyRate = double.parse(v);
+    case 'policySpread':
+      p.policySpread = double.parse(v);
     case 'excessCashReturn': // stabilisation : distribution de l'excédent de trésorerie
       p.excessCashReturn = b();
     case 'excessCashDays':

@@ -54,7 +54,7 @@ extension SimBanking on Sim {
   double _risk(Citizen c) => ((900 - creditScore(c)) / 600).clamp(0.0, 1.0).toDouble();
 
   double personalLoanRate(Citizen c) =>
-      params.interestRate + bankLoanSpread(c.bankId) + params.creditRiskPremium * _risk(c) + 0.05 * creditTightness(c.bankId);
+      baseRate() + bankLoanSpread(c.bankId) + params.creditRiskPremium * _risk(c) + 0.05 * creditTightness(c.bankId);
 
   double cardRateOf(Citizen c) =>
       params.cardRate + bankCardSpread(c.bankId) + 0.5 * params.creditRiskPremium * _risk(c) + 0.05 * creditTightness(c.bankId);

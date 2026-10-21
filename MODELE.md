@@ -897,6 +897,15 @@ jours) : reprise par la banque la plus solide, actionnaires effacés, déposants
 l'entrepreneuriat (connaissance du secteur : jours dans un cabinet comptable) sur le profit espéré à la part de marché restante
 1/(n+1) moins le coût fixe ; capital minimum absolu `bankMinCapital` versé par `transfer()`, frais irrécupérables `bankEntryCost`.
 
+### 6.20 Banque centrale : taux directeur (`Params.policyPassThrough`)
+
+Coupée par défaut dans le moteur ; l'interface l'active (nœud « Banque centrale » du graphe). Avec elle, le taux de base de
+tous les prêts (`Sim.baseRate`) est le taux directeur `policyRate` + `policySpread` au lieu du taux fixe `interestRate` :
+prêts aux entreprises (`loanRate`), hypothèques, prêts personnels, test de paiement des fondateurs et plan de départ. Aux
+valeurs par défaut, 3 % + 3 % = 6 % = `interestRate` exactement : l'activer ne change rien tant que le taux ne bouge pas.
+Le taux directeur garde ses autres rôles (marché interbancaire, plafond des taux de dépôt). Pas de bilan propre ni de
+création de monnaie : c'est un levier de prix du crédit.
+
 ---
 
 ## 7. Vérification

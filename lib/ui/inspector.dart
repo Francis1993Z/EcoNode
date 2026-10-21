@@ -36,6 +36,8 @@ class InspectorTab extends StatelessWidget {
         return _StateView(ctrl);
       case 'B':
         return _BankView(ctrl);
+      case 'BC':
+        return _CentralBankView(ctrl);
       case 'X':
         return _WorldView(ctrl);
       default:
@@ -1410,4 +1412,87 @@ Widget _firmBankSection(BuildContext context, SimController ctrl, Firm f) {
     KV('Dette', money0(f.debt)),
     if (f.workingDebt > 0) KV('dont fonds de roulement', money0(f.workingDebt)),
   ]);
+}
+
+
+/// Banque centrale : le taux directeur et sa transmission aux taux des prêts.
+class _CentralBankView extends StatelessWidget {
+  final SimController ctrl;
+  const _CentralBankView(this.ctrl);
+
+  @override
+  Widget build(BuildContext context) {
+    final pal = Pal.of(context);
+    final sim = ctrl.sim;
+    final p = sim.params;
+    void upd(void Function() f) {
+      f();
+      ctrl.touch();
+    }
+
+    String rate(double v) => '${fmtNum(v * 100, 2)} %';
+    final base = sim.baseRate();
+    final h = sim.history;
+    return ListView(padding: const EdgeInsets.all(12), children: [
+      _title(context, 'Banque centrale'),
+      const SizedBox(height: 4),
+      Text(
+          'Elle fixe le taux directeur. Quand la transmission est active, toutes les banques prêtent au taux directeur plus '
+          'leur marge : prêts aux entreprises, hypothèques, prêts personnels et cartes suivent. Monter le taux freine le '
+          'crédit (moins de monnaie créée, prix et salaires qui ralentissent) ; le baisser le relance.',
+          style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+      Section('Politique monétaire', [
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Les banques suivent le taux directeur', style: TextStyle(fontSize: 13)),
+          subtitle: Text(
+              p.policyPassThrough
+                  ? 'Taux de base des prêts = taux directeur + marge des banques.'
+                  : 'Coupé : les banques prêtent au taux fixe de ${rate(p.interestRate)} ; le taux directeur ne sert qu’au '
+                      'marché interbancaire (module banques).',
+              style: const TextStyle(fontSize: 11)),
+          value: p.policyPassThrough,
+          onChanged: (v) => upd(() => p.policyPassThrough = v),
+        ),
+        ParamSlider(
+            label: 'Taux directeur',
+            value: p.policyRate,
+            min: 0,
+            max: 0.15,
+            format: rate,
+            hint: 'Taux annuel. Prend effet sur les intérêts du jour suivant, pour les prêts en cours comme pour les nouveaux.',
+            onChanged: (v) => upd(() => p.policyRate = (v * 400).round() / 400)),
+        ParamSlider(
+            label: 'Marge des banques sur le taux directeur',
+            value: p.policySpread,
+            min: 0,
+            max: 0.08,
+            format: rate,
+            hint: 'Ce que les banques ajoutent au taux directeur pour leurs prêts (avant la prime de risque de chaque emprunteur).',
+            onChanged: (v) => upd(() => p.policySpread = (v * 400).round() / 400)),
+      ]),
+      Section('Taux qui en résultent', [
+        KV('Taux de base des prêts', rate(base)),
+        KV('Entreprise sans dette (machine)', rate(base)),
+        KV('Entreprise endettée à 80 % de ses machines', rate(base + p.riskSpread * 1.0)),
+        if (sim.modules.buildings) ...[
+          KV('Hypothèque, mise de fonds de 50 % ou plus', rate(base)),
+          KV('Hypothèque, mise de fonds de 5 %', rate(base + p.mortgageSpreadMax)),
+        ],
+        if (sim.modules.banking) ...[
+          KV('Prêt personnel (bonne cote)', rate(base + p.loanRateSpread)),
+          KV('Carte de crédit (base)', rate(p.cardRate)),
+          KV('Plafond des taux de dépôt', rate(p.policyRate)),
+        ],
+      ]),
+      if (h.length > 1)
+        Section('Effets à surveiller', [
+          KV('Masse monétaire', kmoney(h.last.total)),
+          KV('Dette des entreprises et hypothèques', kmoney(h.last.debt)),
+          KV('Indice des prix (départ = 100)', fmtNum(h.last.cpi * 100, 0)),
+          KV('Chômage', pct(h.last.unemp)),
+        ]),
+    ]);
+  }
 }

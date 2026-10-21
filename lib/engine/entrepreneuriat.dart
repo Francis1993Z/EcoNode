@@ -199,7 +199,7 @@ extension SimEntrepreneurship on Sim {
     final sg = safeguards;
     final p = params;
     if (!(modules.bankRegulation || sg.credit)) return null;
-    final pay = loan * (p.interestRate / 365 + 1 / p.loanTermDays);
+    final pay = loan * (baseRate() / 365 + 1 / p.loanTermDays);
     if (pay > sg.maxPaymentRatio * valueAdded) return 'pret_paiements';
     if (bank.equity < sg.minCapitalRatio * (totalDebt() + loan)) return 'pret_fonds_propres';
     return null;

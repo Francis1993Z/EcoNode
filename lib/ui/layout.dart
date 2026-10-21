@@ -74,5 +74,7 @@ void autoLayout(Sim sim) {
   y += homesHeight() + kGapY;
   sim.nodePos['B'] = [x, y];
   y += kSmallH + kGapY;
+  sim.nodePos['BC'] = [x, y]; // banque centrale (interface seulement : le moteur n'en a pas besoin)
+  y += kSmallH + kGapY;
   sim.nodePos['X'] = [x, y];
 }
