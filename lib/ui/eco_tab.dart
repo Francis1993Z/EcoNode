@@ -319,6 +319,7 @@ class _ModelTabState extends State<ModelTab> {
       _productsSection(context, ctrl, upd),
       _creditSection(context, ctrl, upd),
       _banksSection(context, ctrl, upd),
+      _excessCashSection(context, ctrl, upd),
       Section('Nouvelle partie', [
         Row(children: [
           Expanded(
@@ -765,5 +766,46 @@ Widget _banksSection(BuildContext context, SimController ctrl, void Function(voi
             minY: 0,
             series: [Series('banques', pal.money, downsample([for (final n in sim.bankCountHist) n.toDouble()]))]),
     ],
+  ]);
+}
+
+
+/// Distribution de l'excédent de trésorerie (Params.excessCashReturn) : l'interrupteur et ses deux réglages.
+Widget _excessCashSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final p = ctrl.sim.params;
+  return Section('Excédent de trésorerie des entreprises', [
+    Text(
+        'Une entreprise qui garde bien plus d’argent que ce dont elle a besoin (réserve de jours de coûts, plus sa dette) en '
+        'reverse chaque jour une part à son propriétaire, imposée comme un dividende. Sans cette règle, l’argent des ventes '
+        'de logements financées par hypothèque dort chez le bailleur (ce n’est pas un bénéfice, le dividende ne le distribue '
+        'pas) et les ménages s’appauvrissent en remboursant. Le dividende ordinaire (test de solvabilité I1) ne change pas. '
+        'Effet mesuré surtout avec les bâtiments et les banques ; l’argent qui circule de nouveau fait monter les prix.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Distribuer l’excédent de trésorerie', style: TextStyle(fontSize: 13)),
+      subtitle: const Text('Prend effet au prochain jour. Le fonds de reconstruction d’un bailleur est alors plafonné au coût '
+          'de deux logements neufs (ses deux chantiers au plus).', style: TextStyle(fontSize: 11)),
+      value: p.excessCashReturn,
+      onChanged: (v) => upd(() => p.excessCashReturn = v),
+    ),
+    ParamSlider(
+        label: 'Réserve gardée (jours de coûts)',
+        value: p.excessCashDays,
+        min: 10,
+        max: 365,
+        format: (v) => '${fmtNum(v, 0)} j',
+        hint: 'Salaires, intrants et frais fixes de ce nombre de jours, plus la dette, restent dans l’entreprise.',
+        onChanged: (v) => upd(() => p.excessCashDays = v.roundToDouble())),
+    ParamSlider(
+        label: 'Part de l’excédent versée par jour',
+        value: p.excessCashRate,
+        min: 0.002,
+        max: 0.2,
+        format: pct,
+        hint: 'À 2 % par jour, les trois quarts d’un excédent sont versés en environ deux mois.',
+        onChanged: (v) => upd(() => p.excessCashRate = (v * 1000).round() / 1000)),
   ]);
 }
