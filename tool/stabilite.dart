@@ -260,6 +260,12 @@ const Map<String, String> funnelLabels = {
 void applyParam(Params p, String k, String v) {
   bool b() => v == '1' || v == 'true';
   switch (k) {
+    case 'excessCashReturn': // stabilisation : distribution de l'excédent de trésorerie
+      p.excessCashReturn = b();
+    case 'excessCashDays':
+      p.excessCashDays = double.parse(v);
+    case 'excessCashRate':
+      p.excessCashRate = double.parse(v);
     case 'sellerSample': // recherche limitée des vendeurs (0 : tous)
       p.sellerSample = int.parse(v);
     case 'sellerHabit': // test : 0 supprime l'habitude du dernier vendeur
