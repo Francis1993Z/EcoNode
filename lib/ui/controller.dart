@@ -81,7 +81,9 @@ class SimController extends ChangeNotifier {
               ..policyPassThrough = true
               ..tradeWaves = true // douane : prix mondiaux en vagues (sans effet tant que les frontières sont fermées)
               ..floatingFx = true // douane : taux de change flottant (idem)
-              ..foreignDemand = true, // douane : commandes de l'étranger (idem)
+              ..foreignDemand = true // douane : commandes de l'étranger (idem)
+              ..revival = true // renaissance des filières éteintes (MODELE.md § 6.22)
+              ..revivalPlannedDemand = true, // demande dérivée comptée au plan de l'aval : moins de relances vouées à l'échec
             modules: Modules()
               ..jobs = true
               ..entrepreneurship = true
@@ -213,7 +215,9 @@ class SimController extends ChangeNotifier {
           ..policyPassThrough = true // banque centrale : voir le constructeur
           ..tradeWaves = true
           ..floatingFx = true
-          ..foreignDemand = true,
+          ..foreignDemand = true
+          ..revival = true // renaissance des filières : voir le constructeur
+          ..revivalPlannedDemand = true,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();

@@ -14,20 +14,23 @@ class Section extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pal = Pal.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-      decoration: BoxDecoration(
+    // Une surface Material plutôt qu'une boîte décorée : les interrupteurs (SwitchListTile) qu'elle contient y peignent
+    // leur fond et leurs effets de clic, qu'une boîte colorée cacherait (Flutter le signale par une assertion).
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
         color: pal.sheet,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: pal.rule2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: pal.rule2)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title.toUpperCase(),
+                style: TextStyle(color: pal.ink3, fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+            const SizedBox(height: 8),
+            ...children,
+          ]),
+        ),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title.toUpperCase(),
-            style: TextStyle(color: pal.ink3, fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
-        const SizedBox(height: 8),
-        ...children,
-      ]),
     );
   }
 }

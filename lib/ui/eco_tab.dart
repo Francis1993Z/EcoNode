@@ -320,6 +320,7 @@ class _ModelTabState extends State<ModelTab> {
       _creditSection(context, ctrl, upd),
       _banksSection(context, ctrl, upd),
       _excessCashSection(context, ctrl, upd),
+      _revivalSection(context, ctrl, upd),
       Section('Nouvelle partie', [
         Row(children: [
           Expanded(
@@ -771,6 +772,39 @@ Widget _banksSection(BuildContext context, SimController ctrl, void Function(voi
 
 
 /// Distribution de l'excédent de trésorerie (Params.excessCashReturn) : l'interrupteur et ses deux réglages.
+/// Renaissance des filières éteintes (Params.revival, MODELE.md § 6.22).
+Widget _revivalSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final p = ctrl.sim.params;
+  return Section('Renaissance des filières', [
+    Text(
+        'Quand plus aucune entreprise ne produit un bien, la création d’entreprises ne voit d’ordinaire que la demande non '
+        'servie : un bien importé, ou un intrant dont l’aval a cessé de produire, ne renaît jamais. Avec la règle, le signal '
+        'compte aussi les importations et les besoins en intrants des entreprises d’aval ; la relance passe ensuite les '
+        'tests habituels (main-d’œuvre, viabilité, capital) et, frontières ouvertes, doit coûter moins cher qu’importer.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Relancer les filières éteintes', style: TextStyle(fontSize: 13)),
+      value: p.revival,
+      onChanged: (v) => upd(() => p.revival = v),
+    ),
+    if (p.revival)
+      SwitchListTile(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Besoins d’intrants comptés au plan de production', style: TextStyle(fontSize: 13)),
+        subtitle: const Text(
+            'La demande d’un intrant est celle que l’aval prévoit vraiment d’utiliser, pas ce que son équipe pourrait '
+            'produire : environ deux fois moins de relances et de faillites.',
+            style: TextStyle(fontSize: 11)),
+        value: p.revivalPlannedDemand,
+        onChanged: (v) => upd(() => p.revivalPlannedDemand = v),
+      ),
+  ]);
+}
+
 Widget _excessCashSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
   final pal = Pal.of(context);
   final p = ctrl.sim.params;

@@ -946,7 +946,8 @@ d'intrants disparaissent, les intrants importés rendent l'export non rentable, 
 
 ### 6.22 Renaissance des filières (`Params.revival`, `renaissance.dart`)
 
-Coupée par défaut. **Constat** (`tool/filieres.dart --causes`, 240 citoyens, 5 graines × 1 500 jours) : la création
+Coupée par défaut dans le moteur ; l'interface l'active avec la variante `revivalPlannedDemand` (onglet Modèle,
+section « Renaissance des filières »). **Constat** (`tool/filieres.dart --causes`, 240 citoyens, 5 graines × 1 500 jours) : la création
 automatique (§ 6.12) et le module entrepreneurship (§ 6.17) ne lisent qu'un signal, la demande non servie, notée quand un
 acheteur ne trouve aucune offre. Un bien sans producteur actif cesse vite de l'envoyer :
 
