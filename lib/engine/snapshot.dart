@@ -201,6 +201,10 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.fdMinMargin != d.fdMinMargin) 'fdMinMargin': _d(p.fdMinMargin),
     if (p.fdStart != d.fdStart) 'fdStart': _d(p.fdStart),
     if (p.fdMaxCap != d.fdMaxCap) 'fdMaxCap': _d(p.fdMaxCap),
+    if (p.revival != d.revival) 'revival': p.revival,
+    if (p.revivalHours != d.revivalHours) 'revivalHours': p.revivalHours,
+    if (p.revivalFullCost != d.revivalFullCost) 'revivalFullCost': p.revivalFullCost,
+    if (p.revivalPlannedDemand != d.revivalPlannedDemand) 'revivalPlannedDemand': p.revivalPlannedDemand,
   };
 }
 
@@ -358,7 +362,11 @@ Params _paramsFrom(Map j) => Params()
   ..fdGrowth = _rdOr(j['fdGrowth'], 0.02)
   ..fdMinMargin = _rdOr(j['fdMinMargin'], 0.05)
   ..fdStart = _rdOr(j['fdStart'], 0.1)
-  ..fdMaxCap = _rdOr(j['fdMaxCap'], 1);
+  ..fdMaxCap = _rdOr(j['fdMaxCap'], 1)
+  ..revival = (j['revival'] as bool?) ?? false
+  ..revivalHours = (j['revivalHours'] as bool?) ?? false
+  ..revivalFullCost = (j['revivalFullCost'] as bool?) ?? false
+  ..revivalPlannedDemand = (j['revivalPlannedDemand'] as bool?) ?? false;
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
@@ -961,6 +969,7 @@ extension SimSnapshot on Sim {
         if (ledgerTariffs != 0) 'ledgerTariffs': _d(ledgerTariffs),
         if (fxRate != 1 || fxImportsEma != 0 || fxExportsEma != 0) 'fx': [_d(fxRate), _d(fxImportsEma), _d(fxExportsEma)],
         if (foreignOrders.isNotEmpty) 'foreignOrders': _dm(foreignOrders),
+        if (importEma.isNotEmpty) 'importEma': _dm(importEma),
         if (banksFounded + banksClosed > 0) 'banksEntryExit': [banksFounded, banksClosed],
         if (consumerLent > 0 || consumerBankruptcies > 0)
           'consumerCredit': [
@@ -1047,6 +1056,7 @@ extension SimSnapshot on Sim {
           _dm(tradeFactor), _dm(tradeNoiseState), _d(ledgerTariffs), _d(fxRate), _d(fxImportsEma), _d(fxExportsEma),
           _dm(foreignOrders)
         ])),
+      if (importEma.isNotEmpty) 'renaissance': _fnv(j(_dm(importEma))),
       if (products.isNotEmpty) 'produits': _fnv(j([for (final p in products.values) _productJson(p), _dm(poorEma)])),
       'moniteur': _fnv(j(monitor.toJson())),
       'historique': _fnv(j(history.isEmpty ? null : _histJson(history.last))),
@@ -1118,6 +1128,9 @@ extension SimSnapshot on Sim {
     foreignOrders
       ..clear()
       ..addAll(j['foreignOrders'] == null ? const {} : _rdm(j['foreignOrders']));
+    importEma
+      ..clear()
+      ..addAll(j['importEma'] == null ? const {} : _rdm(j['importEma']));
     final ee = (j['banksEntryExit'] as List?) ?? const [0, 0];
     banksFounded = ee[0] as int;
     banksClosed = ee[1] as int;

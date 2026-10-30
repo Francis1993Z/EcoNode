@@ -839,6 +839,31 @@ class Params {
   double fdMinMargin = 0.05;
   double fdStart = 0.1;
   double fdMaxCap = 1;
+
+  // ---- Renaissance des filières (2026-10-21). Coupée par défaut. Voir MODELE.md § 6.22.
+  // Un bien qui n'a plus aucun producteur actif n'envoie souvent plus de signal d'entrée : frontières ouvertes,
+  // l'importation sert toute la demande (rien n'est « non servi ») ; en économie fermée, les transformateurs qui en
+  // avaient besoin ont cessé de produire, donc d'en acheter. Avec revival, le signal d'entrée d'un tel bien (création
+  // automatique et module entrepreneurship) est le plus grand de : la demande non servie, les importations lissées
+  // (~10 jours) et la demande dérivée, ce que les équipes des entreprises qui l'utilisent comme intrant pourraient
+  // transformer par jour. La viabilité reste celle de toute création : au prix du marché (l'importation, frontières
+  // ouvertes), les ventes doivent payer l'équipe et ses intrants.
+  // revivalHours (avec revival et le temps partiel, partTime) : l'entreprise qui relance un bien sans producteur garde la
+  // productivité nominale de son type et travaille à temps partiel, au lieu d'être créée à productivité réduite à la
+  // taille de la demande (« échelle minimale ») ; sa viabilité compte donc les heures nécessaires (au moins
+  // Sim.minHours d'un employé), pas des employés entiers. Variante coupée : mesurée (MODELE.md § 6.22), elle double les
+  // créations vouées à la faillite et relève le chômage en économie fermée.
+  // revivalFullCost (avec revival) : la viabilité d'une relance compte aussi les frais fixes attendus (comptabilité,
+  // entretien, intérêts du prêt de fondation ; une entreprise neuve n'a pas de machines, donc pas d'usure), et le prix de
+  // départ (coût complet par unité × markup) ne doit pas dépasser le prix d'import, frontières ouvertes. Voir
+  // Sim.revivalCostRefusal.
+  // revivalPlannedDemand (avec revival) : la demande dérivée d'un bien est comptée au plan de production des entreprises
+  // qui l'utilisent (tiré de la demande de leurs produits), au plus la capacité de leurs équipes ; sans elle, à la seule
+  // capacité des équipes, ce qui surestime ce qu'elles achèteront (Sim.derivedWant).
+  bool revival = false;
+  bool revivalHours = false;
+  bool revivalFullCost = false;
+  bool revivalPlannedDemand = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

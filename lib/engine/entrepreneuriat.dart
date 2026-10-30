@@ -158,8 +158,9 @@ extension SimEntrepreneurship on Sim {
       if (publicGood(g)) continue; // l'État fournit ce service
       if (g == 'logement' && modules.buildings) continue; // on construit, on ne fonde pas un bailleur sans bâtiment
       if (day - (_lastEntry[ty] ?? -100000) < p.entryCooldown) continue;
-      final want = entryWant(g); // demande non servie (module products : aussi faiblement servie)
+      var want = entryWant(g); // demande non servie (module products : aussi faiblement servie)
       if (want < 0) continue; // module products : marge des variétés en place peu attrayante
+      if (p.revival) want = math.max(want, revivalWant(g)); // bien sans producteur actif : signal de renaissance
       final perWorker0 = t.rate * t.outputs[g]!;
       if (want < p.entryMinShare * perWorker0) continue; // pas de signal : pas de projet
       if (c.skill + eps < t.skill) continue; // il travaillera dans son entreprise
@@ -176,13 +177,20 @@ extension SimEntrepreneurship on Sim {
       for (final e in t.outputs.entries) {
         revenue0 += batches * e.value * math.min(bestPrice(e.key), 2 * worldPrice[e.key]!);
       }
-      if (revenue0 < 1.1 * (team * wage + inputCost)) continue; // le marché est trop petit pour vivre
+      // Params.revivalHours : une relance à temps partiel ne paie que les heures nécessaires
+      final labour = p.revival ? entryLabour(g, w, team, wage) : team * wage;
+      if (revenue0 < 1.1 * (labour + inputCost)) continue; // le marché est trop petit pour vivre
       final capital = p.entCapitalMult * (10 * wage * team + 5 * inputCost);
       final own = math.min(c.money - buffer, capital);
       if (own < (modules.credit ? p.entMinOwnShare : 1.0) * capital) continue;
+      // Params.revivalFullCost : une relance paie aussi ses frais fixes (intérêts du prêt compris), et son prix de départ
+      // ne dépasse pas l'import ; le bénéfice attendu les déduit
+      final full = p.revival && p.revivalFullCost && !hasActiveProducer(g);
+      final loan = math.max(0.0, capital - own);
+      if (full && revivalCostRefusal(ty, w, team, wage, labour, inputCost, revenue0, loan) != null) continue;
       final k = sectorKnowledge(c, ty);
       final pS = (p.entSurviveBase + p.entSurviveKnowledge * k).clamp(0.05, 0.95).toDouble();
-      final profit0 = revenue0 - team * wage - inputCost;
+      final profit0 = revenue0 - labour - inputCost - (full ? entryFixedCost(ty, team, loan) : 0);
       final income = wage + math.max(0.0, profit0) * (1 - p.taxRate); // son salaire et ses dividendes, s'il réussit
       final fallback = p.benefit; // s'il échoue, il retourne au chômage
       final riskCost = aversion * (1 - pS) * own / 365; // sa mise perdue, répartie sur un an, pesée par son aversion
@@ -212,6 +220,7 @@ extension SimEntrepreneurship on Sim {
     final g = t.outputs.keys.first;
     final own = math.min(c.money - buffer, pr.capital);
     final loan = quantize(pr.capital - own);
+    final hours = p.revival && revivesByHours(g); // Params.revivalHours : relance à temps partiel, lue avant la fondation
     if (own < (modules.credit ? p.entMinOwnShare : 1.0) * pr.capital - eps) return 'capital';
     if (loan > eps) {
       if (!modules.credit || day < 0) return 'pret_credit_coupe';
@@ -232,7 +241,7 @@ extension SimEntrepreneurship on Sim {
     if (c.employer != null) _fire(firm(c.employer!), c, 'départ pour fonder une entreprise');
     final f = _newFirm(pr.type, '${t.label} ${c.name.split(' ').last}', 0, c.id, slot[0], slot[1]);
     // module products, catégorie différenciée : pas de fraction d'employé (la variété fait vivre un employé entier)
-    f.rate = productsActive && isDifferentiated(g) ? t.rate : t.rate * Sim._minScale(batches / t.rate, 1);
+    f.rate = (productsActive && isDifferentiated(g)) || hours ? t.rate : t.rate * Sim._minScale(batches / t.rate, 1);
     f.wage = pr.wage;
     if (modules.jobs) {
       f.offer = marketOffer(t.skill);

@@ -197,7 +197,7 @@ ristournes, refus. Identité de bilan : réserves + prêts = dépôts + fonds pr
 | 10 | Capital (ordre `capital`) : usure, service de la dette, investissement ; ristourne de la Caisse | `_capital`, `_invest` | toujours |
 | 11 | Décisions des entreprises : prix, plan d'embauche, salaires (module `jobs` : le salaire affiché seulement), profits, dividendes ; flux lissés pour l'affichage | `_decide`, `jobs.dart:_adjustOffer` | toujours |
 | 12 | Renflouement (filet) ; redistribution du surplus de l'État | `_finance` | renflouement : filet actif |
-| 13 | `unmetEma` ← 0,9 × `unmetEma` + 0,1 × demande non servie du jour | `step` | toujours |
+| 13 | `unmetEma` ← 0,9 × `unmetEma` + 0,1 × demande non servie du jour ; importations lissées par bien (`importEma`, § 6.22) | `step`, `renaissance.dart:_revivalEvening` | importations : `revival` |
 | 14 | Sorties puis entrées d'entreprises | `_entryExit` | module entrée |
 | 15 | Enregistrement du jour (historique, indice des prix) | `_record` | toujours |
 | 16 | Résumé des filets ; invariants comptables ; détecteurs | `_netSummary`, `_checkInvariants`, `monitor.dart:Monitor.check` | toujours |
@@ -369,6 +369,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `tradeWaves`, `tradeWaveAmp`, `tradeWavePeriod`, `tradeNoise`, `tariff` | non, 0,3, 365 j, 0,02, 0 | douane (§ 6.21) : prix mondiaux en vagues, droit sur les importations | choix de jeu |
 | `floatingFx`, `fxSpeed` | non, 0,05 | douane (§ 6.21) : taux de change flottant et sa vitesse d'ajustement par jour | mesure § 6.21 |
 | `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
+| `revival`, `revivalHours`, `revivalFullCost`, `revivalPlannedDemand` | non, non, non, non | renaissance des filières (§ 6.22) : signal d'entrée d'un bien sans producteur actif ; relance à temps partiel ; viabilité d'une relance au coût complet et prix de départ face à l'import ; demande dérivée au plan de production de l'aval | mesure § 6.22 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
 | `priceStep`, `wageStep` | 0,02, 0,015 | pas d'ajustement de la marge et du salaire | choix de jeu (tâche 3 du plan : lissage) |
 | `priceMaxDaily`, `wageMaxDaily` | 1,5 %/j | variation quotidienne maximale décidée par l'entreprise | coûts d'étiquetage, contrats, réputation ; sous le plafond de 2 %/j du filet |
@@ -695,7 +696,8 @@ Choix de jeu : c'est le débouché de la filière informatique.
   - **sans producteur actif**, l'entrée est possible tout de suite ;
   - **concurrente**, il faut en plus : jour 100 ou après ; moins de 3 producteurs actifs ; une demande qui occupe un
     employé ; des producteurs tous rentables et vendant à au moins `entryMarginRatio` × leur coût ;
-  - délai : `entryCooldown` jours entre deux créations d'un même type.
+  - délai : `entryCooldown` jours entre deux créations d'un même type ;
+  - avec `revival` (§ 6.22), le signal d'un bien sans producteur actif inclut ses importations et sa demande dérivée.
 - **Fondation** (`_found`) :
   - équipe de 1 à 3 personnes, au salaire du marché ;
   - il faut assez de chômeurs qualifiés : au plein emploi, une nouvelle entreprise ne fait que débaucher ses voisines ;
@@ -941,6 +943,74 @@ lié à la demande d'ici, une entreprise de transformation (restaurant : intrant
 Mesure (240 citoyens, 5 graines, chômage moyen des jours 1000 à 1500) : frontières fermées 23 %, change seul 38 %,
 change + demande étrangère 30 % (15 à 20 % dans 4 graines ; la cinquième s'effondre vers le jour 900 : des filières
 d'intrants disparaissent, les intrants importés rendent l'export non rentable, et le taux au plafond n'y peut rien).
+
+### 6.22 Renaissance des filières (`Params.revival`, `renaissance.dart`)
+
+Coupée par défaut. **Constat** (`tool/filieres.dart --causes`, 240 citoyens, 5 graines × 1 500 jours) : la création
+automatique (§ 6.12) et le module entrepreneurship (§ 6.17) ne lisent qu'un signal, la demande non servie, notée quand un
+acheteur ne trouve aucune offre. Un bien sans producteur actif cesse vite de l'envoyer :
+
+- frontières ouvertes, l'importation est une offre sans limite : rien n'est « non servi ». Aucun bien importable n'y
+  renaît (0 renaissance en 5 graines pour cuivre, or, plastique, acier, machines…), et les biens sans producteur
+  représentent 12 jours-biens par jour (contre 2,6 en économie fermée) ;
+- en économie fermée, un transformateur privé d'intrant ne produit plus, son plan tombe à zéro et il n'achète plus :
+  la demande dérivée disparaît (or, processeurs, conception, bauxite : 60 à 90 % des jours sans producteur sans aucun
+  signal), puis il ferme ;
+- quand le signal existe, une petite filière (moins d'un employé de demande) échoue au test de viabilité : la création
+  est faite à productivité réduite (« échelle minimale ») et doit payer un employé entier, alors que le temps partiel
+  (`partTime`, actif par défaut) ne paierait que les heures.
+
+**Règle.** Pour un bien sans producteur actif (aucune entreprise qui le produit n'a d'employé), le signal d'entrée est le
+plus grand de, en unités par jour :
+
+- la demande non servie lissée (`unmetEma`, comme avant) ;
+- les importations lissées (`importEma` : importations du jour lues dans les flux venant de l'étranger, α = 0,1) ;
+- la demande dérivée (`derivedWant`) : Σ sur les entreprises qui l'utilisent comme intrant de (employés + postes
+  ouverts) × lots par employé (`perWorker`, borné par la capacité) × intrant par lot.
+
+Le projet passe ensuite par les conditions habituelles : main-d'œuvre, viabilité aux prix du marché bornés au double du
+prix mondial (frontières ouvertes, le prix d'import : une relance n'a lieu que si produire ici coûte moins cher
+qu'importer), capital, délai `entryCooldown`, une création par jour. Avec la variante `revivalHours` (seulement
+avec `partTime`), l'entreprise qui relance un bien garde la productivité nominale de son
+type et travaille à temps partiel : sa viabilité compte wage × w, w = lots voulus ÷ lots d'un employé borné à
+[`Sim.minHours` ; équipe], au lieu d'employés entiers. Variante coupée par défaut (`revivalHours` = non) : mesurée, elle
+double les créations vouées à la faillite. Le module entrepreneurship lit le même signal et, avec la variante, le même
+coût du travail (gain espéré du fondateur compris).
+
+**Mesure** (240 citoyens, 30 graines × 1 500 jours, comparaisons appariées ; `rapports/renaissance-filieres.md`).
+- Frontières ouvertes (trade + tradeWaves + floatingFx + foreignDemand) :
+  - chômage moyen −4,6 pt sans filets et −5,7 pt avec filets (concluants) ;
+  - pire graine : 65 % de chômage et santé 0,18 avant, 33 % et 0,65 après ;
+  - santé +0,02 et attente à l'hôpital −3,3 j avec filets ;
+  - 25 types d'entreprise actifs en fin au lieu de 14 ;
+  - coût : environ 15 naissances et 15 morts d'entreprises par an au lieu de 1 à 5 ; beaucoup de relances échouent en
+    2 à 3 mois, leur prix dépassant le prix d'import.
+- Économie fermée : chômage non concluant (−0,6 pt et −1,3 pt) ; petits gains concluants avec filets (sans-abri,
+  jours-alerte critiques, trésor de l'État).
+
+**Variantes contre les relances vouées à l'échec** (coupées par défaut, seulement avec `revival` et pour un bien sans
+producteur actif ; `rapports/renaissance-filieres.md` § 5) :
+
+- `revivalFullCost` : la viabilité d'une relance (`_found`, et `_bestProject` avec le gain espéré du fondateur) compte
+  aussi les frais fixes attendus (`entryFixedCost`) : comptabilité (0,1 + 0,03 × équipe unités de `compta`), entretien
+  des opérations de l'industrie lourde (0,06 × équipe), intérêts du prêt de fondation. Une entreprise neuve n'a pas de
+  machines : ni entretien de machines ni usure. Frontières ouvertes, le prix de départ de chaque extrant importable
+  (coût complet par unité × `markup`, le travail compté comme dans `unitCost`) ne doit pas dépasser son prix d'import.
+  Refus `viabilite` ou `prix_import` (`revivalCostRefusal`).
+- `revivalPlannedDemand` : la demande dérivée compte, pour chaque entreprise d'aval, au plus son plan de production
+  (`_plannedBatches`), au lieu de la seule capacité de son équipe.
+
+Diagnostic (5 graines, frontières ouvertes) : le prix de départ d'une relance est déjà sous l'import (médiane 0,79 ×).
+Les relances meurent de faillite, faute de ventes. 150 relances sur 174 viennent de la demande dérivée ; elles vendent
+11 % de ce signal sur leurs 60 premiers jours, et 114 meurent. Mesure (30 graines × 1 500 jours, contre `revival` seul) :
+
+- `revivalFullCost` : −1,6 à −1,8 naissance et autant de morts par an (concluant avec filets seulement) ; le gain de
+  chômage contre l'économie sans règle tombe à −2,6 et −2,2 pt.
+- `revivalPlannedDemand`, frontières ouvertes : naissances 15,7 → 9,6 et morts 16,7 → 10,8 par an sans filets
+  (14,5 → 8,3 et 15,2 → 9,9 avec), faillites divisées par deux. Chômage non concluant contre la règle seule ; contre
+  l'économie sans règle, −4,0 et −4,4 pt. Types actifs en fin : 1,5 à 3 de moins. En économie fermée, les petits gains
+  de la règle disparaissent (jours-alerte critiques +9,5 avec filets).
+- Les deux ensemble ne font pas mieux que la demande au plan seule.
 
 ---
 

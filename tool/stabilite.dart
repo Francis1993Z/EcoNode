@@ -260,6 +260,14 @@ const Map<String, String> funnelLabels = {
 void applyParam(Params p, String k, String v) {
   bool b() => v == '1' || v == 'true';
   switch (k) {
+    case 'revival': // renaissance des filières : signal d'entrée d'un bien sans producteur actif
+      p.revival = b();
+    case 'revivalHours': // renaissance, variante : temps partiel et productivité nominale de l'entreprise relancée
+      p.revivalHours = b();
+    case 'revivalFullCost': // renaissance, variante : viabilité au coût complet et prix de départ face à l'import
+      p.revivalFullCost = b();
+    case 'revivalPlannedDemand': // renaissance, variante : demande dérivée au plan de production de l'aval
+      p.revivalPlannedDemand = b();
     case 'trade': // commerce extérieur (frontières ouvertes)
       p.trade = b();
     case 'tradeWaves': // douane : prix mondiaux en vagues
