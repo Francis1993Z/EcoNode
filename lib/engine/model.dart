@@ -898,6 +898,16 @@ class Params {
   // prévoit par exemple 49 bijoux par jour à 240 citoyens quand les ménages en achètent 2, et 420 pains au lieu de 630 :
   // les secteurs sous-dimensionnés montent leurs prix et se disputent les travailleurs au démarrage.
   bool planFromHouseholds = false;
+  // Santé de départ étalée (spreadHealth, 2026-10-31, anomalie N6) : chaque citoyen démarre à un point au hasard de son
+  // cycle de santé, entre le seuil de consultation (0,75) et 1, au lieu d'être en parfaite santé. Sinon la santé moyenne
+  // descend de 1 à ≈ 0,85 les deux premiers mois, l'efficacité des employés baisse d'autant (les entreprises embauchent
+  // jusqu'à vider le marché du travail, et les salaires montent), et tout le monde consulte en même temps vers le jour 80.
+  bool spreadHealth = false;
+  // Effectifs réalistes au plan (planWorkforce, 2026-10-31, anomalie N6) : le plan de départ compte chaque employé à son
+  // efficacité d'équilibre (facteur santé 0,4 + 0,6 × 0,875, la santé moyenne d'un cycle usure-consultation) et réserve
+  // l'arrondi des équipes (≈ 0,3 employé par entreprise : effectif voulu = ⌈lots / productivité − 0,2⌉) dans son objectif
+  // de 94 % d'emploi. Sinon, dès le premier jour, les entreprises veulent ≈ 104 % de la population active.
+  bool planWorkforce = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

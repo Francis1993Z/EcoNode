@@ -32,7 +32,7 @@ Réglages par défaut aujourd'hui :
 | A2 | Travail indivisible : les filières disparaissent dans un petit marché | **Largement traité.** `partTime` actif par défaut (moteur compris) depuis le 21 octobre. Cause du non-retour trouvée : la création d'entreprises ne lisait que la demande non servie, que l'importation et la chute de l'aval font disparaître. `revival` + `revivalPlannedDemand` (interface) : frontières ouvertes, chômage −4,0 à −4,4 pt contre l'économie sans règle (30 graines), 25 types actifs en fin au lieu de 14 avec `revival` seul ; économie fermée : non concluant |
 | A3 | La ferme perd de l'argent (coproduit bétail sans acheteur) | **Ouvert.** `extremes_test.dart` toujours sauté pour cette raison. Répartition des coûts des coproduits à décider |
 | A4 | Effondrement de fin de partie, trésor de l'État vide | Réglé par I3 (non revérifié) |
-| A5 | Démarrage en sur-emploi | Non revérifié |
+| A5 | Démarrage en sur-emploi | **Cause trouvée, corrigée dans l'interface (démarrage à l'équilibre, voir N6).** Le plan promettait 94 % d'emploi mais la règle d'embauche en voulait ≈ 104 % (efficacité des employés < 1, arrondi des équipes), plus une demande excédentaire (épargne de départ au-dessus de la cible, panier du plan différent des achats réels) |
 | A6 | Le logement manque | **Module Bâtiments coupé par défaut, non calibré.** Voir N3, N4, N11 |
 | A7 | Prix aberrants, sauts de l'indice des prix | **Cause trouvée, corrigée dans l'interface (`normalUtil` = 0,5, branche `fix/prix-aberrants`).** Une entreprise à 5-15 % d'utilisation répartit frais fixes et heures minimales sur une production minuscule : coût réel 7-8 fois la référence, prix qui suit malgré une marge au plancher, clients qui fuient. Les sauts de l'indice (jusqu'à +63 % en un jour) viennent d'un bien vendu à l'unité (bijoux) à prix aberrant. Prix au coût normal (Godley-Lavoie), 240 citoyens, 10 graines : prix > 3× la référence 14,6 → 1,3 % des jours-entreprises, fermetures 17 → 5, indice final 0,75-2,63 → 1,04-1,28, chômage 7,6 → 5,4 %. **Reste : à 2 500 citoyens, chômage 4,4 → 8,3 %** (198 entreprises au lieu de 113, deux fois plus petites, 31 % à perte : « zombies » ; paradoxe plus d'entreprises / moins d'emplois non expliqué). Sortie pour pertes persistantes essayée et retirée |
 | A8 | Services vendus sous leur coût | Hôpital et école : I2. Pétrochimie et électronique : non revérifiées. Lié à A1 (plastique vendu sous son coût) |
@@ -58,7 +58,7 @@ Réglages par défaut aujourd'hui :
 | N3 | Bâtiments × Banques : effondrement à 240 citoyens | **Correctif fusionné** (`excessCashReturn` + plafond du fonds de reconstruction : chômage 75 % → 11 %, 30 graines, 3 000 j), coupé dans le moteur, **actif dans l'interface depuis le 30 octobre** (inflation en plus : N6) |
 | N4 | Dérive lente à 2 500 citoyens avec Bâtiments | **Cause probable trouvée** : déflation par la dette après une vague unique d'hypothèques (70 % des ménages achètent en 500 j, puis les remboursements détruisent la monnaie). `excessCashReturn` n'y fait que peu. Pistes proposées, non décidées : étaler la vague, plus de reventes, politique monétaire (le taux directeur existe maintenant) |
 | N5 | Les filets semblent aggraver le chômage à 2 500 citoyens et 3 000 j | Non expliqué |
-| N6 | Inflation de base élevée (≈ 30 %/an à 240, 42 %/an à 2 500) | Ouvert. `excessCashReturn` l'augmente (0,012 → 0,05 %/j à 240 tous modules) |
+| N6 | Inflation de base élevée | **Cause trouvée, corrigée dans l'interface (« Démarrage à l'équilibre », branche `fix/inflation-depart`).** Avec les réglages du 30 octobre, l'inflation n'était plus continue : un choc de démarrage (prix et salaires +35 à 55 % en 100 jours, marché du travail saturé) puis des prix stables. Quatre causes, quatre réglages (MODELE.md § 5) : épargne de départ 17 % au-dessus de la cible des ménages, panier du plan différent des achats réels (bijoux 49/j prévus, 2 achetés), santé de départ uniforme à 1, plan qui ignore l'efficacité des employés et l'arrondi des équipes. Indice au jour 100 : 1,44 → 1,05 à 240 citoyens, 1,52 → 1,16 à 2 500. Reste : un creux de déflation entre les jours 500 et 1 500 (−8,9 %/an en moyenne à 240 citoyens), qui existait déjà |
 | N7 | Concentration extrême à 2 500 tous modules (Herfindahl 0,94) | Non réconcilié avec `tests-produits` ; la branche `mesure-concentration` (non fusionnée) mesure concentration et mortalité selon k |
 | N8 | Gini hors bande : 0,45 à 2 500, 0,57-0,60 à 10 000 | Ouvert |
 | N9 | Alertes critiques ouvertes dans 10/10 parties à 2 500 | Ouvert |
@@ -86,7 +86,7 @@ Réglages par défaut aujourd'hui :
 ## 6. Décisions de Francis en attente
 
 1. Module Produits : N1 ne se produit plus avec le temps partiel ; reste N2 (émergence faible) et la dérive longue N16.
-2. Inflation de base (N6) ; à 2 500 citoyens, le chômage plus élevé avec le prix au coût normal (A7).
+2. À 2 500 citoyens, le chômage plus élevé avec le prix au coût normal (A7) ; creux de déflation des jours 500 à 1 500 (N6).
 3. Déflation par la dette à 2 500 citoyens (N4) : étaler la vague d'hypothèques, reventes, politique monétaire.
 4. `healthWearIfDeprived` (A1) et répartition des coûts des coproduits (A3).
 5. Calibrage des Bâtiments (A6, N11).

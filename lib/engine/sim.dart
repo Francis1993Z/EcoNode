@@ -978,6 +978,12 @@ class Sim {
       final f = c.employer != null ? firm(c.employer!) : null;
       c.incomeEma = f != null ? (this.modules.jobs ? c.wage : f.wage) * (1 - p.taxRate) : p.benefit;
     }
+    if (p.spreadHealth && this.modules.health) {
+      // santé de départ étalée sur le cycle usure-consultation (N6) ; trait propre à chaque citoyen (sous-indice 73)
+      for (final c in citizens) {
+        c.sat['sante'] = 0.75 + 0.25 * traitDraw(c.id, 73);
+      }
+    }
     if (p.walletAtTarget) {
       // épargne de départ à la cible de la fonction de consommation (N6) : ni désépargne ni épargne au démarrage ; même
       // dispersion (0,6 à 1,4) et même tirage qu'à la création du citoyen
@@ -1048,10 +1054,12 @@ class Sim {
     if (!m.education) basic.remove('cours');
     if (!m.buildings) basic.remove('batiment');
 
+    // effectifs réalistes (Params.planWorkforce) : efficacité d'équilibre des employés (facteur santé)
+    final planEff = p.planWorkforce && m.health ? 0.4 + 0.6 * 0.875 : 1.0;
     double perW(String ty) {
       final t = templates[ty]!;
       final kk = k[ty]!;
-      return t.rate * (1 + t.capital * kk / (kk + 1));
+      return t.rate * (1 + t.capital * kk / (kk + 1)) * planEff;
     }
 
     double maintNeed(Template t, double workers, double machines) =>
@@ -1152,7 +1160,8 @@ class Sim {
     }
 
     double total() => w.values.fold(0.0, (a, v) => a + v);
-    final target = 0.94 * pop;
+    // effectifs réalistes : l'arrondi des équipes (≈ 0,3 employé par entreprise) est réservé dans l'objectif d'emploi
+    final target = 0.94 * pop - (p.planWorkforce ? 0.3 * count.values.fold(0, (a, n) => a + n) : 0);
     var lambda = 0.0;
     solve(0);
     if (total() >= target) {

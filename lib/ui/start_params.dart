@@ -53,7 +53,11 @@ Params freshParams(Params start, int population) {
   final n = Params()
     ..population = population
     ..trade = start.trade
-    ..partTime = start.partTime;
+    ..partTime = start.partTime
+    ..walletAtTarget = start.walletAtTarget
+    ..planFromHouseholds = start.planFromHouseholds
+    ..spreadHealth = start.spreadHealth
+    ..planWorkforce = start.planWorkforce;
   for (final d in startParamDefs) {
     d.set(n, d.get(start));
   }
@@ -119,6 +123,25 @@ class StartParamsEditor extends StatelessWidget {
       SwitchListTile(
         dense: true,
         contentPadding: EdgeInsets.zero,
+        title: const Text('Démarrage à l’équilibre', style: TextStyle(fontSize: 13)),
+        subtitle: const Text(
+            'Les ménages démarrent avec l’épargne qu’ils visent et une santé à un point au hasard de son cycle, et le parc '
+            'd’entreprises suit ce qu’ils achètent vraiment '
+            '(mesuré sur une courte partie provisoire, quelques secondes). Coupé : panier fixe et épargne au hasard, d’où '
+            'une flambée des prix et des salaires les premiers mois.',
+            style: TextStyle(fontSize: 11)),
+        value: p.walletAtTarget && p.planFromHouseholds && p.spreadHealth && p.planWorkforce,
+        onChanged: (v) {
+          p.walletAtTarget = v;
+          p.planFromHouseholds = v;
+          p.spreadHealth = v;
+          p.planWorkforce = v;
+          onChanged();
+        },
+      ),
+      SwitchListTile(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
         title: const Text('Commerce extérieur', style: TextStyle(fontSize: 13)),
         subtitle: const Text('Importations et exportations au prix mondial.', style: TextStyle(fontSize: 11)),
         value: p.trade,
@@ -135,6 +158,10 @@ class StartParamsEditor extends StatelessWidget {
           }
           p.trade = d.trade;
           p.partTime = d.partTime;
+          p.walletAtTarget = true; // démarrage à l'équilibre : actif par défaut dans l'interface
+          p.planFromHouseholds = true;
+          p.spreadHealth = true;
+          p.planWorkforce = true;
           onChanged();
         },
         icon: const Icon(Icons.restore, size: 16),

@@ -435,6 +435,31 @@ règle au § 6.
 
 ---
 
+### Démarrage à l'équilibre (anomalies N6 et A5)
+
+Quatre réglages, coupés par défaut dans le moteur, actifs dans l'interface (interrupteur « Démarrage à l'équilibre » de
+l'écran de départ, paramètres de départ seulement) :
+
+- `walletAtTarget` : chaque ménage démarre à la cible de sa fonction de consommation, coussin + (1 − α₁) / α₂ × (revenu −
+  besoins), avec la même dispersion (0,6 à 1,4) et le même tirage qu'avant ; sinon les ménages démarrent 16-17 %
+  au-dessus de leur cible et dépensent l'excédent (≈ 6 % de demande en plus du revenu).
+- `planFromHouseholds` : le plan remplace son panier discrétionnaire fixe par le panier réel des ménages, mesuré sur une
+  partie provisoire (mêmes graine et réglages, au plus 1 000 citoyens, achats des jours 101 à 200) ; l'indice des prix
+  prend le même panier. Sinon le plan prévoit par exemple 49 bijoux par jour à 240 citoyens quand les ménages en achètent
+  2, et 420 pains au lieu de 630. Coût : 1,7 s au démarrage à 240 citoyens, 4,7 s au-delà de 1 000.
+- `spreadHealth` : la santé de départ de chaque citoyen est tirée entre 0,75 (seuil de consultation) et 1, au lieu de 1
+  pour tous ; sinon la santé moyenne descend vers ≈ 0,875 les deux premiers mois et tout le monde consulte en même temps.
+- `planWorkforce` : le plan compte chaque employé à son efficacité d'équilibre (facteur santé 0,4 + 0,6 × 0,875) et
+  réserve l'arrondi des équipes (≈ 0,3 employé par entreprise) dans son objectif de 94 % d'emploi ; sinon, dès le premier
+  jour, les entreprises veulent ≈ 104 % de la population active.
+
+Sans ces réglages, le marché du travail est saturé dès les premiers jours (chômage 0 %) et prix et salaires montent de
+35 à 55 % en 100 jours avant de se stabiliser. Mesure (réglages de l'interface ; indice des prix moyen au jour 100) :
+240 citoyens, 10 graines : 1,44 → 1,05 ; 2 500 citoyens, 5 graines : 1,52 → 1,16. Sur 3 000 jours à 240 citoyens,
+inflation annuelle moyenne +4 % (jours 100-500), −8,9 % (500-1 500 : un creux de déflation qui existait déjà, −7 %),
++2,1 % (1 500-3 000) ; chômage des 500 derniers jours 4,9 %. À 2 500 citoyens, chômage des jours 1 001-1 500
+9,1 → 6,6 %.
+
 ## 6. Sous-modèles
 
 ### 6.1 Monnaie et comptabilité
