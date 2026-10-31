@@ -593,6 +593,8 @@ class Sim {
   /// Dette publique envers la Caisse (Params.stateBorrowing) et ses totaux : emprunté, intérêts payés ou capitalisés,
   /// remboursé ; intérêts du jour.
   double stateDebt = 0, stateBorrowed = 0, stateInterest = 0, stateRepaid = 0, stateInterestToday = 0;
+  /// Indice lissé (Params.cpiSmoothDays) : montants et quantités vendus lissés par bien ; vides sans lissage.
+  final Map<String, double> cpiValueEma = {}, cpiQtyEma = {};
   double ledgerCredit = 0; // monnaie créée par le crédit, nette des remboursements
   final List<SimEvent> events = [];
   final List<HistPoint> history = [];
@@ -768,6 +770,8 @@ class Sim {
     foreignOrders.clear();
     ledgerPublicImports = 0;
     stateDebt = stateBorrowed = stateInterest = stateRepaid = stateInterestToday = 0;
+    cpiValueEma.clear();
+    cpiQtyEma.clear();
     ledgerCredit = 0;
     events.clear();
     history.clear();
@@ -1595,15 +1599,18 @@ class Sim {
 
   /// Coût d'un lot : salaires, intrants au prix du marché, frais fixes (services, intérêts, usure), réparti entre les extrants.
   /// Un employé ne se divise pas : si l'équipe est sous-employée, ses salaires se répartissent sur la production prévue.
-  Map<String, double> unitCost(Firm f) {
+  /// [normal] : coût au taux d'utilisation normal (Params.normalUtil), pour la fixation du prix.
+  Map<String, double> unitCost(Firm f, {bool normal = false}) {
     final p = params;
     final per = math.max(eps, perWorker(f));
     final capacity = math.max(1, f.workers.length) * per;
     // utilisation de l'équipe sur ~20 jours : les achats des clients arrivent par lots, le coût ne doit pas suivre chaque creux
-    final util = f.workers.isEmpty ? 1.0 : (f.outputEma / capacity).clamp(0.05, 1.0);
+    var util = f.workers.isEmpty ? 1.0 : (f.outputEma / capacity).clamp(0.05, 1.0);
+    if (normal && util < p.normalUtil) util = p.normalUtil;
     // variante A2 (temps partiel) : seules les heures travaillées sont payées
     var batch = f.wage * (p.partTime ? math.max(util, minHours) : 1.0) / (per * util);
-    final planned = math.max(math.max(f.lastBatches, _plannedBatches(f)), 0.05 * capacity);
+    var planned = math.max(math.max(f.lastBatches, _plannedBatches(f)), 0.05 * capacity);
+    if (normal && planned < p.normalUtil * capacity) planned = p.normalUtil * capacity; // frais fixes sur la production normale
     for (final e in f.inputs.entries) {
       batch += e.value * bestPrice(e.key);
     }
@@ -3482,6 +3489,8 @@ class Sim {
       f.overheadEma = 0.9 * f.overheadEma + 0.1 * f.overhead;
       f.brand *= 0.97; // la notoriété s'estompe sans nouvelles campagnes
       final cost = unitCost(f);
+      // prix au coût normal (A7) : la fixation du prix ignore la sous-utilisation de l'équipe ; le coût réel reste en cache
+      final pricing = params.normalUtil > 0 ? unitCost(f, normal: true) : null;
       f.unitCostCache = cost;
       for (final g in f.outputs.keys) {
         final um = f.unmetShare[g] ?? 0;
@@ -3522,7 +3531,7 @@ class Sim {
           mk += (baseMk - mk) * 0.03; // la concurrence ramène la marge vers la normale
         }
         mk = math.max(-0.4, math.min(3.0, mk));
-        final target = cost[g]! * (1 + mk);
+        final target = (pricing ?? cost)[g]! * (1 + mk);
         final old = f.price[g]!;
         var np = old + (target - old) * 0.25;
         final hi = old * (1 + p.priceMaxDaily), lo = old * (1 - p.priceMaxDaily);
@@ -3820,6 +3829,15 @@ class Sim {
       prices[g] = ms != null && ms.qty > eps
           ? ms.value / ms.qty
           : (history.isNotEmpty ? history.last.prices[g] ?? bestPrice(g) : bestPrice(g));
+      if (params.cpiSmoothDays > 0) {
+        // indice lissé (A7) : prix moyen des ventes sur ~cpiSmoothDays jours, pondéré par les volumes
+        final a = 1 / params.cpiSmoothDays;
+        final v = (1 - a) * (cpiValueEma[g] ?? 0) + a * (ms?.value ?? 0);
+        final q = (1 - a) * (cpiQtyEma[g] ?? 0) + a * (ms?.qty ?? 0);
+        cpiValueEma[g] = v;
+        cpiQtyEma[g] = q;
+        if (q > eps) prices[g] = v / q;
+      }
     }
     var basket = 0.0;
     for (final e in cpiWeights.entries) {

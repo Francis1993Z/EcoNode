@@ -321,6 +321,7 @@ class _ModelTabState extends State<ModelTab> {
       _banksSection(context, ctrl, upd),
       _excessCashSection(context, ctrl, upd),
       _revivalSection(context, ctrl, upd),
+      _pricingSection(context, ctrl, upd),
       Section('Nouvelle partie', [
         Row(children: [
           Expanded(
@@ -772,6 +773,47 @@ Widget _banksSection(BuildContext context, SimController ctrl, void Function(voi
 
 
 /// Distribution de l'excédent de trésorerie (Params.excessCashReturn) : l'interrupteur et ses deux réglages.
+/// Fixation des prix au coût normal et indice des prix lissé (anomalie A7, MODELE.md § 6.4).
+Widget _pricingSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final p = ctrl.sim.params;
+  return Section('Fixation des prix', [
+    Text(
+        'Une entreprise dont l’équipe tourne à vide répartit ses frais fixes et ses heures minimales sur une production '
+        'minuscule : son coût unitaire, et son prix, montent à plusieurs fois la normale, ce qui fait fuir ses clients. '
+        'Au coût normal, elle fixe son prix comme si son équipe travaillait au moins à la part indiquée de sa capacité ; '
+        'elle vend alors à perte tant qu’elle reste sous-utilisée.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Prix au coût normal', style: TextStyle(fontSize: 13)),
+      value: p.normalUtil > 0,
+      onChanged: (v) => upd(() => p.normalUtil = v ? 0.5 : 0),
+    ),
+    if (p.normalUtil > 0)
+      ParamSlider(
+          label: 'Utilisation normale de l’équipe',
+          value: p.normalUtil,
+          min: 0.1,
+          max: 1,
+          format: pct,
+          hint: 'Mesure : 50 % et 80 % donnent presque le même résultat.',
+          onChanged: (v) => upd(() => p.normalUtil = (v * 20).round() / 20)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Indice des prix lissé sur 30 jours', style: TextStyle(fontSize: 13)),
+      subtitle: const Text(
+          'Mesure seulement : l’indice prend le prix moyen des ventes des 30 derniers jours au lieu des seules ventes du '
+          'jour, pour qu’un bien vendu à l’unité ne le fasse pas sauter.',
+          style: TextStyle(fontSize: 11)),
+      value: p.cpiSmoothDays > 0,
+      onChanged: (v) => upd(() => p.cpiSmoothDays = v ? 30 : 0),
+    ),
+  ]);
+}
+
 /// Renaissance des filières éteintes (Params.revival, MODELE.md § 6.22).
 Widget _revivalSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
   final pal = Pal.of(context);

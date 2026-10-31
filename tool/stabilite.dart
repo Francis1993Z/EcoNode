@@ -284,6 +284,10 @@ void applyParam(Params p, String k, String v) {
       p.floatingFx = b();
     case 'fxSpeed':
       p.fxSpeed = double.parse(v);
+    case 'normalUtil': // prix au coût normal (A7) : utilisation normale de l'équipe, 0 = coût réel
+      p.normalUtil = double.parse(v);
+    case 'cpiSmoothDays': // indice des prix lissé sur ~n jours (A7), 0 = ventes du jour
+      p.cpiSmoothDays = double.parse(v);
     case 'stateBorrowing': // dette publique : l'État emprunte à la Caisse pour les enveloppes des établissements publics
       p.stateBorrowing = b();
     case 'stateDebtMaxGdp':

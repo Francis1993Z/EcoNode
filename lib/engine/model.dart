@@ -877,6 +877,15 @@ class Params {
   bool stateBorrowing = false;
   double stateDebtMaxGdp = 0.6;
   double stateRepayRate = 0.02;
+  // Prix au coût normal (normalUtil > 0, 2026-10-30, anomalie A7) : pour fixer son prix, une entreprise compte son coût
+  // unitaire comme si son équipe travaillait au moins à normalUtil de sa capacité (frais fixes et heures minimales
+  // répartis sur une production normale), à la Godley-Lavoie, au lieu de sa production du jour. Le coût réel
+  // (unitCostCache) sert toujours à la rentabilité, à l'entrée et à l'export. 0 : coût réel (comme avant).
+  double normalUtil = 0;
+  // Indice des prix lissé (cpiSmoothDays > 0, anomalie A7) : le prix de chaque bien dans l'indice est le prix moyen des
+  // ventes, pondéré par les volumes, sur environ cpiSmoothDays jours (moyennes lissées des montants et des quantités),
+  // au lieu des seules ventes du jour. Mesure seulement : l'indice ne sert à aucune décision. 0 : ventes du jour.
+  double cpiSmoothDays = 0;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
