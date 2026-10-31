@@ -86,7 +86,8 @@ class SimController extends ChangeNotifier {
               ..revivalPlannedDemand = true // demande dérivée comptée au plan de l'aval : moins de relances vouées à l'échec
               ..excessCashReturn = true // excédent de trésorerie reversé aux propriétaires (dérive N16, rapports/anomalies)
               ..publicImports = true // hôpital : importations de secours de ses intrants (anomalie A1)
-              ..stateBorrowing = true, // l'État emprunte plutôt que de couper l'enveloppe de l'hôpital (anomalie A1)
+              ..stateBorrowing = true // l'État emprunte plutôt que de couper l'enveloppe de l'hôpital (anomalie A1)
+              ..normalUtil = 0.5, // prix au coût normal : plus de prix aberrants (anomalie A7)
             modules: Modules()
               ..jobs = true
               ..entrepreneurship = true
@@ -223,7 +224,8 @@ class SimController extends ChangeNotifier {
           ..revivalPlannedDemand = true
           ..excessCashReturn = true
           ..publicImports = true
-          ..stateBorrowing = true,
+          ..stateBorrowing = true
+          ..normalUtil = 0.5,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();

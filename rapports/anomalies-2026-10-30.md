@@ -34,7 +34,7 @@ Réglages par défaut aujourd'hui :
 | A4 | Effondrement de fin de partie, trésor de l'État vide | Réglé par I3 (non revérifié) |
 | A5 | Démarrage en sur-emploi | Non revérifié |
 | A6 | Le logement manque | **Module Bâtiments coupé par défaut, non calibré.** Voir N3, N4, N11 |
-| A7 | Prix aberrants, sauts de l'indice des prix | **Ouvert, aucun correctif.** Fermetures « prix aberrant » : médiane 7 par partie à 240, 9 à 2 500. Lien possible avec N6, non démontré |
+| A7 | Prix aberrants, sauts de l'indice des prix | **Cause trouvée, corrigée dans l'interface (`normalUtil` = 0,5, branche `fix/prix-aberrants`).** Une entreprise à 5-15 % d'utilisation répartit frais fixes et heures minimales sur une production minuscule : coût réel 7-8 fois la référence, prix qui suit malgré une marge au plancher, clients qui fuient. Les sauts de l'indice (jusqu'à +63 % en un jour) viennent d'un bien vendu à l'unité (bijoux) à prix aberrant. Prix au coût normal (Godley-Lavoie), 240 citoyens, 10 graines : prix > 3× la référence 14,6 → 1,3 % des jours-entreprises, fermetures 17 → 5, indice final 0,75-2,63 → 1,04-1,28, chômage 7,6 → 5,4 %. **Reste : à 2 500 citoyens, chômage 4,4 → 8,3 %** (198 entreprises au lieu de 113, deux fois plus petites, 31 % à perte : « zombies » ; paradoxe plus d'entreprises / moins d'emplois non expliqué). Sortie pour pertes persistantes essayée et retirée |
 | A8 | Services vendus sous leur coût | Hôpital et école : I2. Pétrochimie et électronique : non revérifiées. Lié à A1 (plastique vendu sous son coût) |
 | A9 | Caisse insolvable sans filets | I4 appliqué ; effet des faillites de banques (module Banques) non vérifié |
 
@@ -86,7 +86,7 @@ Réglages par défaut aujourd'hui :
 ## 6. Décisions de Francis en attente
 
 1. Module Produits : N1 ne se produit plus avec le temps partiel ; reste N2 (émergence faible) et la dérive longue N16.
-2. Prix aberrants et indice des prix (A7, N6).
+2. Inflation de base (N6) ; à 2 500 citoyens, le chômage plus élevé avec le prix au coût normal (A7).
 3. Déflation par la dette à 2 500 citoyens (N4) : étaler la vague d'hypothèques, reventes, politique monétaire.
 4. `healthWearIfDeprived` (A1) et répartition des coûts des coproduits (A3).
 5. Calibrage des Bâtiments (A6, N11).

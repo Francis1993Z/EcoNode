@@ -539,6 +539,23 @@ règle au § 6.
   - sans transaction, le dernier prix observé est repris, comme le font les instituts statistiques ;
   - rapporté au coût du panier aux prix du plan.
 
+- **Prix au coût normal (`normalUtil`, anomalie A7).** Coupé par défaut dans le moteur ; l'interface l'active à 0,5.
+  Pour fixer son prix (et seulement pour cela), une entreprise compte son coût unitaire comme si son équipe travaillait
+  au moins à `normalUtil` de sa capacité : utilisation et production prévue sont relevées à ce niveau, ce qui répartit
+  frais fixes et heures minimales sur une production normale (« normal-cost pricing » de Godley et Lavoie). Le coût réel
+  (`unitCostCache`) sert toujours à la rentabilité, à l'entrée, à l'export et à la renaissance. **Pourquoi** : à 5-15 %
+  d'utilisation, le coût réel monte à 7-8 fois la référence et le prix le suit malgré une marge au plancher (−40 %) ; la
+  clientèle fuit et l'utilisation baisse encore. **Mesure** (réglages de l'interface, 1 500 j) : 240 citoyens, 10
+  graines : prix au-delà de 3 fois la référence 14,6 → 1,3 % des jours-entreprises, fermetures 17 → 5 par partie, indice
+  final 0,75-2,63 → 1,04-1,28, chômage 7,6 → 5,4 %. 2 500 citoyens, 5 graines : prix aberrants supprimés, mais chômage
+  4,4 → 8,3 % : 198 entreprises actives au lieu de 113, deux fois plus petites, dont 31 % vendent sous leur coût réel
+  (entreprises « zombies »). Une sortie pour pertes persistantes (90 jours) a été essayée et retirée : 15,5 % de chômage à
+  240 citoyens (une graine effondrée), 7,3 % à 2 500.
+- **Indice des prix lissé (`cpiSmoothDays`).** Coupé partout. Mesure seulement (l'indice ne sert à aucune décision) : le
+  prix d'un bien dans l'indice est le prix moyen des ventes sur environ `cpiSmoothDays` jours, pondéré par les volumes.
+  Les sauts de l'indice (jusqu'à +63 % en un jour) venaient d'un bien vendu à l'unité (bijoux) à un prix aberrant ; une
+  fois les prix au coût normal, le lissage n'apporte presque plus rien (1,7 → 0,4 jour de saut au-delà de 2 % par partie).
+
 ### 6.5 Travail : embauche, mobilité, salaires (`sim.dart:_laborMarket`, `_decide`, `_payWages`)
 
 - **Embauche.**
