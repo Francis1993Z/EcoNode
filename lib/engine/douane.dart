@@ -11,6 +11,8 @@ part of 'sim.dart';
 // Taux de change flottant (Params.floatingFx) : les deux prix sont aussi multipliés par fxRate, qui suit chaque soir le
 // solde commercial lissé (voir _updateFx).
 // Demande étrangère active (Params.foreignDemand) : carnet de commandes par entreprise et par bien (voir _foreignOrders).
+// Importations de secours (Params.publicImports) : frontières fermées, un établissement public complète ses intrants à
+// l'étranger (voir _publicImport).
 //
 // Pas de math.sin (résultats différents entre la VM et le web) : approximation de Bhaskara, en opérations élémentaires.
 
@@ -46,6 +48,36 @@ extension Douane on Sim {
     final sum = fxImportsEma + fxExportsEma;
     if (sum <= 0) return;
     fxRate = (fxRate * (1 + params.fxSpeed * (fxImportsEma - fxExportsEma) / sum)).clamp(0.1, 10.0).toDouble();
+  }
+
+  /// Importation de secours d'un établissement public : au plus [q] unités du bien [g], au prix d'import, dans la limite
+  /// de [budget]. Mêmes comptes qu'un achat importé (`buy`) : sortie de monnaie, droit de douane éventuel à l'État.
+  /// Rend (quantité, dépense).
+  (double, double) _publicImport(Firm f, String g, double q, double budget) {
+    if (goods[g]!.perish || !goods[g]!.tradable) return (0.0, 0.0);
+    final price = importPrice(g);
+    q = math.min(q, math.min(budget, f.money) / price);
+    if (q <= eps) return (0.0, 0.0);
+    final cost = math.min(q * price, f.money);
+    var paid = 0.0;
+    if (params.tariff > 0) {
+      final duty = transfer(f, state, cost * params.tariff / (1 + params.tariff));
+      state.taxes += duty;
+      state.taxesToday += duty;
+      ledgerTariffs += duty;
+      paid += duty;
+    }
+    final out = transfer(f, null, cost - paid);
+    paid += out;
+    ledgerImports += out;
+    bank.reserves -= out;
+    dayFlows.imports += out;
+    ledgerPublicImports += paid;
+    _flow('X', f.id.toString(), g, q, paid);
+    final ms = marketStats[g]!;
+    ms.qty += q;
+    ms.value += paid;
+    return (q, paid);
   }
 
   /// Commande quotidienne de l'étranger pour un bien d'une entreprise (0 sans commande).

@@ -691,6 +691,16 @@ Choix de jeu : c'est le débouché de la filière informatique.
 - **Renflouement (filet).** Une entreprise privée qui a des clients et moins de 4 jours de salaires de l'équipe voulue
   reçoit de son propriétaire jusqu'à la moitié de son surplus, pour revenir à 10 jours. Un propriétaire sans moyens est
   remplacé par le citoyen le plus riche (rachat).
+- **Dette publique (`stateBorrowing`).** Coupée par défaut dans le moteur, active dans l'interface. Quand le trésor,
+  au-dessus de son plancher, ne suffit pas aux enveloppes des établissements publics (I2), l'État emprunte la différence
+  à la Caisse, qui crée la monnaie prêtée (`ledgerCredit`, `bank.lent`, comme un prêt à une entreprise), jusqu'à
+  `stateDebtMaxGdp` (60 %) du PIB annuel. Chaque jour, avant les enveloppes, il paie les intérêts au taux de base des
+  prêts (`baseRate`), capitalisés si le trésor ne peut pas les payer, et rembourse `stateRepayRate` (2 %) de ce qui
+  dépasse deux fois son plancher. La dette entre dans `totalLoans` (invariants) mais pas dans l'exposition pondérée de la
+  Caisse (dette souveraine pondérée à 0 %, Bâle III). Mesure (240 citoyens, réglages de l'interface avec les importations
+  de secours, 10 graines × 1 500 j) : jours sans soins 0 à 184 → 0 à 8 ; dette au plus 60 000 à 254 000 $ (moins de
+  2,5 % du PIB annuel), remboursée en fin de partie dans 19 parties sur 20 ; chômage des jours 1100-1500 inchangé (5,4 %
+  contre 4,5 % sans filets, 7,0 % contre 6,8 % avec).
 - **Redistribution de l'État.** Au-delà d'une réserve de 30 × `benefit` × max(4 ; population/10), `stateRebate` du
   surplus est versé chaque jour à parts égales.
 
@@ -953,6 +963,19 @@ lié à la demande d'ici, une entreprise de transformation (restaurant : intrant
 Mesure (240 citoyens, 5 graines, chômage moyen des jours 1000 à 1500) : frontières fermées 23 %, change seul 38 %,
 change + demande étrangère 30 % (15 à 20 % dans 4 graines ; la cinquième s'effondre vers le jour 900 : des filières
 d'intrants disparaissent, les intrants importés rendent l'export non rentable, et le taux au plafond n'y peut rien).
+
+Importations de secours (`publicImports`, coupées par défaut dans le moteur, actives dans l'interface) : frontières
+fermées, un établissement public (hôpital ; l'école n'a pas d'intrant) achète d'abord ses intrants sur le marché d'ici,
+puis le reste à l'étranger au prix d'import (`importPrice`), dans la limite de son budget d'achat. Le manque reste noté
+comme demande non servie (signal de relance des filières). Comptes : ceux d'un achat importé (`ledgerImports`, droit de
+douane éventuel à l'État), plus le total `ledgerPublicImports`. **Pourquoi** (anomalie A1) : à 240 citoyens, le cuivre et
+le pétrole ont une demande d'un quart d'employé, qui arrive par à-coups ; la mine perd son employé faute de trésorerie et
+fait faillite (cuivre éteint dans 19 parties sur 20, jour médian 28), l'électronique puis le plastique s'arrêtent, l'hôpital
+ne soigne plus et la santé tombe à 0,05 ; sans filets, l'économie s'écroule ensuite (chômage 95 %). **Mesure** (240
+citoyens, réglages de l'interface, 10 graines × 1 500 j, santé moyenne des 500 derniers jours) : effondrements 7/10 → 0/10
+sans filets et 4/10 → 0/10 avec ; santé 0,83 à 0,88 dans les 20 parties ; coût 3 000 à 85 000 $ importés en 1 500 j
+(au plus 5 % de la masse monétaire). Restent des arrêts de 30 jours et plus dans 11 parties sur 20 : le trésor de l'État,
+vidé par les allocations pendant une récession, passe sous son plancher et l'enveloppe de l'hôpital s'arrête.
 
 ### 6.22 Renaissance des filières (`Params.revival`, `renaissance.dart`)
 

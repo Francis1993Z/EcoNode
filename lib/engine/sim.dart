@@ -588,6 +588,11 @@ class Sim {
   double fxRate = 1, fxImportsEma = 0, fxExportsEma = 0;
   /// Commandes quotidiennes de l'étranger (Params.foreignDemand), en unités, par « identifiant d'entreprise:bien ».
   final Map<String, double> foreignOrders = {};
+  /// Importations de secours des établissements publics (Params.publicImports), en dollars, depuis le début.
+  double ledgerPublicImports = 0;
+  /// Dette publique envers la Caisse (Params.stateBorrowing) et ses totaux : emprunté, intérêts payés ou capitalisés,
+  /// remboursé ; intérêts du jour.
+  double stateDebt = 0, stateBorrowed = 0, stateInterest = 0, stateRepaid = 0, stateInterestToday = 0;
   double ledgerCredit = 0; // monnaie créée par le crédit, nette des remboursements
   final List<SimEvent> events = [];
   final List<HistPoint> history = [];
@@ -761,6 +766,8 @@ class Sim {
     fxImportsEma = 0;
     fxExportsEma = 0;
     foreignOrders.clear();
+    ledgerPublicImports = 0;
+    stateDebt = stateBorrowed = stateInterest = stateRepaid = stateInterestToday = 0;
     ledgerCredit = 0;
     events.clear();
     history.clear();
@@ -1366,6 +1373,7 @@ class Sim {
     }
     if (mortgages.isNotEmpty) d += mortgageDebt();
     if (consumerLent > 0) d += consumerDebtOf(); // module banking : prêts personnels et soldes de carte
+    if (stateDebt != 0) d += stateDebt; // dette publique (Params.stateBorrowing)
     return d;
   }
 
@@ -2208,6 +2216,7 @@ class Sim {
       st.envelopeToday = 0;
       st.wantedToday = 0;
     }
+    if (params.stateBorrowing || stateDebt > 0) _stateDebtService();
     final list = firms.where(publicService).toList();
     if (list.isEmpty) return;
     final want = <double>[];
@@ -2229,7 +2238,11 @@ class Sim {
       total += w;
       st.wantedToday += w;
     }
-    final avail = math.max(0.0, state.money - _stateFloor());
+    var avail = math.max(0.0, state.money - _stateFloor());
+    if (params.stateBorrowing && total > avail) {
+      // dette publique : l'État emprunte à la Caisse ce qui manque aux enveloppes, dans la limite du plafond
+      avail += _stateBorrow(total - avail);
+    }
     final k = total > avail ? avail / total : 1.0;
     final short = <ServiceStats>{};
     for (var i = 0; i < list.length; i++) {
@@ -2258,6 +2271,67 @@ class Sim {
     }
     for (final st in short) {
       st.shortDays++;
+    }
+  }
+
+  /// Plafond de la dette publique : stateDebtMaxGdp du PIB annuel (PIB du dernier jour relevé × 365).
+  double stateDebtCeiling() => history.isEmpty ? 0.0 : params.stateDebtMaxGdp * 365 * history.last.gdp;
+
+  /// Emprunt de l'État à la Caisse : au plus [amt], sous le plafond. La Caisse crée la monnaie prêtée (comme `_lend`).
+  /// Rend le montant emprunté.
+  double _stateBorrow(double amt) {
+    final a = transfer(null, state, math.min(amt, math.max(0.0, stateDebtCeiling() - stateDebt)));
+    if (a <= 0) return 0;
+    stateDebt += a;
+    stateBorrowed += a;
+    ledgerCredit += a;
+    bank.lent += a;
+    dayFlows.loans += a;
+    _flow('B', 'E', '\$prêts', 1, a);
+    if (trace != null) {
+      _t('institutions', 'emprunt_public', 'État', null, 'dette publique', 'enveloppes des établissements publics', a,
+          'dette ${fmtMoney0(stateDebt)}');
+    }
+    return a;
+  }
+
+  /// Service de la dette publique, chaque jour avant les enveloppes : intérêts au taux de base (capitalisés si le trésor
+  /// ne peut pas les payer), puis remboursement de stateRepayRate de ce qui dépasse deux fois le plancher du trésor.
+  void _stateDebtService() {
+    stateInterestToday = 0;
+    if (stateDebt <= 0) return;
+    final interest = quantize(stateDebt * baseRate() / 365);
+    if (interest > 0 && state.money >= interest) {
+      final paid = transfer(state, bank, interest);
+      bank.interest += paid;
+      bank.equity += paid;
+      if (banks.isNotEmpty) _attrib(0, paid, income: paid); // module banking : la dette publique est à la Caisse
+      dayFlows.interest += paid;
+      stateInterest += paid;
+      stateInterestToday = paid;
+      state.paid += paid;
+      state.paidToday += paid;
+      _flow('E', 'B', '\$intérêts', 1, paid);
+    } else if (interest > 0) {
+      stateDebt += interest; // intérêts impayés ajoutés à la dette
+      bank.capitalized += interest;
+      bank.equity += interest;
+      if (banks.isNotEmpty) _attrib(0, interest, income: interest);
+      dayFlows.capitalized += interest;
+      stateInterest += interest;
+      stateInterestToday = interest;
+    }
+    final surplus = state.money - 2 * _stateFloor();
+    if (surplus > 0) {
+      final repaid = transfer(state, null, math.min(stateDebt, params.stateRepayRate * surplus));
+      if (repaid > 0) {
+        ledgerCredit -= repaid;
+        stateDebt -= repaid;
+        stateRepaid += repaid;
+        bank.repaid += repaid;
+        dayFlows.repaid += repaid;
+        _flow('E', 'B', '\$remboursements', 1, repaid);
+      }
     }
   }
 
@@ -2406,6 +2480,13 @@ class Sim {
             _setStock(f, e.key, (f.inv[e.key] ?? 0) + r.qty);
             f.costs += r.spent;
             f.inputSpend += r.spent;
+            if (params.publicImports && !params.trade && r.qty < e.value - eps && publicService(f)) {
+              // importations de secours : le reste du besoin, que le marché d'ici n'a pas servi (le manque reste noté)
+              final x = _publicImport(f, e.key, e.value - r.qty, math.min(share, f.money) - r.spent);
+              _setStock(f, e.key, (f.inv[e.key] ?? 0) + x.$1);
+              f.costs += x.$2;
+              f.inputSpend += x.$2;
+            }
           }
         }
       }
