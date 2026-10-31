@@ -83,7 +83,8 @@ class SimController extends ChangeNotifier {
               ..floatingFx = true // douane : taux de change flottant (idem)
               ..foreignDemand = true // douane : commandes de l'étranger (idem)
               ..revival = true // renaissance des filières éteintes (MODELE.md § 6.22)
-              ..revivalPlannedDemand = true, // demande dérivée comptée au plan de l'aval : moins de relances vouées à l'échec
+              ..revivalPlannedDemand = true // demande dérivée comptée au plan de l'aval : moins de relances vouées à l'échec
+              ..excessCashReturn = true, // excédent de trésorerie reversé aux propriétaires (dérive N16, rapports/anomalies)
             modules: Modules()
               ..jobs = true
               ..entrepreneurship = true
@@ -217,7 +218,8 @@ class SimController extends ChangeNotifier {
           ..floatingFx = true
           ..foreignDemand = true
           ..revival = true // renaissance des filières : voir le constructeur
-          ..revivalPlannedDemand = true,
+          ..revivalPlannedDemand = true
+          ..excessCashReturn = true,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();

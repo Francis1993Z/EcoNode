@@ -678,6 +678,16 @@ Choix de jeu : c'est le débouché de la filière informatique.
   - Pas de dividende qui laisserait moins que le seuil d'embauche des postes voulus.
   - Jamais plus que le bénéfice lissé du jour, ou que les bénéfices non répartis avec `dividendFromRetained`.
   - Repère : Loi canadienne sur les sociétés par actions, art. 42.
+- **Distribution de l'excédent de trésorerie (`excessCashReturn`).** Coupée par défaut dans le moteur, active dans
+  l'interface. Une entreprise privée qui a un propriétaire garde `excessCashDays` (60) jours de coûts (salaires,
+  intrants et frais fixes lissés), plus sa dette et son fonds de réinvestissement ; elle reverse chaque jour
+  `excessCashRate` (2 %) du surplus à son propriétaire, imposé comme un dividende. Le fonds de reconstruction d'un
+  bailleur est plafonné à deux logements neufs. Le dividende I1 ne change pas.
+  - Pourquoi : sans elle, l'argent des ventes s'accumule dans les entreprises et les ménages s'appauvrissent (anomalies
+    N3 et N16, `rapports/anomalies-2026-10-30.md`). À 2 500 citoyens (réglages de l'interface, 10 graines, jours
+    2501-3000) : chômage 13,2 → 6,9 %, ménages qui gardent leur argent. À 240 citoyens : 14,1 → 12,3 %, effet mêlé, et
+    plus d'inflation (indice des prix médian ≈ 2,3 → 3,3 en 3 000 j). Bâtiments × Banques à 240 citoyens : chômage
+    75 → 11 % (`rapports/stabilisation.md`).
 - **Renflouement (filet).** Une entreprise privée qui a des clients et moins de 4 jours de salaires de l'équipe voulue
   reçoit de son propriétaire jusqu'à la moitié de son surplus, pour revenir à 10 jours. Un propriétaire sans moyens est
   remplacé par le citoyen le plus riche (rachat).
