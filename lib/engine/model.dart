@@ -864,6 +864,11 @@ class Params {
   bool revivalHours = false;
   bool revivalFullCost = false;
   bool revivalPlannedDemand = false;
+  // Importations de secours (publicImports, 2026-10-30) : frontières fermées, un établissement public (hôpital, école)
+  // achète à l'étranger, au prix d'import, la part de ses intrants que le marché d'ici n'a pas pu servir. Sans elles,
+  // à 240 citoyens, la mort des petites filières (cuivre, pétrole) arrête l'électronique et le plastique, puis l'hôpital,
+  // et la santé s'effondre (anomalie A1). Frontières ouvertes, l'importation ordinaire suffit.
+  bool publicImports = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

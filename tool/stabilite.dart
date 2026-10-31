@@ -284,6 +284,8 @@ void applyParam(Params p, String k, String v) {
       p.floatingFx = b();
     case 'fxSpeed':
       p.fxSpeed = double.parse(v);
+    case 'publicImports': // importations de secours des établissements publics (frontières fermées)
+      p.publicImports = b();
     case 'foreignDemand': // douane : demande étrangère active (carnet de commandes)
       p.foreignDemand = b();
     case 'fdGrowth':

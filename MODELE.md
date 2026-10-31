@@ -954,6 +954,19 @@ Mesure (240 citoyens, 5 graines, chômage moyen des jours 1000 à 1500) : fronti
 change + demande étrangère 30 % (15 à 20 % dans 4 graines ; la cinquième s'effondre vers le jour 900 : des filières
 d'intrants disparaissent, les intrants importés rendent l'export non rentable, et le taux au plafond n'y peut rien).
 
+Importations de secours (`publicImports`, coupées par défaut dans le moteur, actives dans l'interface) : frontières
+fermées, un établissement public (hôpital ; l'école n'a pas d'intrant) achète d'abord ses intrants sur le marché d'ici,
+puis le reste à l'étranger au prix d'import (`importPrice`), dans la limite de son budget d'achat. Le manque reste noté
+comme demande non servie (signal de relance des filières). Comptes : ceux d'un achat importé (`ledgerImports`, droit de
+douane éventuel à l'État), plus le total `ledgerPublicImports`. **Pourquoi** (anomalie A1) : à 240 citoyens, le cuivre et
+le pétrole ont une demande d'un quart d'employé, qui arrive par à-coups ; la mine perd son employé faute de trésorerie et
+fait faillite (cuivre éteint dans 19 parties sur 20, jour médian 28), l'électronique puis le plastique s'arrêtent, l'hôpital
+ne soigne plus et la santé tombe à 0,05 ; sans filets, l'économie s'écroule ensuite (chômage 95 %). **Mesure** (240
+citoyens, réglages de l'interface, 10 graines × 1 500 j, santé moyenne des 500 derniers jours) : effondrements 7/10 → 0/10
+sans filets et 4/10 → 0/10 avec ; santé 0,83 à 0,88 dans les 20 parties ; coût 3 000 à 85 000 $ importés en 1 500 j
+(au plus 5 % de la masse monétaire). Restent des arrêts de 30 jours et plus dans 11 parties sur 20 : le trésor de l'État,
+vidé par les allocations pendant une récession, passe sous son plancher et l'enveloppe de l'hôpital s'arrête.
+
 ### 6.22 Renaissance des filières (`Params.revival`, `renaissance.dart`)
 
 Coupée par défaut dans le moteur ; l'interface l'active avec la variante `revivalPlannedDemand` (onglet Modèle,

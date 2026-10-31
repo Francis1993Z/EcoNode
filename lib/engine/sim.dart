@@ -588,6 +588,8 @@ class Sim {
   double fxRate = 1, fxImportsEma = 0, fxExportsEma = 0;
   /// Commandes quotidiennes de l'étranger (Params.foreignDemand), en unités, par « identifiant d'entreprise:bien ».
   final Map<String, double> foreignOrders = {};
+  /// Importations de secours des établissements publics (Params.publicImports), en dollars, depuis le début.
+  double ledgerPublicImports = 0;
   double ledgerCredit = 0; // monnaie créée par le crédit, nette des remboursements
   final List<SimEvent> events = [];
   final List<HistPoint> history = [];
@@ -761,6 +763,7 @@ class Sim {
     fxImportsEma = 0;
     fxExportsEma = 0;
     foreignOrders.clear();
+    ledgerPublicImports = 0;
     ledgerCredit = 0;
     events.clear();
     history.clear();
@@ -2406,6 +2409,13 @@ class Sim {
             _setStock(f, e.key, (f.inv[e.key] ?? 0) + r.qty);
             f.costs += r.spent;
             f.inputSpend += r.spent;
+            if (params.publicImports && !params.trade && r.qty < e.value - eps && publicService(f)) {
+              // importations de secours : le reste du besoin, que le marché d'ici n'a pas servi (le manque reste noté)
+              final x = _publicImport(f, e.key, e.value - r.qty, math.min(share, f.money) - r.spent);
+              _setStock(f, e.key, (f.inv[e.key] ?? 0) + x.$1);
+              f.costs += x.$2;
+              f.inputSpend += x.$2;
+            }
           }
         }
       }

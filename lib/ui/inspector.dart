@@ -1246,6 +1246,17 @@ class _WorldView extends StatelessWidget {
           value: p.trade,
           onChanged: (v) => upd(() => sim.setTrade(v)),
         ),
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Importations de secours des établissements publics', style: TextStyle(fontSize: 13)),
+          subtitle: const Text(
+              'Frontières fermées, l’hôpital (et l’école) achètent à l’étranger, au prix d’import, les intrants que '
+              'personne ici n’a pu leur vendre : plus d’arrêt des soins faute de plastique ou d’électronique.',
+              style: TextStyle(fontSize: 11)),
+          value: p.publicImports,
+          onChanged: (v) => upd(() => p.publicImports = v),
+        ),
         ParamSlider(
             label: 'Droit de douane sur les importations',
             value: p.tariff,
@@ -1400,6 +1411,7 @@ class _WorldView extends StatelessWidget {
         KV('Solde commercial', money0(sim.ledgerExports - sim.ledgerImports),
             color: sim.ledgerExports >= sim.ledgerImports ? pal.ok : pal.warn),
         KV('Droits de douane perçus', money0(sim.ledgerTariffs)),
+        KV('Importations de secours (total)', money0(sim.ledgerPublicImports)),
       ]),
       Section('Prix du jour à la frontière', [
         Row(children: [
