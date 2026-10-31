@@ -207,6 +207,8 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.stateRepayRate != d.stateRepayRate) 'stateRepayRate': _d(p.stateRepayRate),
     if (p.normalUtil != d.normalUtil) 'normalUtil': _d(p.normalUtil),
     if (p.cpiSmoothDays != d.cpiSmoothDays) 'cpiSmoothDays': _d(p.cpiSmoothDays),
+    if (p.walletAtTarget != d.walletAtTarget) 'walletAtTarget': p.walletAtTarget,
+    if (p.planFromHouseholds != d.planFromHouseholds) 'planFromHouseholds': p.planFromHouseholds,
     if (p.revival != d.revival) 'revival': p.revival,
     if (p.revivalHours != d.revivalHours) 'revivalHours': p.revivalHours,
     if (p.revivalFullCost != d.revivalFullCost) 'revivalFullCost': p.revivalFullCost,
@@ -378,7 +380,9 @@ Params _paramsFrom(Map j) => Params()
   ..stateDebtMaxGdp = _rdOr(j['stateDebtMaxGdp'], 0.6)
   ..stateRepayRate = _rdOr(j['stateRepayRate'], 0.02)
   ..normalUtil = _rdOr(j['normalUtil'], 0)
-  ..cpiSmoothDays = _rdOr(j['cpiSmoothDays'], 0);
+  ..cpiSmoothDays = _rdOr(j['cpiSmoothDays'], 0)
+  ..walletAtTarget = (j['walletAtTarget'] as bool?) ?? false
+  ..planFromHouseholds = (j['planFromHouseholds'] as bool?) ?? false;
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
