@@ -284,6 +284,12 @@ void applyParam(Params p, String k, String v) {
       p.floatingFx = b();
     case 'fxSpeed':
       p.fxSpeed = double.parse(v);
+    case 'stateBorrowing': // dette publique : l'État emprunte à la Caisse pour les enveloppes des établissements publics
+      p.stateBorrowing = b();
+    case 'stateDebtMaxGdp':
+      p.stateDebtMaxGdp = double.parse(v);
+    case 'stateRepayRate':
+      p.stateRepayRate = double.parse(v);
     case 'publicImports': // importations de secours des établissements publics (frontières fermées)
       p.publicImports = b();
     case 'foreignDemand': // douane : demande étrangère active (carnet de commandes)

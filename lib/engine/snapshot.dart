@@ -202,6 +202,9 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.fdStart != d.fdStart) 'fdStart': _d(p.fdStart),
     if (p.fdMaxCap != d.fdMaxCap) 'fdMaxCap': _d(p.fdMaxCap),
     if (p.publicImports != d.publicImports) 'publicImports': p.publicImports,
+    if (p.stateBorrowing != d.stateBorrowing) 'stateBorrowing': p.stateBorrowing,
+    if (p.stateDebtMaxGdp != d.stateDebtMaxGdp) 'stateDebtMaxGdp': _d(p.stateDebtMaxGdp),
+    if (p.stateRepayRate != d.stateRepayRate) 'stateRepayRate': _d(p.stateRepayRate),
     if (p.revival != d.revival) 'revival': p.revival,
     if (p.revivalHours != d.revivalHours) 'revivalHours': p.revivalHours,
     if (p.revivalFullCost != d.revivalFullCost) 'revivalFullCost': p.revivalFullCost,
@@ -368,7 +371,10 @@ Params _paramsFrom(Map j) => Params()
   ..revivalHours = (j['revivalHours'] as bool?) ?? false
   ..revivalFullCost = (j['revivalFullCost'] as bool?) ?? false
   ..revivalPlannedDemand = (j['revivalPlannedDemand'] as bool?) ?? false
-  ..publicImports = (j['publicImports'] as bool?) ?? false;
+  ..publicImports = (j['publicImports'] as bool?) ?? false
+  ..stateBorrowing = (j['stateBorrowing'] as bool?) ?? false
+  ..stateDebtMaxGdp = _rdOr(j['stateDebtMaxGdp'], 0.6)
+  ..stateRepayRate = _rdOr(j['stateRepayRate'], 0.02);
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
@@ -972,6 +978,8 @@ extension SimSnapshot on Sim {
         if (fxRate != 1 || fxImportsEma != 0 || fxExportsEma != 0) 'fx': [_d(fxRate), _d(fxImportsEma), _d(fxExportsEma)],
         if (foreignOrders.isNotEmpty) 'foreignOrders': _dm(foreignOrders),
         if (ledgerPublicImports != 0) 'ledgerPublicImports': _d(ledgerPublicImports),
+        if (stateBorrowed != 0)
+          'stateDebt': [_d(stateDebt), _d(stateBorrowed), _d(stateInterest), _d(stateRepaid), _d(stateInterestToday)],
         if (importEma.isNotEmpty) 'importEma': _dm(importEma),
         if (banksFounded + banksClosed > 0) 'banksEntryExit': [banksFounded, banksClosed],
         if (consumerLent > 0 || consumerBankruptcies > 0)
@@ -1061,6 +1069,8 @@ extension SimSnapshot on Sim {
         ])),
       if (importEma.isNotEmpty) 'renaissance': _fnv(j(_dm(importEma))),
       if (ledgerPublicImports != 0) 'secours': _fnv(j([_d(ledgerPublicImports)])),
+      if (stateBorrowed != 0)
+        'dette_publique': _fnv(j([_d(stateDebt), _d(stateBorrowed), _d(stateInterest), _d(stateRepaid), _d(stateInterestToday)])),
       if (products.isNotEmpty) 'produits': _fnv(j([for (final p in products.values) _productJson(p), _dm(poorEma)])),
       'moniteur': _fnv(j(monitor.toJson())),
       'historique': _fnv(j(history.isEmpty ? null : _histJson(history.last))),
@@ -1133,6 +1143,12 @@ extension SimSnapshot on Sim {
       ..clear()
       ..addAll(j['foreignOrders'] == null ? const {} : _rdm(j['foreignOrders']));
     ledgerPublicImports = _rdOr(j['ledgerPublicImports'], 0);
+    final sd = (j['stateDebt'] as List?) ?? const [0.0, 0.0, 0.0, 0.0, 0.0];
+    stateDebt = _rd(sd[0]);
+    stateBorrowed = _rd(sd[1]);
+    stateInterest = _rd(sd[2]);
+    stateRepaid = _rd(sd[3]);
+    stateInterestToday = _rd(sd[4]);
     importEma
       ..clear()
       ..addAll(j['importEma'] == null ? const {} : _rdm(j['importEma']));

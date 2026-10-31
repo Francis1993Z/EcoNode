@@ -85,7 +85,8 @@ class SimController extends ChangeNotifier {
               ..revival = true // renaissance des filières éteintes (MODELE.md § 6.22)
               ..revivalPlannedDemand = true // demande dérivée comptée au plan de l'aval : moins de relances vouées à l'échec
               ..excessCashReturn = true // excédent de trésorerie reversé aux propriétaires (dérive N16, rapports/anomalies)
-              ..publicImports = true, // hôpital : importations de secours de ses intrants (anomalie A1)
+              ..publicImports = true // hôpital : importations de secours de ses intrants (anomalie A1)
+              ..stateBorrowing = true, // l'État emprunte plutôt que de couper l'enveloppe de l'hôpital (anomalie A1)
             modules: Modules()
               ..jobs = true
               ..entrepreneurship = true
@@ -221,7 +222,8 @@ class SimController extends ChangeNotifier {
           ..revival = true // renaissance des filières : voir le constructeur
           ..revivalPlannedDemand = true
           ..excessCashReturn = true
-          ..publicImports = true,
+          ..publicImports = true
+          ..stateBorrowing = true,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();

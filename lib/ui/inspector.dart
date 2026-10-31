@@ -967,6 +967,39 @@ class _StateView extends StatelessWidget {
         KV('Impôts aujourd’hui', money0(st.taxesToday)),
         KV('Versements aujourd’hui', money0(st.paidToday)),
       ]),
+      Section('Dette publique', [
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('L’État peut emprunter', style: TextStyle(fontSize: 13)),
+          subtitle: const Text(
+              'Quand le trésor ne suffit plus aux enveloppes de l’hôpital et de l’école, l’État emprunte la différence '
+              'à la Caisse au lieu de les couper ; il paie les intérêts et rembourse quand le trésor se reconstitue.',
+              style: TextStyle(fontSize: 11)),
+          value: p.stateBorrowing,
+          onChanged: (v) {
+            p.stateBorrowing = v;
+            ctrl.touch();
+          },
+        ),
+        if (p.stateBorrowing)
+          ParamSlider(
+              label: 'Plafond de la dette (part du PIB annuel)',
+              value: p.stateDebtMaxGdp,
+              min: 0,
+              max: 1.5,
+              format: pct,
+              onChanged: (v) {
+                p.stateDebtMaxGdp = (v * 100).round() / 100;
+                ctrl.touch();
+              }),
+        KV('Dette', money0(sim.stateDebt), color: sim.stateDebt > 0 ? pal.warn : null),
+        KV('Plafond', money0(sim.stateDebtCeiling())),
+        KV('Taux', '${fmtNum(sim.baseRate() * 100, 2)} %'),
+        KV('Intérêts aujourd’hui', money0(sim.stateInterestToday)),
+        KV('Emprunté · remboursé (total)', '${money0(sim.stateBorrowed)} · ${money0(sim.stateRepaid)}'),
+        KV('Intérêts (total)', money0(sim.stateInterest)),
+      ]),
       if (m.insurance)
         Section('Assurance-emploi et aide sociale', [
           KV('Cotisations perçues (total)', money0(st.eiPremiums)),

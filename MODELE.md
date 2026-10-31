@@ -691,6 +691,16 @@ Choix de jeu : c'est le débouché de la filière informatique.
 - **Renflouement (filet).** Une entreprise privée qui a des clients et moins de 4 jours de salaires de l'équipe voulue
   reçoit de son propriétaire jusqu'à la moitié de son surplus, pour revenir à 10 jours. Un propriétaire sans moyens est
   remplacé par le citoyen le plus riche (rachat).
+- **Dette publique (`stateBorrowing`).** Coupée par défaut dans le moteur, active dans l'interface. Quand le trésor,
+  au-dessus de son plancher, ne suffit pas aux enveloppes des établissements publics (I2), l'État emprunte la différence
+  à la Caisse, qui crée la monnaie prêtée (`ledgerCredit`, `bank.lent`, comme un prêt à une entreprise), jusqu'à
+  `stateDebtMaxGdp` (60 %) du PIB annuel. Chaque jour, avant les enveloppes, il paie les intérêts au taux de base des
+  prêts (`baseRate`), capitalisés si le trésor ne peut pas les payer, et rembourse `stateRepayRate` (2 %) de ce qui
+  dépasse deux fois son plancher. La dette entre dans `totalLoans` (invariants) mais pas dans l'exposition pondérée de la
+  Caisse (dette souveraine pondérée à 0 %, Bâle III). Mesure (240 citoyens, réglages de l'interface avec les importations
+  de secours, 10 graines × 1 500 j) : jours sans soins 0 à 184 → 0 à 8 ; dette au plus 60 000 à 254 000 $ (moins de
+  2,5 % du PIB annuel), remboursée en fin de partie dans 19 parties sur 20 ; chômage des jours 1100-1500 inchangé (5,4 %
+  contre 4,5 % sans filets, 7,0 % contre 6,8 % avec).
 - **Redistribution de l'État.** Au-delà d'une réserve de 30 × `benefit` × max(4 ; population/10), `stateRebate` du
   surplus est versé chaque jour à parts égales.
 

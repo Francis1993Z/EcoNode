@@ -869,6 +869,14 @@ class Params {
   // à 240 citoyens, la mort des petites filières (cuivre, pétrole) arrête l'électronique et le plastique, puis l'hôpital,
   // et la santé s'effondre (anomalie A1). Frontières ouvertes, l'importation ordinaire suffit.
   bool publicImports = false;
+  // Dette publique (stateBorrowing, 2026-10-30) : quand le trésor, au-dessus de son plancher, ne suffit pas aux
+  // enveloppes des établissements publics, l'État emprunte la différence à la Caisse (création de monnaie, comme un prêt
+  // à une entreprise), jusqu'à stateDebtMaxGdp du PIB annuel (60 % : repère de Maastricht). Il paie chaque jour les
+  // intérêts au taux de base des prêts (Sim.baseRate) et rembourse stateRepayRate par jour de ce qui dépasse deux fois
+  // son plancher. Sans elle, une récession qui vide le trésor coupe l'enveloppe de l'hôpital (anomalie A1).
+  bool stateBorrowing = false;
+  double stateDebtMaxGdp = 0.6;
+  double stateRepayRate = 0.02;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
