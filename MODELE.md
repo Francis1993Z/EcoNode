@@ -446,7 +446,10 @@ l'écran de départ, paramètres de départ seulement) :
 - `planFromHouseholds` : le plan remplace son panier discrétionnaire fixe par le panier réel des ménages, mesuré sur une
   partie provisoire (mêmes graine et réglages, au plus 1 000 citoyens, achats des jours 101 à 200) ; l'indice des prix
   prend le même panier. Sinon le plan prévoit par exemple 49 bijoux par jour à 240 citoyens quand les ménages en achètent
-  2, et 420 pains au lieu de 630. Coût : 1,7 s au démarrage à 240 citoyens, 4,7 s au-delà de 1 000.
+  2, et 420 pains au lieu de 630. Coût : 1,7 s au démarrage à 240 citoyens, 4,7 s au-delà de 1 000. Le logement reste
+  un besoin fixe, une nuit par personne (correctif du 2026-11-01) : mesuré et multiplié par l'échelle du plan, il oubliait
+  les propriétaires-occupants et les sans-abri de la partie provisoire, et les bailleurs démarraient trop petits ; avec
+  Bâtiments, 214 à 286 sans-abri au jour 1 à 2 500 citoyens, 800 à 1 086 avec les Banques (5 graines) ; aucun depuis.
 - `spreadHealth` : la santé de départ de chaque citoyen est tirée entre 0,75 (seuil de consultation) et 1, au lieu de 1
   pour tous ; sinon la santé moyenne descend vers ≈ 0,875 les deux premiers mois et tout le monde consulte en même temps.
 - `planWorkforce` : le plan compte chaque employé à son efficacité d'équilibre (facteur santé 0,4 + 0,6 × 0,875) et

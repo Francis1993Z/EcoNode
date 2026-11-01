@@ -1099,8 +1099,11 @@ class Sim {
       for (var it = 0; it < 80; it++) {
         final d = <String, double>{
           for (final g in goods.keys)
+            // panier mesuré des ménages ; le logement reste un besoin fixe, une nuit par personne : mesuré, il manquait
+            // les propriétaires-occupants et les sans-abri de la partie provisoire, et l'échelle lambda le réduisait
+            // (bailleurs sous-dimensionnés, jusqu'à 1 086 sans-abri au jour 1 à 2 500 citoyens avec bâtiments et banques)
             g: basket != null
-                ? pop * (basket.containsKey(g) ? lambda * basket[g]! : (basic[g] ?? 0)) // panier mesuré des ménages
+                ? pop * (basket.containsKey(g) && g != 'logement' ? lambda * basket[g]! : (basic[g] ?? 0))
                 : pop * ((basic[g] ?? 0) + lambda * (_extraDemand[g] ?? 0)),
         };
         for (final ty in types) {
