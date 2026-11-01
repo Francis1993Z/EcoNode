@@ -38,7 +38,9 @@ Params parametresInterface(int population) => Params()
   ..planWorkforce = true
   ..ownersAtStart = true
   ..reservePerCitizen = 2000
-  ..prodEntryMargin = 0.05;
+  ..prodEntryMargin = 0.05
+  ..spreadTakeovers = true
+  ..progressiveTax = true;
 
 /// Leviers du module Produits et de l'entrepreneuriat (absents du protocole de stabilité), puis ceux du protocole.
 void regler(Params p, String nom, String valeur) {

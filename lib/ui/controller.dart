@@ -30,7 +30,8 @@ class Tabs {
   static const journal = 4;
   static const model = 5;
   static const housing = 6;
-  static const labels = ['Inspecteur', 'Diagnostic', 'God mode', 'Économie', 'Journal', 'Modèle', 'Immobilier'];
+  static const taxes = 7;
+  static const labels = ['Inspecteur', 'Diagnostic', 'God mode', 'Économie', 'Journal', 'Modèle', 'Immobilier', 'Impôts'];
 }
 
 /// Pilote la simulation : boucle de temps, vitesse, sélection, notifications d'interface.
@@ -94,6 +95,7 @@ class SimController extends ChangeNotifier {
               ..jointCostBySales = true // coproduits : le coût commun se répartit sur ce qui se vend (A3)
               ..prodEntryMargin = 0.05 // produits : une variété peut entrer si les vendeurs en place font un profit (N2)
               ..spreadTakeovers = true // filet de renflouement : le racheteur n'est plus toujours le plus riche (N16)
+              ..progressiveTax = true // impôt progressif sur le revenu du jour (onglet Impôts)
               ..walletAtTarget = true // démarrage à l'équilibre (anomalie N6)
               ..planFromHouseholds = true
               ..spreadHealth = true
@@ -249,7 +251,8 @@ class SimController extends ChangeNotifier {
           ..purchaseLoans = true
           ..jointCostBySales = true
           ..prodEntryMargin = 0.05
-          ..spreadTakeovers = true,
+          ..spreadTakeovers = true
+          ..progressiveTax = true,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();

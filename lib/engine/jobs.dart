@@ -85,7 +85,7 @@ extension SimJobs on Sim {
       final years = math.min(10, tenure(c) ~/ 365);
       return c.wage * (1 + p.switchPremium + 0.01 * years);
     }
-    final keep = 1 - p.taxRate - (modules.insurance ? p.eiRate : 0);
+    final keep = 1 - (p.progressiveTax ? p.taxRate1 : p.taxRate) - (modules.insurance ? p.eiRate : 0);
     final floor = math.max(p.minWage, keep > 0.05 ? 1.1 * benefitNow(c) / keep : 0.0);
     final decay = math.max(p.reservationFloor, 1 - p.reservationDecay * c.daysUnemployed);
     return math.max(floor, c.wage * decay);

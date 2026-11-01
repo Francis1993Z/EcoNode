@@ -217,6 +217,14 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.ownersAtStart != d.ownersAtStart) 'ownersAtStart': p.ownersAtStart,
     if (p.jointCostBySales != d.jointCostBySales) 'jointCostBySales': p.jointCostBySales,
     if (p.spreadTakeovers != d.spreadTakeovers) 'spreadTakeovers': p.spreadTakeovers,
+    if (p.progressiveTax != d.progressiveTax) 'progressiveTax': p.progressiveTax,
+    if (p.taxCut1 != d.taxCut1) 'taxCut1': _d(p.taxCut1),
+    if (p.taxCut2 != d.taxCut2) 'taxCut2': _d(p.taxCut2),
+    if (p.taxCut3 != d.taxCut3) 'taxCut3': _d(p.taxCut3),
+    if (p.taxRate1 != d.taxRate1) 'taxRate1': _d(p.taxRate1),
+    if (p.taxRate2 != d.taxRate2) 'taxRate2': _d(p.taxRate2),
+    if (p.taxRate3 != d.taxRate3) 'taxRate3': _d(p.taxRate3),
+    if (p.taxRate4 != d.taxRate4) 'taxRate4': _d(p.taxRate4),
     if (p.revival != d.revival) 'revival': p.revival,
     if (p.revivalHours != d.revivalHours) 'revivalHours': p.revivalHours,
     if (p.revivalFullCost != d.revivalFullCost) 'revivalFullCost': p.revivalFullCost,
@@ -398,7 +406,15 @@ Params _paramsFrom(Map j) => Params()
   ..purchaseLoans = (j['purchaseLoans'] as bool?) ?? false
   ..ownersAtStart = (j['ownersAtStart'] as bool?) ?? false
   ..jointCostBySales = (j['jointCostBySales'] as bool?) ?? false
-  ..spreadTakeovers = (j['spreadTakeovers'] as bool?) ?? false;
+  ..spreadTakeovers = (j['spreadTakeovers'] as bool?) ?? false
+  ..progressiveTax = (j['progressiveTax'] as bool?) ?? false
+  ..taxCut1 = _rdOr(j['taxCut1'], 1)
+  ..taxCut2 = _rdOr(j['taxCut2'], 3)
+  ..taxCut3 = _rdOr(j['taxCut3'], 10)
+  ..taxRate1 = _rdOr(j['taxRate1'], 0.10)
+  ..taxRate2 = _rdOr(j['taxRate2'], 0.20)
+  ..taxRate3 = _rdOr(j['taxRate3'], 0.35)
+  ..taxRate4 = _rdOr(j['taxRate4'], 0.50);
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),

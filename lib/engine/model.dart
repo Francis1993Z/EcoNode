@@ -949,6 +949,20 @@ class Params {
   // dépenser (60 achats par jour et par désir), et la dépense s'effondre : crises de plus en plus profondes à 2 500
   // citoyens (chômage 14,6 % en moyenne des jours 4 501 à 5 000, jusqu'à 41 % dans une graine).
   bool spreadTakeovers = false;
+  // Impôt progressif (progressiveTax, 2026-11-01) : au lieu du taux unique taxRate, un barème à quatre tranches sur le revenu
+  // brut d'une journée de chaque citoyen (salaires, dividendes, excédents de trésorerie reversés ; pas les prestations),
+  // seuils en multiples du salaire moyen du jour (le barème suit les prix). L'impôt d'un versement est le barème appliqué au
+  // revenu brut du jour, moins ce que les versements précédents du jour ont déjà payé : la somme ne dépend pas de leur
+  // ordre, et le propriétaire de vingt entreprises paie sur le total de leurs dividendes. Les recettes vont au trésor, qui
+  // reverse son surplus à parts égales (stateRebate).
+  bool progressiveTax = false;
+  double taxCut1 = 1; // fin de la première tranche, en salaires moyens par jour
+  double taxCut2 = 3;
+  double taxCut3 = 10;
+  double taxRate1 = 0.10; // taux marginaux des quatre tranches
+  double taxRate2 = 0.20;
+  double taxRate3 = 0.35;
+  double taxRate4 = 0.50;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
