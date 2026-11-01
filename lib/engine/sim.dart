@@ -1024,6 +1024,7 @@ class Sim {
     bankingActive = this.modules.banking;
     if (bankingActive) _bankingSwitch(atReset: true); // banques de départ et leur dotation (avant m0)
     if (this.modules.buildings) _seedBuildings();
+    if (this.modules.buildings && p.ownersAtStart) _seedOwners();
     m0 = totalMoney();
     bank.reserves = m0; // toute la monnaie de départ est « extérieure »
     bank.equity = bank.money;

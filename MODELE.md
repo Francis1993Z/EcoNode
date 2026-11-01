@@ -371,6 +371,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
 | `revival`, `revivalHours`, `revivalFullCost`, `revivalPlannedDemand` | non, non, non, non | renaissance des filières (§ 6.22) : signal d'entrée d'un bien sans producteur actif ; relance à temps partiel ; viabilité d'une relance au coût complet et prix de départ face à l'import ; demande dérivée au plan de production de l'aval | mesure § 6.22 |
 | `equalBanks` | non | banques (§ 6.19) : la Caisse est une banque comme les autres ; hypothèques chez la banque de l'emprunteur | mesure § 6.19 |
+| `ownersAtStart` | non | démarrage (§ 5) : propriétaires de départ, logement payé (module Bâtiments) | mesure § 5 |
 | `purchaseLoans` | non | crédit (§ 6.19) : le prêt d'un ordinateur sert à l'acheter (en stock, montant qui manque) | mesure § 6.19 |
 | `leases` | non | baux (§ 6.6) : un locataire garde son logement tant qu'il paie ; le personnel du bailleur ne sert qu'aux nouveaux baux ; loyer = coût d'usage du logement | mesure § 6.6 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
@@ -458,6 +459,20 @@ l'écran de départ, paramètres de départ seulement) :
 - `planWorkforce` : le plan compte chaque employé à son efficacité d'équilibre (facteur santé 0,4 + 0,6 × 0,875) et
   réserve l'arrondi des équipes (≈ 0,3 employé par entreprise) dans son objectif de 94 % d'emploi ; sinon, dès le premier
   jour, les entreprises veulent ≈ 104 % de la population active.
+- `ownersAtStart` (2026-11-01, avec le module Bâtiments) : chaque citoyen qui veut posséder et a un emploi commence
+  propriétaire-occupant, d'un logement du parc des bailleurs entièrement payé (`_seedOwners`) ; ≈ 70 % des citoyens.
+  Sinon tout le monde commence locataire et 70 % des ménages achètent à crédit en 500 jours : ces hypothèques (≈ 50 M$
+  à 2 500 citoyens) deviennent de la monnaie que les ménages, qui ne gardent qu'≈ 20 jours de revenu, dépensent jusqu'à
+  ce que les prix l'absorbent (× 4,7 avec les banques), puis l'amortissement les fait lentement baisser. **Essayé et
+  retiré** : des propriétaires de départ avec leurs hypothèques en cours, sans la monnaie qu'elles ont créée (une part de
+  la monnaie de départ déclarée « de crédit ») : l'économie doit cinq fois l'argent qu'elle possède, les remboursements
+  le détruisent, chômage 58 % au jour 3 000. **Mesure** (2 500 citoyens, Bâtiments, Banques, baux, réglages de
+  l'interface, 10 graines × 3 000 j) : prix au plus haut × 4,66 → × 1,75 (au plus × 2,08), chômage moyen des jours 1 à
+  1 000 5,5 → 6,2 %, des jours 2 001 à 3 000 7,1 → 6,5 % (pire graine 10,1 → 10,7 %), propriétaires ≈ 1 740 dès le
+  départ ; ensuite les hypothèques grossissent doucement par les reventes (3,8 → 7,9 M$) et les prix d'≈ 1 %/an. Caisse
+  seule : chômage 6,7 → 6,7 %, propriétaires ≈ 300 → ≈ 1 740 (la Caisse, peu capitalisée, n'en finançait pas plus).
+  Reste une hausse des prix d'≈ 50 % les 250 premiers jours avec Bâtiments, présente aussi sans propriétaires de départ
+  ni banques : elle ne vient pas des hypothèques.
 
 Sans ces réglages, le marché du travail est saturé dès les premiers jours (chômage 0 %) et prix et salaires montent de
 35 à 55 % en 100 jours avant de se stabiliser. Mesure (réglages de l'interface ; indice des prix moyen au jour 100) :
@@ -1058,9 +1073,14 @@ d'hypothèques), les prix sont multipliés par 29 puis le chômage monte à 30-5
 | **banques à égalité, dotation 2 000 $, prêt d'achat fidèle** | **7,1 %** (mieux dans 9 graines sur 10) | **10,1 %** | × 4,7 (au plus × 5,0) |
 
 À 240 citoyens, même configuration : 6,2 % (pire graine 7,5 %), prix au plus haut × 7,4 (au plus × 9,1), contre des prix
-multipliés par 73 à 105 dans 3 graines sur 5 sans correctif. Les trois banques survivent dans les 20 parties. Reste la
+multipliés par 73 à 105 dans 3 graines sur 5 sans correctif. Les trois banques survivent dans les 20 parties. La
 vague d'achats du démarrage (70 % des ménages achètent en 500 jours, à crédit : prix × 4,7 à 2 500 citoyens, × 7,4 à
-240), puis une baisse lente des prix quand les hypothèques se remboursent (−21 % et −46 % entre les jours 500 et 3 000).
+240, puis une baisse lente des prix quand les hypothèques se remboursent) disparaît avec les propriétaires de départ
+(`ownersAtStart`, § 5 : prix au plus haut × 1,75).
+
+**Sauvegarde.** Les chiffres du dernier relevé de chaque banque (fonds propres, dépôts, réserves, prêts, prêts pondérés,
+clients) sont sauvegardés : les règles du lendemain matin s'en servent avant le prochain relevé ; une partie rechargée
+les avait à zéro et refusait tout crédit son premier jour.
 
 ### 6.20 Banque centrale : taux directeur (`Params.policyPassThrough`)
 
