@@ -631,7 +631,9 @@ extension SimBanks on Sim {
     _banksMeasure();
     for (final b in banks) {
       if (!b.alive || p.bankRebate <= 0) continue;
-      final surplus = math.min(bank.money, b.equityNow - math.max(b.capital, p.bankTargetRatio * b.riskLoans));
+      // Params.bankMortgageIncome : la Caisse garde ses parts sociales et sa dotation (bank.capital), jamais distribuées
+      final floor = b.id == 0 && p.bankMortgageIncome ? bank.capital : b.capital;
+      final surplus = math.min(bank.money, b.equityNow - math.max(floor, p.bankTargetRatio * b.riskLoans));
       if (surplus <= eps || b.profitEma <= 0) continue;
       final owner = b.ownerId != null ? _cmap[b.ownerId!] : null;
       final total0 = surplus * p.bankRebate;
@@ -755,6 +757,15 @@ extension SimBanks on Sim {
       if (f.bankId == b.id) f.bankId = acq.id;
     }
     if (acq.id != 0) acq.equity += b.equity;
+    if (params.bankMortgageIncome && b.equity > 0) {
+      // le capital de la banque reprise reste bloqué chez celle qui la reprend (jamais distribué en dividendes)
+      final kept = math.min(b.capital, b.equity);
+      if (acq.id == 0) {
+        bank.capital += kept;
+      } else {
+        acq.capital += kept;
+      }
+    }
     acq.interbank += b.interbank;
     final lost = b.equity;
     b

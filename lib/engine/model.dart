@@ -915,6 +915,13 @@ class Params {
   // c'est acheter chaque jour une nuitée produite par un employé : quand le marché du travail est saturé, les bailleurs
   // perdent leurs employés et des ménages solvables dorment dehors à côté de logements vides.
   bool leases = false;
+  // Hypothèques dans les comptes des banques (bankMortgageIncome, 2026-11-01, anomalie N4) : avec le module banques, les
+  // intérêts des hypothèques (que porte la Caisse) comptent dans ses revenus, et leurs pertes dans ses pertes ; la Caisse
+  // garde comme plancher de dividende ses parts sociales et sa dotation (bank.capital), et le capital d'une banque reprise
+  // reste bloqué chez celle qui la reprend. Sinon les intérêts hypothécaires (≈ 4 M$ par an à 2 500 citoyens) ne comptent
+  // dans le profit d'aucune banque : la Caisse paraît déficitaire, ne verse jamais de dividende, et la monnaie s'accumule
+  // dans le système bancaire (déflation par la dette).
+  bool bankMortgageIncome = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

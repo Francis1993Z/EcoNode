@@ -168,6 +168,7 @@ extension SimBuildings on Sim {
       bank.writtenOff += rem;
       bank.equity -= rem;
       dayFlows.writtenOff += rem;
+      if (params.bankMortgageIncome && banks.isNotEmpty) _attrib(0, -rem, loss: rem);
       m.principal = 0;
       if (trace != null) _t('credit', 'radiation', 'Caisse', null, 'radiation d’hypothèque', why, rem);
     }
@@ -376,6 +377,7 @@ extension SimBuildings on Sim {
         bank.interest += pi;
         bank.equity += pi;
         dayFlows.interest += pi;
+        if (params.bankMortgageIncome && banks.isNotEmpty) _attrib(0, pi, income: pi); // module banques : à la Caisse
         if (acct is Firm) acct.costs += pi;
         if (capital > 0) _repayMortgage(m, acct, capital);
         m.missed = 0;
@@ -385,6 +387,7 @@ extension SimBuildings on Sim {
         m.principal += interest; // intérêts impayés capitalisés
         bank.capitalized += interest;
         bank.equity += interest;
+        if (params.bankMortgageIncome && banks.isNotEmpty) _attrib(0, interest, income: interest);
         dayFlows.capitalized += interest;
         m.missed++;
         if (m.missed > params.foreclosureDays) _foreclose(m);

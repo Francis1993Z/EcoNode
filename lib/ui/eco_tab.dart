@@ -664,6 +664,18 @@ Widget _banksSection(BuildContext context, SimController ctrl, void Function(voi
         'intérêts des dépôts, pertes et coûts (employés, local). Les paiements entre banques se règlent en réserves ; '
         'une banque à court emprunte aux autres au taux directeur. Les clients changent rarement de banque.',
         style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Hypothèques dans les comptes des banques', style: TextStyle(fontSize: 13)),
+      subtitle: const Text(
+          'La Caisse porte les hypothèques : leurs intérêts comptent dans ses revenus et lui font verser des dividendes ; '
+          'sa dotation, et le capital des banques qu’elle reprend, ne sont jamais distribués. Coupé, les intérêts '
+          'hypothécaires s’accumulent dans les banques sans revenir aux ménages (déflation par la dette, anomalie N4).',
+          style: TextStyle(fontSize: 11)),
+      value: p.bankMortgageIncome,
+      onChanged: (v) => upd(() => p.bankMortgageIncome = v),
+    ),
     ParamSlider(
         label: 'Banques de départ (nouvelle partie)',
         value: p.nBanks.toDouble(),
