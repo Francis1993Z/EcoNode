@@ -79,7 +79,7 @@ class SimController extends ChangeNotifier {
             seed: seed,
             params: Params()
               ..policyPassThrough = true
-              ..tradeWaves = true // douane : prix mondiaux en vagues (sans effet tant que les frontières sont fermées)
+              ..tradeWaves = true // douane : prix mondiaux en vagues (frontières fermées : importations de secours)
               ..floatingFx = true // douane : taux de change flottant (idem)
               ..foreignDemand = true // douane : commandes de l'étranger (idem)
               ..revival = true // renaissance des filières éteintes (MODELE.md § 6.22)

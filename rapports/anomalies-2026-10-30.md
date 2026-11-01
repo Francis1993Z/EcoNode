@@ -16,7 +16,7 @@ Réglages par défaut aujourd'hui :
 |---|---|---|
 | `partTime` (temps partiel) | **actif** | actif (interrupteur à l'écran de départ) |
 | `revival` + `revivalPlannedDemand` (renaissance des filières) | coupée | **active** (onglet Modèle) |
-| `tradeWaves`, `floatingFx`, `foreignDemand` (douane) | coupés | **actifs**, sans effet tant que les frontières sont fermées |
+| `tradeWaves`, `floatingFx`, `foreignDemand` (douane) | coupés | **actifs** ; frontières fermées, seules les vagues jouent, sur le prix des importations de secours |
 | `trade` (frontières ouvertes) | coupé | coupé (écran de départ, nœud Douane en jeu) |
 | `policyPassThrough` (banque centrale) | coupée | **active** |
 | `excessCashReturn` (excédent de trésorerie) | coupée | **active** depuis le 30 octobre (onglet Modèle) |
@@ -34,7 +34,7 @@ Réglages par défaut aujourd'hui :
 | A4 | Effondrement de fin de partie, trésor de l'État vide | Réglé par I3 (non revérifié) |
 | A5 | Démarrage en sur-emploi | **Cause trouvée, corrigée dans l'interface (démarrage à l'équilibre, voir N6).** Le plan promettait 94 % d'emploi mais la règle d'embauche en voulait ≈ 104 % (efficacité des employés < 1, arrondi des équipes), plus une demande excédentaire (épargne de départ au-dessus de la cible, panier du plan différent des achats réels) |
 | A6 | Le logement manque | **Module Bâtiments coupé par défaut, non calibré.** Voir N3, N4, N11 |
-| A7 | Prix aberrants, sauts de l'indice des prix | **Cause trouvée, corrigée dans l'interface (`normalUtil` = 0,5, branche `fix/prix-aberrants`).** Une entreprise à 5-15 % d'utilisation répartit frais fixes et heures minimales sur une production minuscule : coût réel 7-8 fois la référence, prix qui suit malgré une marge au plancher, clients qui fuient. Les sauts de l'indice (jusqu'à +63 % en un jour) viennent d'un bien vendu à l'unité (bijoux) à prix aberrant. Prix au coût normal (Godley-Lavoie), 240 citoyens, 10 graines : prix > 3× la référence 14,6 → 1,3 % des jours-entreprises, fermetures 17 → 5, indice final 0,75-2,63 → 1,04-1,28, chômage 7,6 → 5,4 %. **Reste : à 2 500 citoyens, chômage 4,4 → 8,3 %** (198 entreprises au lieu de 113, deux fois plus petites, 31 % à perte : « zombies » ; paradoxe plus d'entreprises / moins d'emplois non expliqué). Sortie pour pertes persistantes essayée et retirée |
+| A7 | Prix aberrants, sauts de l'indice des prix | **Cause trouvée, corrigée dans l'interface (`normalUtil` = 0,5, branche `fix/prix-aberrants`).** Une entreprise à 5-15 % d'utilisation répartit frais fixes et heures minimales sur une production minuscule : coût réel 7-8 fois la référence, prix qui suit malgré une marge au plancher, clients qui fuient. Les sauts de l'indice (jusqu'à +63 % en un jour) viennent d'un bien vendu à l'unité (bijoux) à prix aberrant. Prix au coût normal (Godley-Lavoie), 240 citoyens, 10 graines : prix > 3× la référence 14,6 → 1,3 % des jours-entreprises, fermetures 17 → 5, indice final 0,75-2,63 → 1,04-1,28, chômage 7,6 → 5,4 %. **Paradoxe à 2 500 citoyens résolu le 31 octobre : c'était l'échantillon.** Sur 10 graines, réglages actuels (démarrage à l'équilibre compris), jours 1 001 à 1 500 : chômage 9,2 → 6,4 % avec le coût normal (écart-type 3,2 → 2,0, mieux dans 8 graines sur 10), employés 2 241 → 2 314, entreprises 115 → 183. Les entreprises en plus sont de petites entreprises d'amont (1 à 2 employés, souvent à perte : « zombies ») qui n'enlèvent pas d'emplois. Le 4,4 → 8,3 % venait de 5 graines favorables au coût réel ; sur 10 graines sans démarrage à l'équilibre, 6,3-7,2 % contre 7,1 %, écart non significatif. Sortie pour pertes persistantes essayée et retirée |
 | A8 | Services vendus sous leur coût | Hôpital et école : I2. Pétrochimie et électronique : non revérifiées. Lié à A1 (plastique vendu sous son coût) |
 | A9 | Caisse insolvable sans filets | I4 appliqué ; effet des faillites de banques (module Banques) non vérifié |
 
@@ -82,11 +82,14 @@ Réglages par défaut aujourd'hui :
   chômage par rapport à l'économie fermée ; à 1 500 j, l'économie fermée dérive aussi (N14).
 - `tool/reference.sh` joue les exécutables de `build/outils/` : les recompiler (`bash tool/compiler.sh`) avant de
   vérifier, sinon la référence diverge à tort.
+- À 2 500 citoyens, 5 graines ne suffisent pas : l'économie est chaotique (un changement minime, comme le prix des
+  importations de secours, fait passer une graine de 6,1 à 14,4 % de chômage) et une graine sur cinq environ part vers
+  11 à 19 % au coût réel. Comparer par paires sur 10 graines au moins (A7).
 
 ## 6. Décisions de Francis en attente
 
 1. Module Produits : N1 ne se produit plus avec le temps partiel ; reste N2 (émergence faible) et la dérive longue N16.
-2. À 2 500 citoyens, le chômage plus élevé avec le prix au coût normal (A7) ; creux de déflation des jours 500 à 1 500 (N6).
+2. Creux de déflation des jours 500 à 1 500 (N6). (Le paradoxe A7 à 2 500 citoyens est résolu : c'était l'échantillon.)
 3. Déflation par la dette à 2 500 citoyens (N4) : étaler la vague d'hypothèques, reventes, politique monétaire.
 4. `healthWearIfDeprived` (A1) et répartition des coûts des coproduits (A3).
 5. Calibrage des Bâtiments (A6, N11).
