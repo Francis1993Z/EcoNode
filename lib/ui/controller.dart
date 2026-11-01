@@ -88,6 +88,7 @@ class SimController extends ChangeNotifier {
               ..publicImports = true // hôpital : importations de secours de ses intrants (anomalie A1)
               ..stateBorrowing = true // l'État emprunte plutôt que de couper l'enveloppe de l'hôpital (anomalie A1)
               ..normalUtil = 0.5 // prix au coût normal : plus de prix aberrants (anomalie A7)
+              ..leases = true // baux : un locataire garde son logement tant qu'il paie (anomalies A6 et N11)
               ..walletAtTarget = true // démarrage à l'équilibre (anomalie N6)
               ..planFromHouseholds = true
               ..spreadHealth = true
@@ -233,7 +234,8 @@ class SimController extends ChangeNotifier {
           ..excessCashReturn = true
           ..publicImports = true
           ..stateBorrowing = true
-          ..normalUtil = 0.5,
+          ..normalUtil = 0.5
+          ..leases = true,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();

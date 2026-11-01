@@ -370,6 +370,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `floatingFx`, `fxSpeed` | non, 0,05 | douane (§ 6.21) : taux de change flottant et sa vitesse d'ajustement par jour | mesure § 6.21 |
 | `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
 | `revival`, `revivalHours`, `revivalFullCost`, `revivalPlannedDemand` | non, non, non, non | renaissance des filières (§ 6.22) : signal d'entrée d'un bien sans producteur actif ; relance à temps partiel ; viabilité d'une relance au coût complet et prix de départ face à l'import ; demande dérivée au plan de production de l'aval | mesure § 6.22 |
+| `leases` | non | baux (§ 6.6) : un locataire garde son logement tant qu'il paie ; le personnel du bailleur ne sert qu'aux nouveaux baux ; loyer = coût d'usage du logement | mesure § 6.6 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
 | `priceStep`, `wageStep` | 0,02, 0,015 | pas d'ajustement de la marge et du salaire | choix de jeu (tâche 3 du plan : lissage) |
 | `priceMaxDaily`, `wageMaxDaily` | 1,5 %/j | variation quotidienne maximale décidée par l'entreprise | coûts d'étiquetage, contrats, réputation ; sous le plafond de 2 %/j du filet |
@@ -635,7 +636,39 @@ des contrats.
 2. **Manger.** Jusqu'à 5 achats, tant que la faim n'est pas comblée. Le citoyen prend l'aliment qui apporte le plus de
    satisfaction par dollar, selon le goût de sa classe et la notoriété du bien. Si son favori manque, la demande non
    servie est notée. Il a faim (`hungerDays`) si sa satisfaction de faim reste sous 0,5.
-3. **Se loger.** Une nuitée par jour ; sans nuitée, il est sans logis.
+3. **Se loger.** Une nuitée par jour ; sans nuitée, il est sans logis. Avec les baux (`leases`, ci-dessous), un
+   locataire paie d'abord le loyer de son bailleur.
+
+**Baux (`leases`, 2026-11-01, anomalies A6 et N11).** Coupés par défaut dans le moteur ; l'interface les active (onglet
+Modèle, section « Logement »).
+- **Bail.** Un locataire (`Citizen.leaseFirm`) paie chaque jour à son bailleur le loyer affiché, hors du stock de
+  nuitées (`_payRent`), et reste logé même si le bailleur manque d'employés. Louer une nuitée sur le marché ouvre un bail
+  chez ce bailleur. Au départ, chaque citoyen a un bail, réparti à tour de rôle entre les bailleurs dans la limite de
+  leur capacité.
+- **Fin du bail** (`_leaseMorning`, chaque matin, ou au moment de payer) : loyer impayable, logement acheté
+  (propriétaire-occupant), bailleur disparu, ou parc devenu plus petit que le nombre de locataires (les derniers de la
+  liste des citoyens partent). Coupés en cours de partie, tous les baux prennent fin le lendemain.
+- **Personnel du bailleur.** Il ne produit plus que les nuitées des nouveaux baux, dans la place restante (capacité −
+  locataires) : effectif voulu = ⌈(lots prévus − locataires) / productivité − 0,2⌉, au moins un employé tant qu'il y a
+  des locataires ; au départ, le plan lui donne 5 % de l'effectif d'avant (`leaseStaffShare`). Un bailleur qui a des
+  locataires ne ferme pas faute d'employé : ses logements et ses loyers restent, il réembauche.
+- **Loyer = coût d'usage du logement.** Le coût de revient d'un bailleur répartit le travail (des seuls nouveaux baux)
+  et ses frais fixes sur toutes les nuits louées, et compte l'intérêt au taux de base sur la valeur de son parc, net de
+  ses hypothèques (`_leaseCapital` ; sans bâtiments, valeur de remplacement de ses logements). Sans cet intérêt, le
+  loyer tombait au coût de l'usure (2,45 $ au lieu de 45 $) et plus personne n'achetait de logement : la mensualité
+  dépassait toujours 1,2 fois le loyer (`buyRentRatio`).
+- **Pourquoi.** Sans bail, se loger, c'est acheter chaque jour une nuitée produite par un employé du bailleur (24 par
+  employé). Quand le marché du travail est saturé (4 à 20 chômeurs sur 2 500 entre les jours 15 et 60), les bailleurs
+  suivent les salaires avec retard : leur hausse de salaire suit leur demande non servie rapportée à leurs ventes,
+  qui reste faible (≈ 10 %) même avec 200 sans-abri. Ils perdent des employés, et des ménages solvables (≈ 2 700 $)
+  dorment dehors à côté de logements vides.
+- **Mesure** (2 500 citoyens, réglages de l'interface, 10 graines, 1 500 j ; sans baux → avec baux). Sans Bâtiments :
+  pointe de sans-abri 188 → 16 en moyenne (reste : des chômeurs sans le sou qui perdent leur bail quand le personnel
+  des nouveaux baux manque), chômage des jours 1 001 à 1 500 6,5 → 6,6 %, loyer 8,07 → 4,29 $, employés des bailleurs
+  84 → 10. Avec Bâtiments : pointe de sans-abri 274 → 0,2, chômage 6,4 → 7,2 % (écart non significatif : mieux dans 3
+  graines sur 10, écart-type 1,9), propriétaires 1 757 → 466 (274 à 1 749 selon la graine), loyer 45 → 9,65 $, indice
+  des prix final 4,31 → 1,67 (la vague d'hypothèques, anomalie N4, est plus petite). 240 citoyens, 5 graines, 300 j :
+  aucun sans-abri au-delà de 1 par jour, avec ou sans Banques.
 4. **Santé, ordinateur, études** : §§ 6.7 à 6.9.
 5. **Loisirs.**
    - **Budget du jour, à la Godley-Lavoie :** C = α₁ × max(0 ; revenu lissé − coût de survie) + α₂ × `adsBoost` ×

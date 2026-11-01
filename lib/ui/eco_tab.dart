@@ -322,6 +322,7 @@ class _ModelTabState extends State<ModelTab> {
       _excessCashSection(context, ctrl, upd),
       _revivalSection(context, ctrl, upd),
       _pricingSection(context, ctrl, upd),
+      _leaseSection(context, ctrl, upd),
       Section('Nouvelle partie', [
         Row(children: [
           Expanded(
@@ -810,6 +811,32 @@ Widget _pricingSection(BuildContext context, SimController ctrl, void Function(v
           style: TextStyle(fontSize: 11)),
       value: p.cpiSmoothDays > 0,
       onChanged: (v) => upd(() => p.cpiSmoothDays = v ? 30 : 0),
+    ),
+  ]);
+}
+
+/// Baux (Params.leases, anomalies A6 et N11, MODELE.md § 6.6).
+Widget _leaseSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final p = ctrl.sim.params;
+  return Section('Logement', [
+    Text(
+        'Sans bail, se loger, c’est acheter chaque jour une nuitée produite par un employé du bailleur : quand le marché '
+        'du travail est saturé, les bailleurs perdent leurs employés et des ménages solvables dorment dehors à côté de '
+        'logements vides. Avec les baux, un locataire garde son logement tant qu’il paie le loyer affiché ; le personnel '
+        'du bailleur ne sert qu’aux nouveaux baux.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Baux', style: TextStyle(fontSize: 13)),
+      subtitle: const Text(
+          'Au départ d’une partie, chacun a déjà un bail. Activés en cours de partie, les ménages en signent un à leur '
+          'prochaine location. Coupés, les baux prennent fin le lendemain : les bailleurs n’ont plus que le personnel des '
+          'nouveaux baux, et des centaines de ménages dorment dehors le temps qu’ils réembauchent.',
+          style: TextStyle(fontSize: 11)),
+      value: p.leases,
+      onChanged: (v) => upd(() => p.leases = v),
     ),
   ]);
 }
