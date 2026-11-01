@@ -674,7 +674,11 @@ la santé quand l'hôpital ne tient pas) a une variante de test (§ 6.15).
   - Sinon, le citoyen paie, s'il lui reste 10 cours au-delà de son coussin.
 - **Effet.** Chaque cours ajoute `learnRate` à la qualification : la classe monte tous les 50 cours.
 
-Choix de jeu.
+Choix de jeu. **Conséquence mesurée** (anomalie N17, 2026-10-31, laissée telle quelle) : rien ne fait redescendre la
+qualification (pas de vieillissement, de retraite ni de relève), si bien qu'à 2 500 citoyens, réglages de l'interface,
+la qualification moyenne passe de 0,84 à 2,68 et les professionnels de 9 à 85 % de la population en 1 500 jours. Les
+goûts suivant la classe (§ 6.6), la consommation bascule des sorties (45 % des emplois au jour 100) vers les voyages
+(40 % au jour 1 500), avec une bosse de chômage (12 à 15 %) pendant la bascule.
 
 ### 6.9 Ordinateurs (`sim.dart:_computer`)
 
