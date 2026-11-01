@@ -49,13 +49,51 @@ void main() {
     expect(s.inv.worst, 0);
   });
 
+  // Coproduit sans acheteur (anomalie A3) : sans boucherie, le bétail de la ferme ne se vend pas. Avec la règle
+  // Params.jointCostBySales, le coût d'un lot se répartit sur ce qui se vend : les céréales le portent tout entier, la
+  // ferme les vend au-dessus de leur coût et garde ses employés. Sans la règle, le bétail porte ≈ 45 % du coût sans le
+  // récupérer : la ferme perd de l'argent dès le jour 5 et n'a plus d'employé avant le jour 60.
+  test('coproduit sans acheteur (A3) : la ferme vend ses céréales au coût complet et garde ses employés', () {
+    Sim game(bool rule) => Sim(
+        seed: 3,
+        params: Params()..jointCostBySales = rule,
+        scenario: const [
+          ScenarioFirm('ferme', 'Ferme'),
+          ScenarioFirm('boulangerie', 'Boulangerie'),
+          ScenarioFirm('immobilier', 'Immobilier'),
+        ],
+        modules: Modules.none(),
+        safeguards: Safeguards.none(),
+        devChecks: true);
+    final off = game(false);
+    run(off, 60);
+    expect(off.firms.where((f) => f.type == 'ferme' && f.workers.isNotEmpty), isEmpty,
+        reason: 'sans la règle, la ferme meurt de son coproduit invendu');
+    final s = game(true);
+    var above = 0, days = 0;
+    for (var d = 1; d <= 300; d++) {
+      s.step();
+      final farm = s.firms.firstWhere((f) => f.type == 'ferme');
+      if (d >= 30 && farm.workers.isNotEmpty) {
+        days++;
+        if (farm.price['grain']! >= farm.unitCostCache['grain']!) above++;
+      }
+    }
+    final farm = s.firms.firstWhere((f) => f.type == 'ferme');
+    expect(farm.workers, isNotEmpty, reason: 'la ferme a encore des employés au jour 300');
+    expect(farm.sold['betail'] ?? 0, 0, reason: 'personne n’achète le bétail');
+    expect(above / days, greaterThan(0.9), reason: 'les céréales se vendent au-dessus de leur coût complet');
+  });
+
   // Attendu : la chaîne céréales → pain, avec un logement, nourrit et loge tout le monde. Mesuré (graine 3, modules et
-  // filets coupés) : la ferme vend toutes ses céréales mais perd de l'argent dès le jour 5, car son coproduit, le bétail,
-  // n'a aucun acheteur (≈ 45 % de la valeur d'un lot) ; elle licencie à partir du jour 20 et n'a plus d'employé au
-  // jour 30 ; les 240 citoyens ont faim à partir du jour 36. C'est l'anomalie A3 (rapports/etat-des-lieux.md).
+  // filets coupés) : sans la règle des coproduits, la ferme meurt de son bétail invendu (A3, test ci-dessus). Avec elle
+  // (2026-11-01), les trois entreprises survivent, mais elles n'emploient que 10 à 30 des 240 citoyens : sans aide de
+  // l'État ni création d'entreprise, les chômeurs (85 à 95 %) épuisent leur épargne et ont faim à partir du jour 80
+  // (≈ 150 affamés en moyenne des jours 101 à 300), pendant que l'argent s'accumule chez les salariés et les propriétaires.
   test('une seule entreprise par secteur (ferme, boulangerie, immobilier) : personne n’a faim ni ne dort dehors', () {
     final s = Sim(
         seed: 3,
+        params: Params()..jointCostBySales = true,
         scenario: const [
           ScenarioFirm('ferme', 'Ferme'),
           ScenarioFirm('boulangerie', 'Boulangerie'),
@@ -69,7 +107,7 @@ void main() {
       expect([h.hungry, h.homeless], [0, 0], reason: 'jour ${h.day}');
     }
     expect(s.firms.every((f) => f.workers.isNotEmpty), isTrue);
-  }, skip: 'attendu non obtenu : la ferme meurt de son coproduit invendu (A3) ; voir le commentaire');
+  }, skip: 'attendu non obtenu : trois entreprises n’emploient pas 240 citoyens, sans aide ni création ; voir le commentaire');
 
   test('salaires figés : aucun salaire ne bouge, les invariants tiennent', () {
     final s = Sim(seed: 3, modules: Modules()..entry = false, devChecks: true);

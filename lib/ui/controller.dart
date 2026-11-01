@@ -91,6 +91,7 @@ class SimController extends ChangeNotifier {
               ..leases = true // baux : un locataire garde son logement tant qu'il paie (anomalies A6 et N11)
               ..equalBanks = true // banques : la Caisse est une banque comme les autres (N4)
               ..purchaseLoans = true // crédit : le prêt d'un ordinateur sert à l'acheter (N4)
+              ..jointCostBySales = true // coproduits : le coût commun se répartit sur ce qui se vend (A3)
               ..walletAtTarget = true // démarrage à l'équilibre (anomalie N6)
               ..planFromHouseholds = true
               ..spreadHealth = true
@@ -243,7 +244,8 @@ class SimController extends ChangeNotifier {
           ..normalUtil = 0.5
           ..leases = true
           ..equalBanks = true
-          ..purchaseLoans = true,
+          ..purchaseLoans = true
+          ..jointCostBySales = true,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();
