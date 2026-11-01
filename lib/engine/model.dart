@@ -942,6 +942,13 @@ class Params {
   // aucun coût. Sinon il porte sa part de la valeur du lot (le bétail : ≈ 45 %) et, faute d'acheteur, la ferme ne récupère
   // pas cette part : elle perd de l'argent, licencie et meurt (sans boucherie, dès le jour 30).
   bool jointCostBySales = false;
+  // Rachats répartis (spreadTakeovers, 2026-11-01, anomalie N16) : quand le filet de renflouement fait racheter une
+  // entreprise dont le propriétaire n'a pas les moyens, le racheteur est tiré au hasard parmi les citoyens qui en ont les
+  // moyens, au lieu d'être toujours le plus riche. Sinon le même citoyen rachète tout (des dizaines d'entreprises), touche
+  // leurs dividendes et leurs excédents de trésorerie, détient jusqu'à 90 % de l'argent des ménages sans pouvoir le
+  // dépenser (60 achats par jour et par désir), et la dépense s'effondre : crises de plus en plus profondes à 2 500
+  // citoyens (chômage 14,6 % en moyenne des jours 4 501 à 5 000, jusqu'à 41 % dans une graine).
+  bool spreadTakeovers = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

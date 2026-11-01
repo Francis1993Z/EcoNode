@@ -216,6 +216,7 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.purchaseLoans != d.purchaseLoans) 'purchaseLoans': p.purchaseLoans,
     if (p.ownersAtStart != d.ownersAtStart) 'ownersAtStart': p.ownersAtStart,
     if (p.jointCostBySales != d.jointCostBySales) 'jointCostBySales': p.jointCostBySales,
+    if (p.spreadTakeovers != d.spreadTakeovers) 'spreadTakeovers': p.spreadTakeovers,
     if (p.revival != d.revival) 'revival': p.revival,
     if (p.revivalHours != d.revivalHours) 'revivalHours': p.revivalHours,
     if (p.revivalFullCost != d.revivalFullCost) 'revivalFullCost': p.revivalFullCost,
@@ -396,7 +397,8 @@ Params _paramsFrom(Map j) => Params()
   ..equalBanks = (j['equalBanks'] as bool?) ?? false
   ..purchaseLoans = (j['purchaseLoans'] as bool?) ?? false
   ..ownersAtStart = (j['ownersAtStart'] as bool?) ?? false
-  ..jointCostBySales = (j['jointCostBySales'] as bool?) ?? false;
+  ..jointCostBySales = (j['jointCostBySales'] as bool?) ?? false
+  ..spreadTakeovers = (j['spreadTakeovers'] as bool?) ?? false;
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),

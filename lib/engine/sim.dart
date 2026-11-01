@@ -3919,10 +3919,16 @@ class Sim {
         var surplus = owner != null ? owner.money - buffer : 0.0;
         var bought = false;
         if (surplus < need * 0.5) {
-          // le propriétaire n'a pas les moyens : le citoyen le plus riche rachète
+          // le propriétaire n'a pas les moyens : le citoyen le plus riche rachète ; Params.spreadTakeovers : un citoyen tiré
+          // au hasard parmi ceux qui en ont les moyens (tirage du jour, flux propriétaire, sous-indice 50)
           Citizen? rich;
-          for (final c in citizens) {
-            if (rich == null || c.money > rich.money) rich = c;
+          if (p.spreadTakeovers) {
+            final able = [for (final c in citizens) if (!identical(c, owner) && c.money - buffer > need * 2) c];
+            if (able.isNotEmpty) rich = able[(draw(Flux.proprietaire, f.id, 50) * able.length).floor()];
+          } else {
+            for (final c in citizens) {
+              if (rich == null || c.money > rich.money) rich = c;
+            }
           }
           if (rich != null && !identical(rich, owner) && rich.money - buffer > need * 2) {
             if (trace != null) {
