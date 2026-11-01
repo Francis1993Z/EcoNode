@@ -930,6 +930,12 @@ class Params {
   // seulement par son service de la dette), même quand aucun n'est en vente, et dépense le reste : avec des banques
   // saines, ces prêts créent des centaines de millions de dollars (spirale prix-revenus-prêts, prix × 29 en 1 000 jours).
   bool purchaseLoans = false;
+  // Propriétaires de départ (ownersAtStart, 2026-11-01, vague d'achats du démarrage, anomalie N4) : avec le module
+  // bâtiments, la partie commence avec les propriétaires-occupants qu'elle aurait à l'équilibre : chaque citoyen qui veut
+  // posséder et a un emploi reçoit un logement du parc des bailleurs, entièrement payé (sans hypothèque). Sinon tout le
+  // monde commence locataire, 70 % des ménages achètent à crédit en 500 jours, et la monnaie créée multiplie les prix
+  // (× 4,7 à 2 500 citoyens avec les banques) avant une longue baisse.
+  bool ownersAtStart = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

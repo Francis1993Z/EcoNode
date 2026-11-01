@@ -214,6 +214,7 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.leases != d.leases) 'leases': p.leases,
     if (p.equalBanks != d.equalBanks) 'equalBanks': p.equalBanks,
     if (p.purchaseLoans != d.purchaseLoans) 'purchaseLoans': p.purchaseLoans,
+    if (p.ownersAtStart != d.ownersAtStart) 'ownersAtStart': p.ownersAtStart,
     if (p.revival != d.revival) 'revival': p.revival,
     if (p.revivalHours != d.revivalHours) 'revivalHours': p.revivalHours,
     if (p.revivalFullCost != d.revivalFullCost) 'revivalFullCost': p.revivalFullCost,
@@ -392,12 +393,17 @@ Params _paramsFrom(Map j) => Params()
   ..planWorkforce = (j['planWorkforce'] as bool?) ?? false
   ..leases = (j['leases'] as bool?) ?? false
   ..equalBanks = (j['equalBanks'] as bool?) ?? false
-  ..purchaseLoans = (j['purchaseLoans'] as bool?) ?? false;
+  ..purchaseLoans = (j['purchaseLoans'] as bool?) ?? false
+  ..ownersAtStart = (j['ownersAtStart'] as bool?) ?? false;
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
       _d(b.depositRate), b.founded, b.alive, b.closed, b.state, b.lossDays, _d(b.profitEma), _d(b.lossEma),
       _d(b.incomeEma), _d(b.costEma),
+      // chiffres du dernier relevé (_banksMeasure) : les règles du lendemain matin s'en servent avant le prochain relevé
+      // (fonds propres et prêts de la banque pour un crédit, une hypothèque) ; sans eux, une partie rechargée refusait
+      // tout crédit son premier jour
+      _d(b.equityNow), _d(b.deposits), _d(b.reserves), _d(b.firmLoans), _d(b.consumerLoans), _d(b.riskLoans), b.clients,
     ];
 
 Bank _bankObjFrom(List l) => Bank(l[0] as int, l[1] as String)
@@ -416,7 +422,14 @@ Bank _bankObjFrom(List l) => Bank(l[0] as int, l[1] as String)
   ..profitEma = _rd(l[14])
   ..lossEma = _rd(l[15])
   ..incomeEma = _rd(l[16])
-  ..costEma = _rd(l[17]);
+  ..costEma = _rd(l[17])
+  ..equityNow = l.length > 24 ? _rd(l[18]) : 0
+  ..deposits = l.length > 24 ? _rd(l[19]) : 0
+  ..reserves = l.length > 24 ? _rd(l[20]) : 0
+  ..firmLoans = l.length > 24 ? _rd(l[21]) : 0
+  ..consumerLoans = l.length > 24 ? _rd(l[22]) : 0
+  ..riskLoans = l.length > 24 ? _rd(l[23]) : 0
+  ..clients = l.length > 24 ? l[24] as int : 0;
 
 /// Crédit d'un citoyen (module banking) : écrit seulement s'il diffère de l'état initial.
 bool _hasCredit(Citizen c) =>

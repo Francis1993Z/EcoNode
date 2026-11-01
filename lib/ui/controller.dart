@@ -95,6 +95,7 @@ class SimController extends ChangeNotifier {
               ..planFromHouseholds = true
               ..spreadHealth = true
               ..planWorkforce = true
+              ..ownersAtStart = true
               ..reservePerCitizen = 2000, // banques : dotation réaliste (voir startParams)
             modules: Modules()
               ..jobs = true
@@ -222,6 +223,7 @@ class SimController extends ChangeNotifier {
     ..planFromHouseholds = true
     ..spreadHealth = true
     ..planWorkforce = true
+    ..ownersAtStart = true // propriétaires de départ, logement payé (vague d'achats du démarrage, N4)
     ..reservePerCitizen = 2000; // banques : dotation réaliste (≈ 3 fois le capital qu'exigent les prêts, anomalie N4)
 
   void newGame(int seed, {Params? params}) {

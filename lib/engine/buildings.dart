@@ -288,6 +288,43 @@ extension SimBuildings on Sim {
     }
   }
 
+  /// Propriétaires de départ (Params.ownersAtStart) : chaque citoyen qui veut posséder et a un emploi reçoit un logement du
+  /// parc des bailleurs (à tour de rôle), entièrement payé : ni hypothèque, ni argent qui bouge. Une hypothèque de départ
+  /// sans la monnaie qu'elle a créée ferait une économie qui doit plusieurs fois l'argent qu'elle possède (essayé : les
+  /// remboursements détruisent la monnaie, chômage 58 % au jour 3 000) ; avec cette monnaie, les prix monteraient d'emblée
+  /// au niveau de la vague. Les achats suivants (reventes, nouveaux acheteurs) passent par le crédit.
+  void _seedOwners() {
+    final stock = <List<Building>>[
+      for (final f in firms)
+        if (f.type == 'immobilier') [for (final b in buildings) if (b.ownerKind == 0 && b.ownerId == f.id && b.done) b]
+    ];
+    final next = List<int>.filled(stock.length, 0);
+    var turn = 0;
+    var count = 0;
+    for (final c in _ordered(citizens, Flux.logement, (c) => c.id)) {
+      if (!c.wantsToOwn || c.employer == null || c.homeId != null) continue;
+      Building? b;
+      for (var k = 0; k < stock.length && b == null; k++) {
+        final i = (turn + k) % stock.length;
+        if (next[i] < stock[i].length) {
+          b = stock[i][next[i]++];
+          turn = i + 1;
+        }
+      }
+      if (b == null) break;
+      b
+        ..ownerKind = 1
+        ..ownerId = c.id
+        ..basis = quantize(fairValue(b))
+        ..listedDay = null;
+      c.homeId = b.id;
+      count++;
+    }
+    if (count > 0) {
+      _log('info', '$count propriétaires de départ, logements payés (${fmtPct(count / math.max(1, citizens.length))} des citoyens).');
+    }
+  }
+
   // ------------------------------------------------------------------ chaque jour
 
   /// Début de journée : la capacité de chaque bailleur suit son parc habitable ; chaleur du marché.

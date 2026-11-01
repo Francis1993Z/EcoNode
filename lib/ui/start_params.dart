@@ -57,7 +57,8 @@ Params freshParams(Params start, int population) {
     ..walletAtTarget = start.walletAtTarget
     ..planFromHouseholds = start.planFromHouseholds
     ..spreadHealth = start.spreadHealth
-    ..planWorkforce = start.planWorkforce;
+    ..planWorkforce = start.planWorkforce
+    ..ownersAtStart = start.ownersAtStart;
   for (final d in startParamDefs) {
     d.set(n, d.get(start));
   }
@@ -127,15 +128,18 @@ class StartParamsEditor extends StatelessWidget {
         subtitle: const Text(
             'Les ménages démarrent avec l’épargne qu’ils visent et une santé à un point au hasard de son cycle, et le parc '
             'd’entreprises suit ce qu’ils achètent vraiment '
-            '(mesuré sur une courte partie provisoire, quelques secondes). Coupé : panier fixe et épargne au hasard, d’où '
-            'une flambée des prix et des salaires les premiers mois.',
+            '(mesuré sur une courte partie provisoire, quelques secondes). Avec le marché immobilier, ceux qui veulent '
+            'posséder et ont un emploi sont déjà propriétaires, logement payé. Coupé : panier fixe, épargne au hasard et '
+            'tout le monde locataire, d’où une flambée des prix et des salaires les premiers mois (et une vague d’achats '
+            'à crédit avec le marché immobilier).',
             style: TextStyle(fontSize: 11)),
-        value: p.walletAtTarget && p.planFromHouseholds && p.spreadHealth && p.planWorkforce,
+        value: p.walletAtTarget && p.planFromHouseholds && p.spreadHealth && p.planWorkforce && p.ownersAtStart,
         onChanged: (v) {
           p.walletAtTarget = v;
           p.planFromHouseholds = v;
           p.spreadHealth = v;
           p.planWorkforce = v;
+          p.ownersAtStart = v;
           onChanged();
         },
       ),
@@ -162,6 +166,7 @@ class StartParamsEditor extends StatelessWidget {
           p.planFromHouseholds = true;
           p.spreadHealth = true;
           p.planWorkforce = true;
+          p.ownersAtStart = true;
           p.reservePerCitizen = 2000; // banques : dotation réaliste (anomalie N4)
           onChanged();
         },
