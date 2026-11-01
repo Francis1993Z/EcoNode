@@ -84,6 +84,11 @@ void main(List<String> a) {
     print('     argent des ménages : 1 % les plus riches ${f1(top1 / hh * 100)} %, 10 % ${f1(top10 / hh * 100)} % '
         '(propriétaires d’entreprise $own10/$n10, le plus riche ${f1(rich.first.money / 1000)} k\$) ; dépense du jour des 10 % '
         '${f1(spend10 / 1000)} k\$ pour un budget de loisirs ${f1(budget10 / 1000)} k\$ et ${f2(top10 / 1e6)} M\$ d’argent');
+    final top = rich.first;
+    final mine = [for (final f in s.firms) if (f.ownerId == top.id) f];
+    print('     le plus riche : ${top.name}, ${top.employer != null ? 'salarié' : 'sans emploi'}, revenu du jour '
+        '${f1(top.income)} \$, dépense ${f1(top.spend)} \$, budget de loisirs ${f1(s.leisureBudget(top))} \$ ; possède '
+        '${mine.map((f) => '${f.type} (${f.workers.length} employés, dividendes cumulés ${f1(f.dividends / 1000)} k\$)').join(', ')}');
     final sector = (byType.entries.toList()..sort((x, y) => y.value.compareTo(x.value))).take(5).map((e) => '${e.key} ${e.value}');
     print('j$d chômage ${f1(h.unemp * 100)} % dépense ${f1(spend / step / 1000)} k\$/j IPC ${f2(h.cpi)} salaire ${f1(h.wage)} ; '
         'ménages ${f2(hh / 1e6)} M (médiane ${f1(moneys[moneys.length ~/ 2])}), entreprises ${f2(fm / 1e6)} M, '
