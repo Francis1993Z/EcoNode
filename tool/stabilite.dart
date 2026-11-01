@@ -286,6 +286,14 @@ void applyParam(Params p, String k, String v) {
       p.fxSpeed = double.parse(v);
     case 'normalUtil': // prix au coût normal (A7) : utilisation normale de l'équipe, 0 = coût réel
       p.normalUtil = double.parse(v);
+    case 'planWorkforce': // plan de départ : efficacité d'équilibre et arrondi des équipes (N6)
+      p.planWorkforce = b();
+    case 'spreadHealth': // santé de départ étalée sur le cycle usure-consultation (N6)
+      p.spreadHealth = b();
+    case 'planFromHouseholds': // plan de départ dimensionné sur le panier mesuré des ménages (N6)
+      p.planFromHouseholds = b();
+    case 'walletAtTarget': // épargne de départ à la cible de la fonction de consommation (N6)
+      p.walletAtTarget = b();
     case 'cpiSmoothDays': // indice des prix lissé sur ~n jours (A7), 0 = ventes du jour
       p.cpiSmoothDays = double.parse(v);
     case 'stateBorrowing': // dette publique : l'État emprunte à la Caisse pour les enveloppes des établissements publics

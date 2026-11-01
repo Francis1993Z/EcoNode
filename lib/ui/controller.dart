@@ -87,7 +87,11 @@ class SimController extends ChangeNotifier {
               ..excessCashReturn = true // excédent de trésorerie reversé aux propriétaires (dérive N16, rapports/anomalies)
               ..publicImports = true // hôpital : importations de secours de ses intrants (anomalie A1)
               ..stateBorrowing = true // l'État emprunte plutôt que de couper l'enveloppe de l'hôpital (anomalie A1)
-              ..normalUtil = 0.5, // prix au coût normal : plus de prix aberrants (anomalie A7)
+              ..normalUtil = 0.5 // prix au coût normal : plus de prix aberrants (anomalie A7)
+              ..walletAtTarget = true // démarrage à l'équilibre (anomalie N6)
+              ..planFromHouseholds = true
+              ..spreadHealth = true
+              ..planWorkforce = true,
             modules: Modules()
               ..jobs = true
               ..entrepreneurship = true
@@ -209,7 +213,11 @@ class SimController extends ChangeNotifier {
 
   /// Nouvelle partie : les modules et les filets en cours sont conservés.
   /// Paramètres de départ de la prochaine partie (écran de départ, onglet Modèle).
-  final Params startParams = Params();
+  final Params startParams = Params()
+    ..walletAtTarget = true // démarrage à l'équilibre (anomalie N6) : paramètre de départ, actif par défaut dans l'interface
+    ..planFromHouseholds = true
+    ..spreadHealth = true
+    ..planWorkforce = true;
 
   void newGame(int seed, {Params? params}) {
     realSpeed = 0;

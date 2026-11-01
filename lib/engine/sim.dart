@@ -524,7 +524,8 @@ class _Plan {
   final Map<String, double> batches; // par type d'entreprise
   final Map<String, double> machinesPerWorker; // par type d'entreprise
   final double lambda; // part discrétionnaire de la demande retenue
-  _Plan(this.price, this.workers, this.batches, this.machinesPerWorker, this.lambda);
+  final Map<String, double>? basket; // panier des ménages mesuré (Params.planFromHouseholds), par personne et par jour
+  _Plan(this.price, this.workers, this.batches, this.machinesPerWorker, this.lambda, [this.basket]);
 }
 
 // Demande quotidienne estimée par citoyen, pour dimensionner l'économie de départ.
@@ -857,15 +858,18 @@ class Sim {
     for (final s in full) {
       perType[s.type] = (perType[s.type] ?? 0) + 1;
     }
-    final plan = _plan(p, full, perType);
+    final plan = _plan(p, full, perType, basket: p.planFromHouseholds ? _householdBasket(scenario) : null);
     // une entreprise dont le produit n'a aucune demande (module coupé) n'est pas créée
     final scen = full.where((s) => plan.batches[s.type]! > 1e-6).toList();
     worldPrice = Map<String, double>.from(plan.price);
-    cpiWeights = {
-      for (final g in householdGoods)
-        if ((_basicDemand[g] ?? 0) + plan.lambda * (_extraDemand[g] ?? 0) > 0)
-          g: (_basicDemand[g] ?? 0) + plan.lambda * (_extraDemand[g] ?? 0),
-    };
+    final hb = plan.basket;
+    cpiWeights = hb != null
+        ? {for (final g in householdGoods) if ((hb[g] ?? 0) > 0) g: plan.lambda * hb[g]!}
+        : {
+            for (final g in householdGoods)
+              if ((_basicDemand[g] ?? 0) + plan.lambda * (_extraDemand[g] ?? 0) > 0)
+                g: (_basicDemand[g] ?? 0) + plan.lambda * (_extraDemand[g] ?? 0),
+          };
     if (!this.modules.health) cpiWeights.remove('soins');
     if (!this.modules.education) cpiWeights.remove('cours');
     // un service public gratuit n'est pas un prix payé par les ménages
@@ -974,6 +978,21 @@ class Sim {
       final f = c.employer != null ? firm(c.employer!) : null;
       c.incomeEma = f != null ? (this.modules.jobs ? c.wage : f.wage) * (1 - p.taxRate) : p.benefit;
     }
+    if (p.spreadHealth && this.modules.health) {
+      // santé de départ étalée sur le cycle usure-consultation (N6) ; trait propre à chaque citoyen (sous-indice 73)
+      for (final c in citizens) {
+        c.sat['sante'] = 0.75 + 0.25 * traitDraw(c.id, 73);
+      }
+    }
+    if (p.walletAtTarget) {
+      // épargne de départ à la cible de la fonction de consommation (N6) : ni désépargne ni épargne au démarrage ; même
+      // dispersion (0,6 à 1,4) et même tirage qu'à la création du citoyen
+      final need = _needCost();
+      for (final c in citizens) {
+        final target = p.bufferDays * need + (1 - p.mpcIncome) * math.max(0.0, c.incomeEma - need) / p.propensity;
+        c.money = quantize(target * (0.6 + 0.8 * draw(Flux.traits, c.id, 2)));
+      }
+    }
     jobsActive = this.modules.jobs;
     if (this.modules.products) _productsSwitch(); // les entreprises du départ reçoivent leur variété
     bankingActive = this.modules.banking;
@@ -999,7 +1018,29 @@ class Sim {
 
   /// Résout prix et effectifs de départ : la demande des ménages (besoins de base + une part discrétionnaire
   /// ajustée pour employer 94 % de la population) remonte les chaînes d'approvisionnement.
-  _Plan _plan(Params p, List<ScenarioFirm> scen, Map<String, int> count) {
+  /// Panier des ménages (Params.planFromHouseholds) : achats réels par personne et par jour (biens et services reçus par
+  /// les ménages, importations et services publics compris) d'une partie provisoire, mêmes graine et réglages, au plus
+  /// 1 000 citoyens, mesurés des jours 101 à 200, une fois passé le démarrage.
+  Map<String, double> _householdBasket(List<ScenarioFirm>? scenario) {
+    final q = _paramsFrom({..._paramsJson(params), ..._entParamsJson(params)})
+      ..planFromHouseholds = false
+      ..population = math.min(params.population, 1000);
+    final s = Sim(seed: seed, params: q, scenario: scenario, modules: modules.copy(), safeguards: safeguards.copy());
+    final sum = <String, double>{};
+    var people = 0.0;
+    for (var d = 1; d <= 200; d++) {
+      s.step();
+      if (d <= 100) continue;
+      for (final e in s.flows.values) {
+        if (e.to != 'M' || e.isMoney) continue;
+        sum[e.good] = (sum[e.good] ?? 0) + e.qty;
+      }
+      people += s.citizens.length;
+    }
+    return {for (final e in sum.entries) e.key: e.value / people};
+  }
+
+  _Plan _plan(Params p, List<ScenarioFirm> scen, Map<String, int> count, {Map<String, double>? basket}) {
     final m = modules;
     final types = count.keys.toList();
     final price = <String, double>{for (final g in goods.keys) g: goods[g]!.guess};
@@ -1013,10 +1054,12 @@ class Sim {
     if (!m.education) basic.remove('cours');
     if (!m.buildings) basic.remove('batiment');
 
+    // effectifs réalistes (Params.planWorkforce) : efficacité d'équilibre des employés (facteur santé)
+    final planEff = p.planWorkforce && m.health ? 0.4 + 0.6 * 0.875 : 1.0;
     double perW(String ty) {
       final t = templates[ty]!;
       final kk = k[ty]!;
-      return t.rate * (1 + t.capital * kk / (kk + 1));
+      return t.rate * (1 + t.capital * kk / (kk + 1)) * planEff;
     }
 
     double maintNeed(Template t, double workers, double machines) =>
@@ -1055,7 +1098,10 @@ class Sim {
     void solve(double lambda) {
       for (var it = 0; it < 80; it++) {
         final d = <String, double>{
-          for (final g in goods.keys) g: pop * ((basic[g] ?? 0) + lambda * (_extraDemand[g] ?? 0)),
+          for (final g in goods.keys)
+            g: basket != null
+                ? pop * (basket.containsKey(g) ? lambda * basket[g]! : (basic[g] ?? 0)) // panier mesuré des ménages
+                : pop * ((basic[g] ?? 0) + lambda * (_extraDemand[g] ?? 0)),
         };
         for (final ty in types) {
           final t = templates[ty]!;
@@ -1114,7 +1160,8 @@ class Sim {
     }
 
     double total() => w.values.fold(0.0, (a, v) => a + v);
-    final target = 0.94 * pop;
+    // effectifs réalistes : l'arrondi des équipes (≈ 0,3 employé par entreprise) est réservé dans l'objectif d'emploi
+    final target = 0.94 * pop - (p.planWorkforce ? 0.3 * count.values.fold(0, (a, n) => a + n) : 0);
     var lambda = 0.0;
     solve(0);
     if (total() >= target) {
@@ -1140,7 +1187,7 @@ class Sim {
     }
     scaled = true;
     solve(lambda);
-    return _Plan(price, w, b, k, lambda);
+    return _Plan(price, w, b, k, lambda, basket);
   }
 
   /// Part de la productivité nominale d'une entreprise trop petite pour occuper un employé à plein temps.

@@ -886,6 +886,28 @@ class Params {
   // ventes, pondéré par les volumes, sur environ cpiSmoothDays jours (moyennes lissées des montants et des quantités),
   // au lieu des seules ventes du jour. Mesure seulement : l'indice ne sert à aucune décision. 0 : ventes du jour.
   double cpiSmoothDays = 0;
+  // Épargne de départ à l'équilibre (walletAtTarget, 2026-10-31, anomalie N6) : chaque ménage démarre à la cible de sa
+  // fonction de consommation (coussin + (1 − α₁) / α₂ × revenu discrétionnaire), avec la même dispersion qu'avant
+  // (0,6 à 1,4). Sinon les ménages démarrent 16-17 % au-dessus de leur cible, dépensent l'excédent (≈ 6 % de demande en
+  // plus du revenu), poussent l'économie au plein emploi et déclenchent une spirale salaires-prix (+35 à 55 % en 100 j).
+  bool walletAtTarget = false;
+  // Plan fidèle aux ménages (planFromHouseholds, 2026-10-31, anomalie N6) : avant de dimensionner l'économie de départ, le
+  // moteur joue une partie provisoire (mêmes graine et réglages, au plus 1 000 citoyens, 200 jours) et mesure ce que les
+  // ménages achètent vraiment par personne et par jour (jours 101 à 200) ; le plan remplace son panier fixe par ce panier
+  // mesuré (échelle toujours fixée pour employer 94 % de la population), et l'indice des prix aussi. Sinon le plan
+  // prévoit par exemple 49 bijoux par jour à 240 citoyens quand les ménages en achètent 2, et 420 pains au lieu de 630 :
+  // les secteurs sous-dimensionnés montent leurs prix et se disputent les travailleurs au démarrage.
+  bool planFromHouseholds = false;
+  // Santé de départ étalée (spreadHealth, 2026-10-31, anomalie N6) : chaque citoyen démarre à un point au hasard de son
+  // cycle de santé, entre le seuil de consultation (0,75) et 1, au lieu d'être en parfaite santé. Sinon la santé moyenne
+  // descend de 1 à ≈ 0,85 les deux premiers mois, l'efficacité des employés baisse d'autant (les entreprises embauchent
+  // jusqu'à vider le marché du travail, et les salaires montent), et tout le monde consulte en même temps vers le jour 80.
+  bool spreadHealth = false;
+  // Effectifs réalistes au plan (planWorkforce, 2026-10-31, anomalie N6) : le plan de départ compte chaque employé à son
+  // efficacité d'équilibre (facteur santé 0,4 + 0,6 × 0,875, la santé moyenne d'un cycle usure-consultation) et réserve
+  // l'arrondi des équipes (≈ 0,3 employé par entreprise : effectif voulu = ⌈lots / productivité − 0,2⌉) dans son objectif
+  // de 94 % d'emploi. Sinon, dès le premier jour, les entreprises veulent ≈ 104 % de la population active.
+  bool planWorkforce = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

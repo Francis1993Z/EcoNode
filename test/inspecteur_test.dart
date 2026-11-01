@@ -26,7 +26,8 @@ void main() {
       ctrl.sim.step();
     }
     final sim = ctrl.sim;
-    final f = sim.firms.where((f) => f.talks.isNotEmpty && f.workers.length >= 3).reduce(
+    // la fiche n'affiche que les 80 premiers employés : on prend une entreprise dont toute la liste est bâtie
+    final f = sim.firms.where((f) => f.talks.isNotEmpty && f.workers.length >= 3 && f.workers.length <= 80).reduce(
         (a, b) => a.workers.length >= b.workers.length ? a : b);
     ctrl.selection = Selection('firm', f.id);
     await show(tester, ctrl);
