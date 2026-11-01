@@ -39,6 +39,35 @@ Params parametresInterface(int population) => Params()
   ..ownersAtStart = true
   ..reservePerCitizen = 2000;
 
+/// Leviers du module Produits et de l'entrepreneuriat (absents du protocole de stabilité), puis ceux du protocole.
+void regler(Params p, String nom, String valeur) {
+  final v = double.parse(valeur);
+  switch (nom) {
+    case 'prodEntryMargin':
+      p.prodEntryMargin = v;
+    case 'prodAdRate':
+      p.prodAdRate = v;
+    case 'prodWordRate':
+      p.prodWordRate = v;
+    case 'prodForgetDays':
+      p.prodForgetDays = v.round();
+    case 'prodKnownMax':
+      p.prodKnownMax = v.round();
+    case 'prodHabit':
+      p.prodHabit = v;
+    case 'prodQualityWeight':
+      p.prodQualityWeight = v;
+    case 'prodPriceSens':
+      p.prodPriceSens = v;
+    case 'entFoundRate':
+      p.entFoundRate = v;
+    case 'entCapitalMult':
+      p.entCapitalMult = v;
+    default:
+      applyParam(p, nom, valeur);
+  }
+}
+
 String f1(double v) => v.toStringAsFixed(1);
 String f2(double v) => v.toStringAsFixed(2);
 
@@ -50,7 +79,7 @@ void main(List<String> a) {
     if (a[i] == '--param') {
       for (final kv in a[++i].split(',')) {
         final j = kv.indexOf('=');
-        applyParam(p, kv.substring(0, j), kv.substring(j + 1));
+        regler(p, kv.substring(0, j), kv.substring(j + 1));
       }
     } else if (a[i] == '--batiments') {
       batiments = a[++i] == '1';
