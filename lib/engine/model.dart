@@ -936,6 +936,12 @@ class Params {
   // monde commence locataire, 70 % des ménages achètent à crédit en 500 jours, et la monnaie créée multiplie les prix
   // (× 4,7 à 2 500 citoyens avec les banques) avant une longue baisse.
   bool ownersAtStart = false;
+  // Coproduits (jointCostBySales, 2026-11-01, anomalie A3) : le coût commun d'un lot (la ferme : céréales et bétail) se
+  // répartit sur ce qui se vend, au prix mondial : coût d'une unité de g = coût du lot × prix mondial de g ÷ Σ (quantité
+  // vendue par lot × prix mondial). Quand tout se vend, c'est la répartition d'avant ; un coproduit sans acheteur ne porte
+  // aucun coût. Sinon il porte sa part de la valeur du lot (le bétail : ≈ 45 %) et, faute d'acheteur, la ferme ne récupère
+  // pas cette part : elle perd de l'argent, licencie et meurt (sans boucherie, dès le jour 30).
+  bool jointCostBySales = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

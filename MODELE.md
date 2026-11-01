@@ -371,6 +371,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
 | `revival`, `revivalHours`, `revivalFullCost`, `revivalPlannedDemand` | non, non, non, non | renaissance des filières (§ 6.22) : signal d'entrée d'un bien sans producteur actif ; relance à temps partiel ; viabilité d'une relance au coût complet et prix de départ face à l'import ; demande dérivée au plan de production de l'aval | mesure § 6.22 |
 | `equalBanks` | non | banques (§ 6.19) : la Caisse est une banque comme les autres ; hypothèques chez la banque de l'emprunteur | mesure § 6.19 |
+| `jointCostBySales` | non | coproduits (§ 6.4) : le coût d'un lot se répartit sur ce qui se vend | mesure § 6.4 |
 | `ownersAtStart` | non | démarrage (§ 5) : propriétaires de départ, logement payé (module Bâtiments) | mesure § 5 |
 | `purchaseLoans` | non | crédit (§ 6.19) : le prêt d'un ordinateur sert à l'acheter (en stock, montant qui manque) | mesure § 6.19 |
 | `leases` | non | baux (§ 6.6) : un locataire garde son logement tant qu'il paie ; le personnel du bailleur ne sert qu'aux nouveaux baux ; loyer = coût d'usage du logement | mesure § 6.6 |
@@ -562,6 +563,18 @@ inflation annuelle moyenne +4 % (jours 100-500), −8,9 % (500-1 500 : un creux 
 
   Le coût est réparti entre coproduits selon les prix mondiaux. Justification : un employé ne se divise pas. Si l'équipe
   est sous-employée, ses salaires se répartissent sur ce qu'elle produit vraiment (tâche 1 du plan : coût honnête).
+- **Coproduits sur ce qui se vend (`jointCostBySales`, 2026-11-01, anomalie A3).** Coupé par défaut dans le moteur ;
+  l'interface l'active (section « Fixation des prix »). Le coût d'un lot se répartit sur ce qui se vend : coût d'une unité
+  de g = coût du lot × prix mondial de g ÷ Σ (quantité vendue par lot × prix mondial), la quantité vendue par lot étant
+  min(production par lot ; demande lissée ÷ lots prévus). Quand tout se vend, c'est la répartition au prix mondial ; un
+  coproduit sans acheteur ne porte aucun coût. Le plan de départ fait de même avec la demande prévue (sinon le prix de
+  départ, calculé comme si le bétail se vendait, ne rattrape le coût qu'à 1,5 % par jour). **Pourquoi** : la ferme produit
+  4 sacs de céréales et 0,25 tête de bétail par lot ; le bétail pèse ≈ 45 % de la valeur du lot. Sans boucherie, ou avec
+  trop peu de boucheries (1 000 à 1 800 têtes invendues dans une partie ordinaire), la ferme ne récupère pas cette part :
+  sans boucherie, elle perd de l'argent dès le jour 5 et n'a plus d'employé avant le jour 60. Avec la règle, elle vend ses
+  céréales au coût complet et garde ses employés (test `extremes_test.dart`). **Mesure** (réglages de l'interface, 10
+  graines × 1 500 j, chômage des 500 derniers jours) : 240 citoyens 5,6 → 5,3 %, 2 500 citoyens 6,6 → 6,0 % (écarts
+  dans le bruit), indice des prix inchangé.
 - **Signal de rareté** (`dir`) :
   - périssable : hausse si des clients sont refusés et plus de 97 % de la production est vendue ; baisse sous 85 %
     vendus ;
@@ -899,7 +912,7 @@ Choix de jeu : c'est le débouché de la filière informatique.
 |---|---|---|---|
 | `Sim.sansHasard` | tirages à 0,5, ordres par identifiant | `draw`, `orderKey`, `buy` | cas extrêmes (§ 4) |
 | `Sim.verifyFastPaths` | recalcule chaque meilleur prix mis en cache pendant la consommation par le parcours complet et lève une erreur à la moindre différence | `quote`, `bestPrice` | vérification des optimisations (journal, § 7) |
-| `Params.healthWearIfDeprived` (A1) | la santé ne s'use que les jours de faim ou sans logis ; les maladies restent | `_health` | variante de l'usure de la santé (décision réservée à Francis) |
+| `Params.healthWearIfDeprived` (A1) | la santé ne s'use que les jours de faim ou sans logis ; les maladies restent | `_health` | variante de l'usure de la santé ; **décision du 2026-11-01 : usure continue conservée** (mesure, réglages de l'interface, 10 graines × 1 500 j : santé 0,88 → 0,94-0,96, mais employés de l'hôpital et chômage inchangés, 2 500 citoyens 6,6 → 7,4 %) |
 | `Params.partTime` (A2) | travail divisible : l'équipe est payée pour la part de sa capacité produite ce jour, au moins 20 % ; le coût de revient ne compte plus les heures oisives | `hoursToday`, `_payWages`, `unitCost` | **actif par défaut depuis le 2026-10-21** (décision de Francis) |
 
 Les résultats de ces variantes sont au journal (tâche 4). Les règles prudentielles fondées sur le salaire contractuel

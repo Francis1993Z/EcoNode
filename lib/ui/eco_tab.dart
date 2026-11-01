@@ -829,6 +829,18 @@ Widget _pricingSection(BuildContext context, SimController ctrl, void Function(v
     SwitchListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
+      title: const Text('Coproduits : coût sur ce qui se vend', style: TextStyle(fontSize: 13)),
+      subtitle: const Text(
+          'La ferme produit à la fois céréales et bétail. Le coût d’un lot se répartit sur ce qui se vend : un coproduit '
+          'sans acheteur ne porte aucun coût. Coupé : le bétail porte sa part (≈ 45 %) même invendu, et la ferme perd de '
+          'l’argent faute de boucherie (anomalie A3).',
+          style: TextStyle(fontSize: 11)),
+      value: p.jointCostBySales,
+      onChanged: (v) => upd(() => p.jointCostBySales = v),
+    ),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
       title: const Text('Indice des prix lissé sur 30 jours', style: TextStyle(fontSize: 13)),
       subtitle: const Text(
           'Mesure seulement : l’indice prend le prix moyen des ventes des 30 derniers jours au lieu des seules ventes du '

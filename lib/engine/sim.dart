@@ -1188,6 +1188,14 @@ class Sim {
           for (final e in t.outputs.entries) {
             tot += e.value * price[e.key]!;
           }
+          if (p.jointCostBySales && t.outputs.length > 1) {
+            // coproduits (A3) : le lot se paie sur ce qui se vend (demande prévue de chaque produit, par lot)
+            var sold = 0.0;
+            for (final e in t.outputs.entries) {
+              sold += math.min(e.value, d[e.key]! / math.max(b[ty]!, 1e-9)) * price[e.key]!;
+            }
+            if (sold > 1e-9) tot = sold;
+          }
           for (final e in t.outputs.entries) {
             price[e.key] = value * (e.value * price[e.key]! / tot) / e.value;
           }
@@ -1706,11 +1714,25 @@ class Sim {
     var fixed = f.overheadEma + f.debt * loanRate(f) / 365 + f.carry + (_leaseCapital[f.id] ?? 0);
     if (modules.capital) fixed += f.machines * p.depreciation * bestPrice('machines');
     batch += fixed / planned;
+    final out = <String, double>{};
+    if (p.jointCostBySales && f.outputs.length > 1) {
+      // coproduits (A3) : le coût commun du lot se répartit sur ce qui se vend (quantité vendue par lot, au prix mondial)
+      final real = math.max(math.max(f.lastBatches, _plannedBatches(f)), eps);
+      var sold = 0.0;
+      for (final e in f.outputs.entries) {
+        sold += math.min(e.value, (f.demandEma[e.key] ?? 0) / real) * worldPrice[e.key]!;
+      }
+      if (sold > eps) {
+        for (final e in f.outputs.entries) {
+          out[e.key] = batch * worldPrice[e.key]! / sold;
+        }
+        return out;
+      }
+    }
     var tot = 0.0;
     for (final e in f.outputs.entries) {
       tot += e.value * worldPrice[e.key]!;
     }
-    final out = <String, double>{};
     for (final e in f.outputs.entries) {
       final share = tot > 0 ? e.value * worldPrice[e.key]! / tot : 1 / f.outputs.length;
       out[e.key] = batch * share / e.value;

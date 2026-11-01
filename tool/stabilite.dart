@@ -286,6 +286,8 @@ void applyParam(Params p, String k, String v) {
       p.fxSpeed = double.parse(v);
     case 'normalUtil': // prix au coût normal (A7) : utilisation normale de l'équipe, 0 = coût réel
       p.normalUtil = double.parse(v);
+    case 'jointCostBySales': // coproduits : coût commun réparti sur ce qui se vend (A3)
+      p.jointCostBySales = b();
     case 'ownersAtStart': // propriétaires de départ, hypothèques en cours (vague d'achats du démarrage, N4)
       p.ownersAtStart = b();
     case 'purchaseLoans': // prêt d'achat : un ordinateur en stock, le montant qui manque, acheté aussitôt (N4)
