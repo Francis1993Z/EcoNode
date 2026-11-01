@@ -941,6 +941,19 @@ Widget _excessCashSection(BuildContext context, SimController ctrl, void Functio
       value: p.excessCashReturn,
       onChanged: (v) => upd(() => p.excessCashReturn = v),
     ),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Rachats répartis', style: TextStyle(fontSize: 13)),
+      subtitle: const Text(
+          'Quand le filet de renflouement fait racheter une entreprise dont le propriétaire n’a pas les moyens, le racheteur '
+          'est tiré au hasard parmi les citoyens qui en ont les moyens. Coupé : c’est toujours le plus riche, qui finit par '
+          'posséder des dizaines d’entreprises et la quasi-totalité de l’argent des ménages sans pouvoir le dépenser '
+          '(anomalie N16).',
+          style: TextStyle(fontSize: 11)),
+      value: p.spreadTakeovers,
+      onChanged: (v) => upd(() => p.spreadTakeovers = v),
+    ),
     ParamSlider(
         label: 'Réserve gardée (jours de coûts)',
         value: p.excessCashDays,

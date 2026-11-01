@@ -93,6 +93,7 @@ class SimController extends ChangeNotifier {
               ..purchaseLoans = true // crédit : le prêt d'un ordinateur sert à l'acheter (N4)
               ..jointCostBySales = true // coproduits : le coût commun se répartit sur ce qui se vend (A3)
               ..prodEntryMargin = 0.05 // produits : une variété peut entrer si les vendeurs en place font un profit (N2)
+              ..spreadTakeovers = true // filet de renflouement : le racheteur n'est plus toujours le plus riche (N16)
               ..walletAtTarget = true // démarrage à l'équilibre (anomalie N6)
               ..planFromHouseholds = true
               ..spreadHealth = true
@@ -247,7 +248,8 @@ class SimController extends ChangeNotifier {
           ..equalBanks = true
           ..purchaseLoans = true
           ..jointCostBySales = true
-          ..prodEntryMargin = 0.05,
+          ..prodEntryMargin = 0.05
+          ..spreadTakeovers = true,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();
