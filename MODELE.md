@@ -371,6 +371,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
 | `revival`, `revivalHours`, `revivalFullCost`, `revivalPlannedDemand` | non, non, non, non | renaissance des filières (§ 6.22) : signal d'entrée d'un bien sans producteur actif ; relance à temps partiel ; viabilité d'une relance au coût complet et prix de départ face à l'import ; demande dérivée au plan de production de l'aval | mesure § 6.22 |
 | `equalBanks` | non | banques (§ 6.19) : la Caisse est une banque comme les autres ; hypothèques chez la banque de l'emprunteur | mesure § 6.19 |
+| `spreadTakeovers` | non | renflouement (§ 6.11) : le racheteur est tiré au hasard parmi ceux qui en ont les moyens | mesure § 6.11 |
 | `jointCostBySales` | non | coproduits (§ 6.4) : le coût d'un lot se répartit sur ce qui se vend | mesure § 6.4 |
 | `ownersAtStart` | non | démarrage (§ 5) : propriétaires de départ, logement payé (module Bâtiments) | mesure § 5 |
 | `purchaseLoans` | non | crédit (§ 6.19) : le prêt d'un ordinateur sert à l'acheter (en stock, montant qui manque) | mesure § 6.19 |
@@ -813,6 +814,19 @@ Choix de jeu : c'est le débouché de la filière informatique.
 - **Renflouement (filet).** Une entreprise privée qui a des clients et moins de 4 jours de salaires de l'équipe voulue
   reçoit de son propriétaire jusqu'à la moitié de son surplus, pour revenir à 10 jours. Un propriétaire sans moyens est
   remplacé par le citoyen le plus riche (rachat).
+- **Rachats répartis (`spreadTakeovers`, 2026-11-01, anomalie N16).** Coupé par défaut dans le moteur ; l'interface l'active
+  (section de l'excédent de trésorerie). Le racheteur est tiré au hasard (flux `proprietaire`, sous-indice 50) parmi les
+  citoyens qui ont plus de deux fois le besoin de l'entreprise au-delà de leur coussin. **Pourquoi** : avec le plus riche
+  comme racheteur, le même citoyen rachète des dizaines d'entreprises (graine 1 à 2 500 citoyens : mines, raffinerie,
+  ferme, pêche, électronique, marketing…), touche leurs dividendes et leurs excédents de trésorerie, et finit par détenir
+  92 % de l'argent des ménages (7,3 M$) ; il ne peut pas le dépenser (60 achats par jour et par désir : 46 000 $ dépensés
+  pour un budget de loisirs de 263 000 $ chez les 10 % les plus riches) : la dépense des ménages tombe de 507 000 à
+  126 000 $ par jour, prix et salaires sont divisés par trois, le chômage monte à 45 %. **Mesure** (outil
+  `tool/derive.dart` sur le serveur de calcul, réglages de l'interface, 10 graines × 5 000 j, 2 500 citoyens) : chômage
+  des jours 3 501 à 4 000 12,3 → 8,2 %, des jours 4 501 à 5 000 14,6 → 8,3 % (pire graine 37,2 → 17,5 %, mieux dans 8
+  graines sur 10) ; à 240 citoyens, sans effet. Reste une concentration de l'argent chez le propriétaire d'une entreprise
+  dominante (graine 9 : un million de dollars, 1 % des ménages détiennent 57 à 69 % de leur argent), qui ne peut pas
+  dépenser son budget non plus.
 - **Dette publique (`stateBorrowing`).** Coupée par défaut dans le moteur, active dans l'interface. Quand le trésor,
   au-dessus de son plancher, ne suffit pas aux enveloppes des établissements publics (I2), l'État emprunte la différence
   à la Caisse, qui crée la monnaie prêtée (`ledgerCredit`, `bank.lent`, comme un prêt à une entreprise), jusqu'à
