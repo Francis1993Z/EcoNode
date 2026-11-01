@@ -679,11 +679,12 @@ Widget _banksSection(BuildContext context, SimController ctrl, void Function(voi
     SwitchListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
-      title: const Text('Hypothèques dans les comptes des banques', style: TextStyle(fontSize: 13)),
+      title: const Text('Banques à égalité', style: TextStyle(fontSize: 13)),
       subtitle: const Text(
-          'La Caisse porte les hypothèques : leurs intérêts comptent dans ses revenus et lui font verser des dividendes ; '
-          'sa dotation, et le capital des banques qu’elle reprend, ne sont jamais distribués. Coupé, les intérêts '
-          'hypothécaires s’accumulent dans les banques sans revenir aux ménages (déflation par la dette, anomalie N4).',
+          'La Caisse est une banque comme les autres : chaque hypothèque est chez la banque de l’emprunteur, qui en touche '
+          'les intérêts ; la Caisse a son capital, verse ses dividendes et peut faire faillite (l’État passe alors à la '
+          'banque qui la reprend). Coupé, toutes les hypothèques sont à la Caisse et leurs intérêts ne reviennent pas aux '
+          'ménages ; les autres banques, sans hypothèques, perdent de l’argent (anomalie N4).',
           style: TextStyle(fontSize: 11)),
       value: p.equalBanks,
       onChanged: (v) => upd(() => p.equalBanks = v),
