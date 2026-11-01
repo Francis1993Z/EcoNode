@@ -924,6 +924,12 @@ class Params {
   // banque : la Caisse paraît déficitaire et ne verse jamais de dividende, la monnaie s'accumule dans le système bancaire
   // (déflation par la dette) et les banques commerciales, sans hypothèques, perdent de l'argent et font faillite.
   bool equalBanks = false;
+  // Prêt d'achat fidèle (purchaseLoans, 2026-11-01, anomalie N4) : le prêt personnel « achat important (ordinateur) »
+  // n'est accordé que si un ordinateur est en stock, il couvre seulement ce qui manque au-delà du coussin pour le payer,
+  // et l'ordinateur est acheté aussitôt. Sinon le citoyen emprunte deux fois le prix de référence d'un ordinateur (plafonné
+  // seulement par son service de la dette), même quand aucun n'est en vente, et dépense le reste : avec des banques
+  // saines, ces prêts créent des centaines de millions de dollars (spirale prix-revenus-prêts, prix × 29 en 1 000 jours).
+  bool purchaseLoans = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration

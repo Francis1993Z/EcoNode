@@ -370,7 +370,8 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `floatingFx`, `fxSpeed` | non, 0,05 | douane (§ 6.21) : taux de change flottant et sa vitesse d'ajustement par jour | mesure § 6.21 |
 | `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
 | `revival`, `revivalHours`, `revivalFullCost`, `revivalPlannedDemand` | non, non, non, non | renaissance des filières (§ 6.22) : signal d'entrée d'un bien sans producteur actif ; relance à temps partiel ; viabilité d'une relance au coût complet et prix de départ face à l'import ; demande dérivée au plan de production de l'aval | mesure § 6.22 |
-| `equalBanks` | non | banques (§ 6.19) : intérêts des hypothèques au revenu de la Caisse, plancher de dividende = sa dotation | mesure § 6.19 |
+| `equalBanks` | non | banques (§ 6.19) : la Caisse est une banque comme les autres ; hypothèques chez la banque de l'emprunteur | mesure § 6.19 |
+| `purchaseLoans` | non | crédit (§ 6.19) : le prêt d'un ordinateur sert à l'acheter (en stock, montant qui manque) | mesure § 6.19 |
 | `leases` | non | baux (§ 6.6) : un locataire garde son logement tant qu'il paie ; le personnel du bailleur ne sert qu'aux nouveaux baux ; loyer = coût d'usage du logement | mesure § 6.6 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
 | `priceStep`, `wageStep` | 0,02, 0,015 | pas d'ajustement de la marge et du salaire | choix de jeu (tâche 3 du plan : lissage) |
@@ -1005,7 +1006,7 @@ dette ≤ `dsrMax` du revenu ; I4 à chaque crédit. Comptes : comme les prêts 
 détruit la monnaie, intérêts aux fonds propres, impayés capitalisés). **Faillite personnelle** : retards depuis `bkArrearsDays` jours,
 ou dette sans emploi > `bkDebtIncome` ans de revenu → radiation (perte de la banque), crédit fermé `bkBanDays` jours.
 **Plusieurs banques** (`nBanks` ≥ 2) : toute la monnaie passe par le compte consolidé `Sim.bank` (invariants inchangés) ; chaque banque
-(`Bank`) en est une répartition : fonds propres (la Caisse, banque 0, a le reste et n'est jamais résolue), prêts et dépôts de ses
+(`Bank`) en est une répartition : fonds propres (la Caisse, banque 0, a le reste et n'est jamais résolue, sauf avec `equalBanks`), prêts et dépôts de ses
 clients, réserves = solde de son bilan (règlement net), position interbancaire au taux directeur `policyRate` sous les réserves
 minimales `reserveRatio`. Dotation `reservePerCitizen` × population par banque de départ : monnaie extérieure, contrepartie capital
 plancher d'un actionnaire institutionnel ; dividendes au-delà du plancher → citoyens (fondateur pour une banque de citoyen). Coûts : le
@@ -1016,22 +1017,50 @@ jours) : reprise par la banque la plus solide, actionnaires effacés, déposants
 l'entrepreneuriat (connaissance du secteur : jours dans un cabinet comptable) sur le profit espéré à la part de marché restante
 1/(n+1) moins le coût fixe ; capital minimum absolu `bankMinCapital` versé par `transfer()`, frais irrécupérables `bankEntryCost`.
 
-**Hypothèques dans les comptes des banques (`equalBanks`, 2026-11-01, anomalie N4).** Coupé par défaut dans le
-moteur ; l'interface l'active (onglet Modèle, section Banques). Avec plusieurs banques et le module Bâtiments, la Caisse
-porte les hypothèques (elles sont dans ses prêts pondérés), mais leurs intérêts n'entraient dans le revenu d'aucune banque :
-la Caisse paraissait déficitaire (profit lissé −1 300 à −1 900 $/j à 2 500 citoyens), ne versait jamais de dividende, et les
-intérêts hypothécaires (≈ 4 M$/an) s'accumulaient dans le système bancaire. L'argent des ménages fondait (31 → 11 M$ entre
-les jours 500 et 3 000) et les prix baissaient de 58 % : la déflation par la dette de N4. Avec la règle : (1) intérêts
-payés ou capitalisés des hypothèques au revenu de la Caisse, radiations à ses pertes (`_attrib`) ; (2) plancher de dividende
-de la Caisse = `bank.capital` (parts sociales et dotation), au lieu de 0 : sans lui, une Caisse rentable distribuerait sa
-dotation (250 M$ à 2 500 citoyens) ; (3) le capital d'une banque reprise reste bloqué chez celle qui la reprend. **Mesure**
-(2 500 citoyens, Bâtiments, Banques et baux, réglages de l'interface, 10 graines, 3 000 j) : chômage moyen des jours
-2 001 à 3 000 13,9 → 8,5 % (médiane 8,8 → 7,4 %, pire graine 46,5 → 18,5 %, mieux dans 6 graines sur 10), prix du jour 500
-au jour 3 000 −58 → −21 %, argent des ménages au jour 3 000 11 → 21,7 M$. Restent : la vague d'achats du démarrage (70 %
-des ménages achètent en 500 jours, prix × 5 : la dotation des banques, `reservePerCitizen` = 100 000 $ par citoyen et par
-banque, rend la règle des fonds propres sans effet), la baisse lente des prix quand les hypothèques se remboursent sans
-nouveaux prêts, et la faillite des banques commerciales (elles paient les intérêts de leurs dépôts mais ne portent aucune
-hypothèque).
+**Banques à égalité (`equalBanks`, 2026-11-01, anomalie N4).** Coupé par défaut dans le moteur ; l'interface l'active
+(onglet Modèle, section Banques). La Caisse est une banque comme les autres :
+- **Hypothèques** chez la banque de l'emprunteur (`Mortgage.bankId`) : intérêts payés ou capitalisés à ses revenus,
+  radiations à ses pertes (`_attrib`), prêt pondéré (35 %) dans ses fonds propres exigés, règle des fonds propres de cette
+  banque à l'octroi (`_bankAllows`). Sans la règle, toutes les hypothèques sont à la Caisse et leurs intérêts (≈ 4 M$/an à
+  2 500 citoyens) n'entrent dans le revenu d'aucune banque.
+- **La Caisse** a son capital plancher (parts sociales et dotation) et verse ses dividendes au-delà, comme les autres ;
+  elle peut faire faillite et être reprise : l'État (son compte, sa dette) passe alors à la banque qui la reprend
+  (`Sim.stateBank`, qui tient aussi le reste du bilan consolidé). Le capital d'une banque reprise reste bloqué chez celle
+  qui la reprend (jamais distribué).
+- **Pourquoi.** Les banques commerciales payaient les intérêts de tous leurs dépôts sans porter d'hypothèque : elles
+  perdaient de l'argent et faisaient faillite en quelques centaines de jours ; leur énorme dotation (réserves toujours
+  « oisives ») les poussait en plus à mieux payer les dépôts. La Caisse paraissait aussi déficitaire (profit lissé −1 300
+  à −1 900 $/j), ne versait jamais de dividende, et les intérêts hypothécaires s'accumulaient dans le système bancaire :
+  l'argent des ménages fondait (31 → 11 M$ entre les jours 500 et 3 000) et les prix baissaient de 58 %.
+
+**Dotation de départ réaliste (interface).** `reservePerCitizen` reste à 100 000 $ par citoyen et par banque dans le
+moteur ; l'interface prend 2 000 $ (paramètre de départ « Dotation / citoyen / banque »). Repère : les prêts que prend
+l'économie (≈ 21 000 $ d'hypothèque et ≈ 8 000 $ d'autres prêts par citoyen, hypothèques pondérées à 35 %) exigent
+≈ 600 $ de capital par citoyen et par banque à trois banques ; 100 000 $ en faisait ≈ 6 ans de masse salariale. La
+dotation ne change pas la vague d'achats du démarrage (mesuré de 1 000 à 100 000 $ : les fonds propres ne freinent rien).
+
+**Prêt d'achat fidèle (`purchaseLoans`, 2026-11-01, anomalie N4).** Coupé par défaut dans le moteur ; l'interface l'active
+(section Crédit aux citoyens). Le prêt « achat important (ordinateur) » n'est accordé que si un ordinateur est en stock ;
+il couvre ce qui manque au-delà du coussin pour le payer (dans la limite du service de la dette, `_loanRoom`) et
+l'ordinateur est acheté aussitôt. Sans la règle, le citoyen emprunte deux fois le prix de référence d'un ordinateur
+(`bestPrice`, qui reste affiché même sans stock : jusqu'à 420 000 $), plafonné seulement par son service de la dette, et
+dépense le reste : avec des banques saines, ces prêts atteignent 429 M$ en 1 000 jours à 2 500 citoyens (contre ≈ 50 M$
+d'hypothèques), les prix sont multipliés par 29 puis le chômage monte à 30-50 %.
+
+**Mesure** (Bâtiments, Banques, baux, réglages de l'interface, 10 graines × 3 000 j ; chômage moyen des jours 2 001 à
+3 000) :
+
+| Configuration | 2 500 citoyens | pire graine | prix au plus haut |
+|---|---|---|---|
+| sans correctif (dotation 100 000 $) | 13,9 % | 46,5 % | × 5 (médiane), jusqu'à × 59 |
+| intérêts hypothécaires à la Caisse seulement (étape intermédiaire) | 8,5 % | 18,5 % | jusqu'à × 61 |
+| banques à égalité, dotation 2 000 $ | 12,5 % | 39,2 % | jusqu'à × 28 (spirale des prêts « ordinateur ») |
+| **banques à égalité, dotation 2 000 $, prêt d'achat fidèle** | **7,1 %** (mieux dans 9 graines sur 10) | **10,1 %** | × 4,7 (au plus × 5,0) |
+
+À 240 citoyens, même configuration : 6,2 % (pire graine 7,5 %), prix au plus haut × 7,4 (au plus × 9,1), contre des prix
+multipliés par 73 à 105 dans 3 graines sur 5 sans correctif. Les trois banques survivent dans les 20 parties. Reste la
+vague d'achats du démarrage (70 % des ménages achètent en 500 jours, à crédit : prix × 4,7 à 2 500 citoyens, × 7,4 à
+240), puis une baisse lente des prix quand les hypothèques se remboursent (−21 % et −46 % entre les jours 500 et 3 000).
 
 ### 6.20 Banque centrale : taux directeur (`Params.policyPassThrough`)
 

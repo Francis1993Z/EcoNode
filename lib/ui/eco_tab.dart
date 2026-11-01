@@ -602,6 +602,18 @@ Widget _creditSection(BuildContext context, SimController ctrl, void Function(vo
       value: sim.modules.banking,
       onChanged: (v) => upd(() => sim.modules.banking = v),
     ),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Prêt d’achat fidèle', style: TextStyle(fontSize: 13)),
+      subtitle: const Text(
+          'Le prêt d’un ordinateur n’est accordé que s’il y en a un en stock, couvre ce qui manque pour le payer, et '
+          'l’ordinateur est acheté aussitôt. Coupé, le citoyen emprunte deux fois le prix d’un ordinateur, même quand '
+          'aucun n’est en vente, et dépense le reste : une spirale prix-revenus-prêts (anomalie N4).',
+          style: TextStyle(fontSize: 11)),
+      value: p.purchaseLoans,
+      onChanged: (v) => upd(() => p.purchaseLoans = v),
+    ),
     ParamSlider(
         label: 'Taux de la carte de crédit (base annuelle)',
         value: p.cardRate,

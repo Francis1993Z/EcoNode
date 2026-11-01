@@ -227,9 +227,31 @@ extension SimBanking on Sim {
     } else if (c.employer != null && c.computerDays == 0 && c.level >= 1 && c.loans.isEmpty &&
         draw(Flux.credit, c.id, 1) < 0.003) {
       // achat important : un ordinateur à crédit
-      final pr = bestPrice('ordinateur');
-      if (c.money - buffer < 2 * pr) _personalLoan(c, 2 * pr, 'achat important (ordinateur)');
+      if (p.purchaseLoans) {
+        // Params.purchaseLoans : un ordinateur en stock, le montant qui manque au-delà du coussin, acheté aussitôt
+        final pr = quote('ordinateur');
+        final missing = pr - math.max(0.0, c.money - buffer);
+        if (pr.isFinite && missing > 0 && missing <= _loanRoom(c)) {
+          _personalLoan(c, missing + 1, 'achat important (ordinateur)');
+          if (c.money - buffer >= pr) {
+            final r = buy(c, 'M', 'ordinateur', 1, c.money, true);
+            if (r.qty >= 1) c.computerDays = p.computerLife;
+          }
+        }
+      } else {
+        final pr = bestPrice('ordinateur');
+        if (c.money - buffer < 2 * pr) _personalLoan(c, 2 * pr, 'achat important (ordinateur)');
+      }
     }
+  }
+
+  /// Montant maximal d'un prêt personnel : ce que permet le service de la dette (dsrMax du revenu mensuel, moins les
+  /// mensualités en cours), au taux du citoyen sur la durée des prêts.
+  double _loanRoom(Citizen c) {
+    final p = params;
+    final af = _annuity(personalLoanRate(c) / 12, p.loanTermMonths);
+    final room = p.dsrMax * 30 * annualIncome(c) / 365 - monthlyDebtService(c);
+    return room * af;
   }
 
   /// Une échéance : intérêts (payés à la banque, sinon capitalisés), puis capital (détruit, sinon en arriérés).
