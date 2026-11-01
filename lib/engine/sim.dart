@@ -604,6 +604,11 @@ class Sim {
   Map<String, double> unmet = {};
   final Map<String, MarketStat> marketStats = {};
   final Map<String, int> lastShortage = {};
+  /// Baux (Params.leases) : locataires de chaque bailleur, comptés chaque matin (identifiant → nombre).
+  final Map<int, int> _tenants = {};
+  /// Baux (Params.leases) : coût quotidien du capital de chaque bailleur (identifiant → $/j), calculé chaque matin.
+  final Map<int, double> _leaseCapital = {};
+  Firm? _saleFirm; // dernier vendeur d'un achat (Params.leases : le bailleur chez qui un nouveau bail s'ouvre)
   final Map<String, double> unmetEma = {}; // demande non servie lissée (~10 jours), par bien
   /// Importations lissées (~10 jours), par bien (Params.revival seulement ; vide sans la règle).
   final Map<String, double> importEma = {};
@@ -781,6 +786,8 @@ class Sim {
     unmet = {};
     marketStats.clear();
     lastShortage.clear();
+    _tenants.clear();
+    _leaseCapital.clear();
     unmetEma.clear();
     importEma.clear();
     _lastEntry.clear();
@@ -974,6 +981,23 @@ class Sim {
       if (citizens.isNotEmpty) f.ownerId = citizens[(draw(Flux.proprietaire, f.id) * citizens.length).floor()].id;
       if (publicService(f)) f.ownerId = null; // établissement public : l'État en est le propriétaire
     }
+    if (p.leases) {
+      // baux de départ (Params.leases) : chaque citoyen loue chez un bailleur, à tour de rôle, dans la limite des capacités
+      final ll = [for (final f in firms) if (f.outputs.containsKey('logement') && f.capacity != null) f];
+      final used = List<int>.filled(ll.length, 0);
+      var i = 0;
+      for (final c in citizens) {
+        for (var k = 0; k < ll.length; k++) {
+          final j = (i + k) % ll.length;
+          if (used[j] < ll[j].capacity!) {
+            c.leaseFirm = ll[j].id;
+            used[j]++;
+            i = j + 1;
+            break;
+          }
+        }
+      }
+    }
     for (final c in citizens) {
       final f = c.employer != null ? firm(c.employer!) : null;
       c.incomeEma = f != null ? (this.modules.jobs ? c.wage : f.wage) * (1 - p.taxRate) : p.benefit;
@@ -1062,6 +1086,10 @@ class Sim {
       return t.rate * (1 + t.capital * kk / (kk + 1)) * planEff;
     }
 
+    // Params.leases : le personnel d'un bailleur ne loue que les nuitées des nouveaux baux (≈ 5 % des nuits, la marge du
+    // plan de production d'un service périssable)
+    double staffShare(String ty) => p.leases && templates[ty]!.outputs.containsKey('logement') ? leaseStaffShare : 1.0;
+
     double maintNeed(Template t, double workers, double machines) =>
         p.maintNeed * machines + (t.heavy ? 0.06 * workers : 0);
     bool needsMaint(Template t) => m.capital && t.maint != null && !t.outputs.containsKey(t.maint);
@@ -1099,8 +1127,11 @@ class Sim {
       for (var it = 0; it < 80; it++) {
         final d = <String, double>{
           for (final g in goods.keys)
+            // panier mesuré des ménages ; le logement reste un besoin fixe, une nuit par personne : mesuré, il manquait
+            // les propriétaires-occupants et les sans-abri de la partie provisoire, et l'échelle lambda le réduisait
+            // (bailleurs sous-dimensionnés, jusqu'à 1 086 sans-abri au jour 1 à 2 500 citoyens avec bâtiments et banques)
             g: basket != null
-                ? pop * (basket.containsKey(g) ? lambda * basket[g]! : (basic[g] ?? 0)) // panier mesuré des ménages
+                ? pop * (basket.containsKey(g) && g != 'logement' ? lambda * basket[g]! : (basic[g] ?? 0))
                 : pop * ((basic[g] ?? 0) + lambda * (_extraDemand[g] ?? 0)),
         };
         for (final ty in types) {
@@ -1130,7 +1161,7 @@ class Sim {
             bb = math.max(bb, d[e.key]! / e.value);
           }
           b[ty] = bb;
-          w[ty] = bb / perW(ty);
+          w[ty] = bb * staffShare(ty) / perW(ty);
         }
         for (final ty in types) {
           final t = templates[ty]!;
@@ -1139,7 +1170,7 @@ class Sim {
           final wage = m.jobs ? p.startWage * classWage[t.skill] * avgRoleRel(ty) : p.startWage * classWage[t.skill];
           if (!scaled) k[ty] = kStar(t, wage);
           final mach = k[ty]! * w[ty]!;
-          var cost = wage / (perW(ty) * (scaled ? _minScale(w[ty]!, n) : 1.0));
+          var cost = wage * staffShare(ty) / (perW(ty) * (scaled ? _minScale(w[ty]!, n) : 1.0));
           for (final e in t.inputs.entries) {
             cost += e.value * price[e.key]!;
           }
@@ -1147,6 +1178,8 @@ class Sim {
           if (needsCompta(t)) fixed += price['compta']! * (0.1 * n + 0.03 * w[ty]!);
           if (needsMaint(t)) fixed += price[t.maint!]! * maintNeed(t, w[ty]!, mach);
           cost += fixed / math.max(b[ty]!, 1e-3);
+          // Params.leases : le loyer couvre l'intérêt sur la valeur des logements (1,06 logement par nuit louée)
+          if (staffShare(ty) < 1) cost += r * 1.06 * p.dwellingModules * price['batiment']!;
           final value = cost * p.markup / (t.ads && m.marketing ? 1 - p.adsShare : 1);
           var tot = 0.0;
           for (final e in t.outputs.entries) {
@@ -1189,6 +1222,9 @@ class Sim {
     solve(lambda);
     return _Plan(price, w, b, k, lambda, basket);
   }
+
+  /// Params.leases : part des nuits louées que le personnel d'un bailleur produit au départ (les nouveaux baux).
+  static const double leaseStaffShare = 0.05;
 
   /// Part de la productivité nominale d'une entreprise trop petite pour occuper un employé à plein temps.
   static double _minScale(double workers, int firms) => (workers / firms).clamp(0.001, 1.0).toDouble();
@@ -1656,12 +1692,15 @@ class Sim {
     if (normal && util < p.normalUtil) util = p.normalUtil;
     // variante A2 (temps partiel) : seules les heures travaillées sont payées
     var batch = f.wage * (p.partTime ? math.max(util, minHours) : 1.0) / (per * util);
-    var planned = math.max(math.max(f.lastBatches, _plannedBatches(f)), 0.05 * capacity);
+    // Params.leases : le travail ne sert qu'aux nuitées des nouveaux baux ; frais fixes répartis sur toutes les nuits louées
+    final t = _tenants[f.id] ?? 0;
+    if (t > 0) batch *= f.lastBatches / (f.lastBatches + t);
+    var planned = math.max(math.max(f.lastBatches + t, _plannedBatches(f)), 0.05 * capacity);
     if (normal && planned < p.normalUtil * capacity) planned = p.normalUtil * capacity; // frais fixes sur la production normale
     for (final e in f.inputs.entries) {
       batch += e.value * bestPrice(e.key);
     }
-    var fixed = f.overheadEma + f.debt * loanRate(f) / 365 + f.carry;
+    var fixed = f.overheadEma + f.debt * loanRate(f) / 365 + f.carry + (_leaseCapital[f.id] ?? 0);
     if (modules.capital) fixed += f.machines * p.depreciation * bestPrice('machines');
     batch += fixed / planned;
     var tot = 0.0;
@@ -1764,6 +1803,7 @@ class Sim {
       } else {
         final s = o.firm!;
         paid = transfer(buyer, s, cost);
+        _saleFirm = s;
         _setStock(s, good, (s.inv[good] ?? 0) - q);
         s.sold[good] = (s.sold[good] ?? 0) + q;
         s.revenue += paid;
@@ -1873,6 +1913,7 @@ class Sim {
 
     if (params.sellerSample > 0 || _availValid) _rebuildAvail(); // liste des vendeurs : reconstruite chaque matin
     if (modules.buildings) _buildingsMorning();
+    if (p.leases || _tenants.isNotEmpty) _leaseMorning();
     _laborMarket();
     if (modules.entrepreneurship) _learnSectors();
     if (productsActive) _productsDay();
@@ -2072,7 +2113,10 @@ class Sim {
       for (final id in f.workers) {
         eff += efficiency(_cmap[id]!, f);
       }
-      final laborBatches = _capBatches(f, eff * perWorker(f));
+      // Params.leases : les nuits des locataires ne demandent ni travail ni stock ; l'équipe ne loue que la place restante
+      final t = _tenants[f.id] ?? 0;
+      var laborBatches = _capBatches(f, eff * perWorker(f));
+      if (t > 0 && f.capacity != null) laborBatches = math.min(laborBatches, math.max(0.0, f.capacity! - t));
       var batches = laborBatches;
       if (f.inputs.isNotEmpty) {
         // intrants principaux : recette stricte ; intrants secondaires : la cadence baisse en proportion de leur poids.
@@ -2099,7 +2143,7 @@ class Sim {
       }
       f.inputLimited = batches < laborBatches - eps;
       // on produit la demande prévue (et le réassort du stock visé), pas toute la capacité de l'équipe
-      batches = math.max(0.0, math.min(batches, _plannedBatches(f)));
+      batches = math.max(0.0, math.min(batches, _plannedBatches(f) - t));
       f.lastBatches = batches;
       f.outputEma = 0.95 * f.outputEma + 0.05 * batches;
       f.effWorkers = eff;
@@ -2110,7 +2154,7 @@ class Sim {
       for (final e in f.outputs.entries) {
         final q = batches * e.value;
         _setStock(f, e.key, (f.inv[e.key] ?? 0) + q);
-        f.produced[e.key] = q;
+        f.produced[e.key] = t > 0 && e.key == 'logement' ? q + t : q;
       }
     }
   }
@@ -2647,7 +2691,15 @@ class Sim {
       c.hungerDays = c.sat['faim']! < 0.5 ? c.hungerDays + 1 : 0;
       // 2. se loger
       // un propriétaire-occupant habite chez lui (module buildings) : pas de nuitée à payer
-      final rl = c.homeId != null ? const BuyResult(1, 0) : buy(c, 'M', 'logement', 1, c.money, true);
+      // Params.leases : un locataire paie son loyer à son bailleur ; sans bail (ou bail perdu), il loue sur le marché
+      var rl = c.homeId != null
+          ? const BuyResult(1, 0)
+          : (p.leases && c.leaseFirm != null ? _payRent(c) : const BuyResult(0, 0));
+      if (rl.qty < 1) {
+        _saleFirm = null;
+        rl = buy(c, 'M', 'logement', 1, c.money, true);
+        if (p.leases && rl.qty >= 1 && _saleFirm != null) c.leaseFirm = _saleFirm!.id;
+      }
       c.homeless = rl.qty < 1;
       c.homelessDays = c.homeless ? c.homelessDays + 1 : 0;
       c.sat['logement'] = c.homeless ? 0 : 1;
@@ -2664,6 +2716,82 @@ class Sim {
     if (modules.publicBudget) _serveQueues();
     _quoteCache = null;
     consumeClock.stop();
+  }
+
+  /// Baux (Params.leases), chaque matin : les baux qui ne tiennent plus prennent fin (bailleur disparu, locataire devenu
+  /// propriétaire-occupant, parc devenu trop petit : les derniers de la liste des citoyens partent), puis on compte les
+  /// locataires de chaque bailleur.
+  void _leaseMorning() {
+    _tenants.clear();
+    _leaseCapital.clear();
+    if (!params.leases) {
+      // règle coupée en cours de partie : les baux prennent fin, chacun loue de nouveau sa nuitée au jour le jour
+      for (final c in citizens) {
+        c.leaseFirm = null;
+      }
+      return;
+    }
+    for (final c in citizens) {
+      final id = c.leaseFirm;
+      if (id == null) continue;
+      final f = _fmap[id];
+      if (f == null || c.homeId != null || !f.outputs.containsKey('logement')) {
+        c.leaseFirm = null;
+        continue;
+      }
+      _tenants[id] = (_tenants[id] ?? 0) + 1;
+    }
+    for (var i = citizens.length - 1; i >= 0; i--) {
+      final c = citizens[i];
+      final id = c.leaseFirm;
+      if (id == null) continue;
+      final cap = _fmap[id]!.capacity;
+      final t = _tenants[id]!;
+      if (cap == null || t <= cap) continue;
+      c.leaseFirm = null;
+      _tenants[id] = t - 1;
+    }
+    // coût du capital (le loyer est le coût d'usage du logement) : intérêt au taux de base sur la valeur du parc, net des
+    // hypothèques du bailleur (leurs intérêts sont déjà dans ses frais, avec la provision pour l'usure) ; sans bâtiments,
+    // la valeur de remplacement de ses logements (sa capacité). Sans cela, le loyer tombe au coût de l'usure et plus
+    // personne n'achète : la mensualité dépasse toujours 1,2 fois le loyer.
+    final r = baseRate() / 365;
+    if (modules.buildings) {
+      final value = <int, double>{};
+      for (final b in buildings) {
+        if (b.ownerKind == 0 && b.done) value[b.ownerId!] = (value[b.ownerId!] ?? 0) + fairValue(b);
+      }
+      for (final m in mortgages) {
+        if (m.borrowerKind == 0 && value.containsKey(m.borrowerId)) value[m.borrowerId!] = value[m.borrowerId!]! - m.principal;
+      }
+      for (final e in value.entries) {
+        if (e.value > 0) _leaseCapital[e.key] = e.value * r;
+      }
+    } else {
+      final v = params.dwellingModules * referencePrice('batiment');
+      for (final f in firms) {
+        if (f.outputs.containsKey('logement') && f.capacity != null) _leaseCapital[f.id] = v * f.capacity! * r;
+      }
+    }
+  }
+
+  /// Loyer du jour d'un locataire (Params.leases) : le loyer affiché de son bailleur, payé hors du stock de nuitées.
+  /// Rend (0, 0) et met fin au bail si le loyer est impayable.
+  BuyResult _payRent(Citizen c) {
+    final f = _fmap[c.leaseFirm!];
+    final rent = f?.price['logement'];
+    if (f == null || rent == null || c.money < rent) {
+      c.leaseFirm = null;
+      return const BuyResult(0, 0);
+    }
+    final paid = transfer(c, f, rent);
+    f.sold['logement'] = (f.sold['logement'] ?? 0) + 1;
+    f.revenue += paid;
+    _flow(f.id.toString(), 'M', 'logement', 1, paid);
+    final ms = marketStats['logement']!;
+    ms.qty += 1;
+    ms.value += paid;
+    return BuyResult(1, paid);
   }
 
   /// Le bien qui apporte le plus de satisfaction par dollar, parmi ceux en stock et abordables.
@@ -3289,7 +3417,9 @@ class Sim {
     final p = params;
     for (final f in List<Firm>.from(firms)) {
       f.idleDays = f.workers.isEmpty ? f.idleDays + 1 : 0;
-      if (f.idleDays >= p.exitIdleDays && !publicService(f)) _close(f); // un établissement public ne ferme pas
+      // un établissement public ne ferme pas ; un bailleur qui a des locataires non plus (Params.leases) : ses logements et
+      // ses loyers restent, il réembauche
+      if (f.idleDays >= p.exitIdleDays && !publicService(f) && (_tenants[f.id] ?? 0) == 0) _close(f);
     }
     if (day < 30) return; // pas pendant le démarrage
     if (modules.entrepreneurship) {
@@ -3601,7 +3731,9 @@ class Sim {
       final nw = f.workers.length;
       final avgEff = nw > 0 ? math.max(0.3, f.effWorkers / nw) : 1.0;
       final per = math.max(eps, perWorker(f) * avgEff);
-      var desired = (_plannedBatches(f) / per - 0.2).ceil();
+      final tenants = _tenants[f.id] ?? 0; // Params.leases : l'équipe ne sert qu'aux nouveaux baux
+      var desired = ((_plannedBatches(f) - tenants) / per - 0.2).ceil();
+      if (tenants > 0 && desired < 1) desired = 1; // un employé au moins tient les baux en cours
       if (f.inputLimited) desired = math.min(desired, (f.lastBatches / per).ceil()); // pas d'embauche sans matière
       f.desired = desired;
       final bill = f.wage * nw;

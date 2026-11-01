@@ -211,6 +211,7 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.planFromHouseholds != d.planFromHouseholds) 'planFromHouseholds': p.planFromHouseholds,
     if (p.spreadHealth != d.spreadHealth) 'spreadHealth': p.spreadHealth,
     if (p.planWorkforce != d.planWorkforce) 'planWorkforce': p.planWorkforce,
+    if (p.leases != d.leases) 'leases': p.leases,
     if (p.revival != d.revival) 'revival': p.revival,
     if (p.revivalHours != d.revivalHours) 'revivalHours': p.revivalHours,
     if (p.revivalFullCost != d.revivalFullCost) 'revivalFullCost': p.revivalFullCost,
@@ -386,7 +387,8 @@ Params _paramsFrom(Map j) => Params()
   ..walletAtTarget = (j['walletAtTarget'] as bool?) ?? false
   ..planFromHouseholds = (j['planFromHouseholds'] as bool?) ?? false
   ..spreadHealth = (j['spreadHealth'] as bool?) ?? false
-  ..planWorkforce = (j['planWorkforce'] as bool?) ?? false;
+  ..planWorkforce = (j['planWorkforce'] as bool?) ?? false
+  ..leases = (j['leases'] as bool?) ?? false;
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
@@ -515,6 +517,7 @@ Map<String, Object?> _citizenJson(Citizen c) => {
       'eiBenefit': _d(c.eiBenefit),
       'schoolSince': c.schoolSince,
       'homeId': c.homeId,
+      if (c.leaseFirm != null) 'leaseFirm': c.leaseFirm,
       'wantsToOwn': c.wantsToOwn,
       'hiredDay': c.hiredDay,
       'role': c.role,
@@ -546,6 +549,7 @@ Citizen _citizenFrom(Map j) {
     ..eiBenefit = _rd(j['eiBenefit'])
     ..schoolSince = j['schoolSince'] as int?
     ..homeId = j['homeId'] as int?
+    ..leaseFirm = j['leaseFirm'] as int?
     ..wantsToOwn = (j['wantsToOwn'] as bool?) ?? false
     ..hiredDay = (j['hiredDay'] as int?) ?? 0
     ..role = (j['role'] as int?) ?? -1

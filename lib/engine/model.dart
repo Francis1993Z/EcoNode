@@ -908,6 +908,13 @@ class Params {
   // l'arrondi des équipes (≈ 0,3 employé par entreprise : effectif voulu = ⌈lots / productivité − 0,2⌉) dans son objectif
   // de 94 % d'emploi. Sinon, dès le premier jour, les entreprises veulent ≈ 104 % de la population active.
   bool planWorkforce = false;
+  // Baux (leases, 2026-11-01, anomalies A6 et N11) : un locataire garde son logement tant qu'il paie le loyer affiché de
+  // son bailleur, chaque jour, sans passer par le stock de nuitées ; le personnel du bailleur ne produit plus que les
+  // nuitées des nouveaux baux (louer sur le marché ouvre un bail chez ce bailleur). Le bail prend fin si le loyer devient
+  // impayable, si le locataire achète un logement, si le bailleur ferme ou si son parc devient trop petit. Sinon, se loger
+  // c'est acheter chaque jour une nuitée produite par un employé : quand le marché du travail est saturé, les bailleurs
+  // perdent leurs employés et des ménages solvables dorment dehors à côté de logements vides.
+  bool leases = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
@@ -1441,6 +1448,7 @@ class Citizen extends Account {
   double eiBenefit = 0; // prestation quotidienne de la demande en cours
   int? schoolSince; // jour d'inscription dans la file de l'école publique
   int? homeId; // bâtiment dont il est propriétaire-occupant (module buildings) ; null : locataire
+  int? leaseFirm; // bailleur dont il a un bail (Params.leases) ; null : pas de bail
   bool wantsToOwn = false; // trait : veut devenir propriétaire (module buildings)
   // emploi (ancienneté tenue dans tous les cas ; rôle, contrat et aplomb ne servent qu'avec le module jobs)
   int hiredDay = 0; // jour d'embauche chez l'employeur actuel (négatif : avant le début de la partie)

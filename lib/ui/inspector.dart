@@ -816,6 +816,7 @@ class _CitizenViewState extends State<_CitizenView> {
         KV('Bonheur', pct(c.happiness)),
         KV('Jours de faim', '${c.hungerDays}', color: c.hungerDays > 0 ? pal.bad : null),
         KV('Logement', c.homeless ? 'sans logis (${c.homelessDays} j)' : 'logé', color: c.homeless ? pal.bad : null),
+        if (c.leaseFirm != null && sim.firm(c.leaseFirm!) != null) KV('Bail', sim.firm(c.leaseFirm!)!.name),
         if (sim.modules.buildings && home != null)
           Row(children: [
             Text('Propriétaire de son logement', style: TextStyle(color: pal.ink2, fontSize: 12.5)),
