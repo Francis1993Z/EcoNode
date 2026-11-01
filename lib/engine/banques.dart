@@ -373,6 +373,10 @@ extension SimBanking on Sim {
   double bankLoanSpread(int id) => id < banks.length ? banks[id].loanSpread : 0.0;
   double bankCardSpread(int id) => id < banks.length ? banks[id].cardSpread : 0.0;
 
+  /// Banque qui tient le reste du bilan consolidé : ses fonds propres sont calculés (consolidé − les autres), pas tenus.
+  /// La Caisse ; Params.equalBanks : la banque de l'État (celle qui a repris la Caisse si elle a fait faillite).
+  int get _rest => params.equalBanks ? stateBank : 0;
+
   /// Répartition d'une variation des fonds propres entre les banques (phase B) ; avec la Caisse seule, rien à répartir.
   void _attrib(int bankId, double delta, {double income = 0, double loss = 0}) {
     if (banks.isEmpty) {
@@ -380,7 +384,7 @@ extension SimBanking on Sim {
       return;
     }
     final b = banks[bankId < banks.length ? bankId : 0];
-    if (b.id != 0) b.equity += delta;
+    if (b.id != _rest) b.equity += delta;
     b.incomeToday += income;
     b.lossToday += loss;
   }
@@ -464,6 +468,7 @@ extension SimBanks on Sim {
     }
     final a = transfer(null, bank, dot * p.nBanks);
     bank.capital += dot; // la dotation de la Caisse n'est jamais ristournée
+    if (p.equalBanks) banks[0].capital = bank.capital; // la Caisse : parts sociales et dotation, son capital plancher
     if (!atReset) {
       // en cours de partie : monnaie extérieure, comme une injection du god mode à la Caisse
       ledgerGod += a;
@@ -518,18 +523,27 @@ extension SimBanks on Sim {
       b.firmLoans += f.debt;
       b.riskLoans += f.debt;
     }
-    final b0 = banks[0];
-    b0.deposits += state.money; // l'État est client de la Caisse
+    final b0 = banks[stateBank];
+    b0.deposits += state.money; // l'État est client de la Caisse (Params.equalBanks : de celle qui l'a reprise)
     if (mortgages.isNotEmpty) {
-      final m = mortgageDebt(); // hypothèques (module bâtiments) : la Caisse
-      b0.firmLoans += m;
-      b0.riskLoans += params.mortgageRiskWeight * m;
+      if (params.equalBanks) {
+        // hypothèques (module bâtiments) : chez la banque prêteuse
+        for (final m in mortgages) {
+          final mb = of(m.bankId);
+          mb.firmLoans += m.principal;
+          mb.riskLoans += params.mortgageRiskWeight * m.principal;
+        }
+      } else {
+        final m = mortgageDebt(); // hypothèques (module bâtiments) : la Caisse
+        b0.firmLoans += m;
+        b0.riskLoans += params.mortgageRiskWeight * m;
+      }
     }
     var others = 0.0;
     for (final b in banks) {
-      if (b.id != 0) others += b.equity;
+      if (b.id != _rest) others += b.equity;
     }
-    b0.equity = bank.equity - others;
+    banks[_rest].equity = bank.equity - others;
     for (final b in banks) {
       b.equityNow = b.equity;
       b.reserves = b.deposits + b.equityNow - b.loans - b.interbank;
@@ -578,7 +592,7 @@ extension SimBanks on Sim {
     for (final b in banks) {
       out += b.costToday;
       bank.equity -= b.costToday;
-      if (b.id != 0) b.equity -= b.costToday;
+      if (b.id != _rest) b.equity -= b.costToday;
     }
     dayFlows.bankOut += out;
     if (out > 0) _flow('B', 'M', '\$intérêts des dépôts et frais', 1, out);
@@ -624,16 +638,14 @@ extension SimBanks on Sim {
     // intérêts interbancaires : une répartition entre banques (le total est nul)
     for (final b in banks) {
       final i = b.interbank * p.policyRate / 365;
-      if (b.id != 0) b.equity += i;
+      if (b.id != _rest) b.equity += i;
       b.incomeToday += i;
     }
     // 4. dividendes : au-delà du capital plancher et de la cible de fonds propres
     _banksMeasure();
     for (final b in banks) {
       if (!b.alive || p.bankRebate <= 0) continue;
-      // Params.bankMortgageIncome : la Caisse garde ses parts sociales et sa dotation (bank.capital), jamais distribuées
-      final floor = b.id == 0 && p.bankMortgageIncome ? bank.capital : b.capital;
-      final surplus = math.min(bank.money, b.equityNow - math.max(floor, p.bankTargetRatio * b.riskLoans));
+      final surplus = math.min(bank.money, b.equityNow - math.max(b.capital, p.bankTargetRatio * b.riskLoans));
       if (surplus <= eps || b.profitEma <= 0) continue;
       final owner = b.ownerId != null ? _cmap[b.ownerId!] : null;
       final total0 = surplus * p.bankRebate;
@@ -650,7 +662,7 @@ extension SimBanks on Sim {
       }
       bank.rebates += total;
       bank.equity -= total;
-      if (b.id != 0) b.equity -= total;
+      if (b.id != _rest) b.equity -= total;
       dayFlows.rebates += total;
       if (total > 0) _flow('B', 'M', '\$dividendes des banques', 1, total);
     }
@@ -680,7 +692,7 @@ extension SimBanks on Sim {
       final failing = b.equityNow < 0 ||
           (b.riskLoans > 0 && b.capitalRatio < safeguards.minCapitalRatio) ||
           b.lossDays >= p.bankLossDays;
-      if (failing && b.id != 0) _resolveBank(b);
+      if (failing && (b.id != 0 || p.equalBanks)) _resolveBank(b); // Params.equalBanks : la Caisse aussi
     }
     _switchBanks();
     if (modules.banking) _bankFounding();
@@ -756,15 +768,15 @@ extension SimBanks on Sim {
     for (final f in firms) {
       if (f.bankId == b.id) f.bankId = acq.id;
     }
-    if (acq.id != 0) acq.equity += b.equity;
-    if (params.bankMortgageIncome && b.equity > 0) {
-      // le capital de la banque reprise reste bloqué chez celle qui la reprend (jamais distribué en dividendes)
-      final kept = math.min(b.capital, b.equity);
-      if (acq.id == 0) {
-        bank.capital += kept;
-      } else {
-        acq.capital += kept;
+    if (acq.id != _rest) acq.equity += b.equity;
+    if (params.equalBanks) {
+      // ses hypothèques, et l'État s'il en était client, passent à la banque qui la reprend ; le capital de la banque
+      // reprise reste bloqué chez celle-ci (jamais distribué en dividendes)
+      for (final m in mortgages) {
+        if (m.bankId == b.id) m.bankId = acq.id;
       }
+      if (stateBank == b.id) stateBank = acq.id;
+      if (b.equity > 0) acq.capital += math.min(b.capital, b.equity);
     }
     acq.interbank += b.interbank;
     final lost = b.equity;

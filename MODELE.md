@@ -370,7 +370,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `floatingFx`, `fxSpeed` | non, 0,05 | douane (§ 6.21) : taux de change flottant et sa vitesse d'ajustement par jour | mesure § 6.21 |
 | `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
 | `revival`, `revivalHours`, `revivalFullCost`, `revivalPlannedDemand` | non, non, non, non | renaissance des filières (§ 6.22) : signal d'entrée d'un bien sans producteur actif ; relance à temps partiel ; viabilité d'une relance au coût complet et prix de départ face à l'import ; demande dérivée au plan de production de l'aval | mesure § 6.22 |
-| `bankMortgageIncome` | non | banques (§ 6.19) : intérêts des hypothèques au revenu de la Caisse, plancher de dividende = sa dotation | mesure § 6.19 |
+| `equalBanks` | non | banques (§ 6.19) : intérêts des hypothèques au revenu de la Caisse, plancher de dividende = sa dotation | mesure § 6.19 |
 | `leases` | non | baux (§ 6.6) : un locataire garde son logement tant qu'il paie ; le personnel du bailleur ne sert qu'aux nouveaux baux ; loyer = coût d'usage du logement | mesure § 6.6 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
 | `priceStep`, `wageStep` | 0,02, 0,015 | pas d'ajustement de la marge et du salaire | choix de jeu (tâche 3 du plan : lissage) |
@@ -1016,7 +1016,7 @@ jours) : reprise par la banque la plus solide, actionnaires effacés, déposants
 l'entrepreneuriat (connaissance du secteur : jours dans un cabinet comptable) sur le profit espéré à la part de marché restante
 1/(n+1) moins le coût fixe ; capital minimum absolu `bankMinCapital` versé par `transfer()`, frais irrécupérables `bankEntryCost`.
 
-**Hypothèques dans les comptes des banques (`bankMortgageIncome`, 2026-11-01, anomalie N4).** Coupé par défaut dans le
+**Hypothèques dans les comptes des banques (`equalBanks`, 2026-11-01, anomalie N4).** Coupé par défaut dans le
 moteur ; l'interface l'active (onglet Modèle, section Banques). Avec plusieurs banques et le module Bâtiments, la Caisse
 porte les hypothèques (elles sont dans ses prêts pondérés), mais leurs intérêts n'entraient dans le revenu d'aucune banque :
 la Caisse paraissait déficitaire (profit lissé −1 300 à −1 900 $/j à 2 500 citoyens), ne versait jamais de dividende, et les

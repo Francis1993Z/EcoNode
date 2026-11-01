@@ -162,6 +162,7 @@ class StartParamsEditor extends StatelessWidget {
           p.planFromHouseholds = true;
           p.spreadHealth = true;
           p.planWorkforce = true;
+          p.reservePerCitizen = 2000; // banques : dotation réaliste (anomalie N4)
           onChanged();
         },
         icon: const Icon(Icons.restore, size: 16),

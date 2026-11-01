@@ -673,8 +673,8 @@ Widget _banksSection(BuildContext context, SimController ctrl, void Function(voi
           'sa dotation, et le capital des banques qu’elle reprend, ne sont jamais distribués. Coupé, les intérêts '
           'hypothécaires s’accumulent dans les banques sans revenir aux ménages (déflation par la dette, anomalie N4).',
           style: TextStyle(fontSize: 11)),
-      value: p.bankMortgageIncome,
-      onChanged: (v) => upd(() => p.bankMortgageIncome = v),
+      value: p.equalBanks,
+      onChanged: (v) => upd(() => p.equalBanks = v),
     ),
     ParamSlider(
         label: 'Banques de départ (nouvelle partie)',

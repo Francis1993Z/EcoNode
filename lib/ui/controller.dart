@@ -89,11 +89,12 @@ class SimController extends ChangeNotifier {
               ..stateBorrowing = true // l'État emprunte plutôt que de couper l'enveloppe de l'hôpital (anomalie A1)
               ..normalUtil = 0.5 // prix au coût normal : plus de prix aberrants (anomalie A7)
               ..leases = true // baux : un locataire garde son logement tant qu'il paie (anomalies A6 et N11)
-              ..bankMortgageIncome = true // banques : intérêts des hypothèques dans les revenus de la Caisse (N4)
+              ..equalBanks = true // banques : intérêts des hypothèques dans les revenus de la Caisse (N4)
               ..walletAtTarget = true // démarrage à l'équilibre (anomalie N6)
               ..planFromHouseholds = true
               ..spreadHealth = true
-              ..planWorkforce = true,
+              ..planWorkforce = true
+              ..reservePerCitizen = 2000, // banques : dotation réaliste (voir startParams)
             modules: Modules()
               ..jobs = true
               ..entrepreneurship = true
@@ -219,7 +220,8 @@ class SimController extends ChangeNotifier {
     ..walletAtTarget = true // démarrage à l'équilibre (anomalie N6) : paramètre de départ, actif par défaut dans l'interface
     ..planFromHouseholds = true
     ..spreadHealth = true
-    ..planWorkforce = true;
+    ..planWorkforce = true
+    ..reservePerCitizen = 2000; // banques : dotation réaliste (≈ 3 fois le capital qu'exigent les prêts, anomalie N4)
 
   void newGame(int seed, {Params? params}) {
     realSpeed = 0;
@@ -237,7 +239,7 @@ class SimController extends ChangeNotifier {
           ..stateBorrowing = true
           ..normalUtil = 0.5
           ..leases = true
-          ..bankMortgageIncome = true,
+          ..equalBanks = true,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();
