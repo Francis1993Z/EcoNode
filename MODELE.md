@@ -1023,6 +1023,17 @@ aucune variété créée d'avance : une entreprise lance la sienne à sa créati
 - **Entrée** (`entryWant`) : pour une catégorie différenciée, plus de plafond de 3 producteurs ni de test de marge par vendeur : demande non
   servie + demande faiblement servie (achat d'une variété mal aimée ou trouvée faute d'en connaître) ÷ (1 + variétés actives), si la marge
   moyenne en place ≥ `prodEntryMargin` ; seule limite dure : un employé entier (pas d'échelle minimale fractionnaire) et la viabilité.
+- **Seuil de marge d'entrée dans l'interface : 5 %** (2026-11-01, anomalie N2 ; 15 % dans le moteur). La marge moyenne des vendeurs
+  en place tourne autour de 5 à 8 % du prix (marge habituelle 1 − 1/1,15 = 13 %, moins avec le prix au coût normal) : à 15 %,
+  l'entrée était bloquée dans 6 catégories sur 9 en permanence. **Mesure** (`tool/emergence.dart`, sur le serveur de calcul,
+  réglages de l'interface, 10 graines × 3 000 j, moyennes des jours 300 à 3 000) : 2 500 citoyens, lancements 2,3 → 4,4 par an
+  (toutes catégories), disparitions 3,8 → 5,4, vendeurs par catégorie 9,6 → 10,4, concentration inchangée (HHI 0,25),
+  chômage 7,7 → 7,9 % (dans le bruit) ; 240 citoyens, lancements 0,8 → 1,8 par an, vendeurs 1,6 → 2,0, HHI 0,85 → 0,74,
+  chômage 6,2 → 5,8 %. Un seuil de 0 donne les mêmes chiffres : c'est le calcul de rentabilité du fondateur qui décide.
+  **Essayé, non retenu** : une découverte cinq fois plus fréquente (`prodAdRate` 0,15) ou un oubli après 180 jours : les
+  ménages connaissent plus de variétés (≥ 2 connues : 50 → 77 %), mais se concentrent sur les meilleures ; les autres
+  disparaissent, la concentration monte (HHI 0,19 → 0,26) et, moins de ménages étant mal servis, les lancements baissent
+  (3,9 → 1,0 par an ; 5 graines × 1 500 j).
 
 ### 6.19 Crédit aux citoyens et banques (module `banking`, `banques.dart`)
 

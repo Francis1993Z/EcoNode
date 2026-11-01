@@ -92,6 +92,7 @@ class SimController extends ChangeNotifier {
               ..equalBanks = true // banques : la Caisse est une banque comme les autres (N4)
               ..purchaseLoans = true // crédit : le prêt d'un ordinateur sert à l'acheter (N4)
               ..jointCostBySales = true // coproduits : le coût commun se répartit sur ce qui se vend (A3)
+              ..prodEntryMargin = 0.05 // produits : une variété peut entrer si les vendeurs en place font un profit (N2)
               ..walletAtTarget = true // démarrage à l'équilibre (anomalie N6)
               ..planFromHouseholds = true
               ..spreadHealth = true
@@ -245,7 +246,8 @@ class SimController extends ChangeNotifier {
           ..leases = true
           ..equalBanks = true
           ..purchaseLoans = true
-          ..jointCostBySales = true,
+          ..jointCostBySales = true
+          ..prodEntryMargin = 0.05,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();
