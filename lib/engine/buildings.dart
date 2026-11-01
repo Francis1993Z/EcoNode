@@ -105,13 +105,24 @@ extension SimBuildings on Sim {
       baseRate() + params.mortgageSpreadMax * ((ltv - 0.5) / 0.45).clamp(0.0, 1.0).toDouble();
 
   /// La Caisse peut-elle prêter ce montant ? Fonds propres ≥ plancher × (exposition pondérée actuelle + prêt pondéré).
-  bool _bankAllows(double loan) {
+  /// Params.equalBanks : la banque de l'emprunteur [bankId], avec ses propres fonds propres et ses prêts.
+  bool _bankAllows(double loan, [int bankId = 0]) {
     if (!modules.credit) return false;
     if (modules.bankRegulation || safeguards.credit) {
+      if (params.equalBanks && banks.isNotEmpty) {
+        final b = banks[bankId < banks.length ? bankId : 0];
+        return b.alive && b.equityNow >= safeguards.minCapitalRatio * (b.riskLoans + params.mortgageRiskWeight * loan);
+      }
       final need = safeguards.minCapitalRatio * (totalDebt() + params.mortgageRiskWeight * loan);
       if (bank.equity < need) return false;
     }
     return true;
+  }
+
+  /// Banque d'un emprunteur (Params.equalBanks) : celle du citoyen ou de l'entreprise ; 0 sans le module banques.
+  int _lenderOf(Account a) {
+    if (!params.equalBanks || banks.isEmpty) return 0;
+    return a is Citizen ? a.bankId : (a is Firm ? a.bankId : 0);
   }
 
   // ------------------------------------------------------------------ hypothèques : monnaie
@@ -123,7 +134,7 @@ extension SimBuildings on Sim {
     ledgerCredit += a;
     bank.lent += a;
     dayFlows.loans += a;
-    final m = Mortgage(_nextMortgageId++, b.id, kind, borrowerId, a, rate, term, day);
+    final m = Mortgage(_nextMortgageId++, b.id, kind, borrowerId, a, rate, term, day)..bankId = _lenderOf(borrower);
     m.payment = quantize(_annuity(a, rate / 365, term));
     mortgages.add(m);
     _mmap[m.id] = m;
@@ -168,6 +179,7 @@ extension SimBuildings on Sim {
       bank.writtenOff += rem;
       bank.equity -= rem;
       dayFlows.writtenOff += rem;
+      if (params.equalBanks && banks.isNotEmpty) _attrib(m.bankId, -rem, loss: rem);
       m.principal = 0;
       if (trace != null) _t('credit', 'radiation', 'Caisse', null, 'radiation d’hypothèque', why, rem);
     }
@@ -376,6 +388,7 @@ extension SimBuildings on Sim {
         bank.interest += pi;
         bank.equity += pi;
         dayFlows.interest += pi;
+        if (params.equalBanks && banks.isNotEmpty) _attrib(m.bankId, pi, income: pi); // la banque prêteuse
         if (acct is Firm) acct.costs += pi;
         if (capital > 0) _repayMortgage(m, acct, capital);
         m.missed = 0;
@@ -385,6 +398,7 @@ extension SimBuildings on Sim {
         m.principal += interest; // intérêts impayés capitalisés
         bank.capitalized += interest;
         bank.equity += interest;
+        if (params.equalBanks && banks.isNotEmpty) _attrib(m.bankId, interest, income: interest);
         dayFlows.capitalized += interest;
         m.missed++;
         if (m.missed > params.foreclosureDays) _foreclose(m);
@@ -484,7 +498,7 @@ extension SimBuildings on Sim {
         bstats.refused++;
         return false;
       }
-      if (!_bankAllows(loan)) {
+      if (!_bankAllows(loan, _lenderOf(c))) {
         bank.refusals++;
         bstats.refused++;
         if (trace != null) {
@@ -573,7 +587,7 @@ extension SimBuildings on Sim {
     }
     final added = math.max(0.0, f.revenueEma - f.inputSpendEma);
     if (pay > safeguards.maxPaymentRatio * added) return false;
-    if (!_bankAllows(amount)) {
+    if (!_bankAllows(amount, _lenderOf(f))) {
       bank.refusals++;
       return false;
     }

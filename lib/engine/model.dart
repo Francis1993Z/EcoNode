@@ -915,6 +915,21 @@ class Params {
   // c'est acheter chaque jour une nuitée produite par un employé : quand le marché du travail est saturé, les bailleurs
   // perdent leurs employés et des ménages solvables dorment dehors à côté de logements vides.
   bool leases = false;
+  // Banques à égalité (equalBanks, 2026-11-01, anomalie N4) : avec le module banques, la Caisse est une banque comme les
+  // autres. Une hypothèque est portée par la banque de l'emprunteur (intérêts à ses revenus, radiations à ses pertes, prêt
+  // pondéré dans ses fonds propres exigés, règle des fonds propres de cette banque à l'octroi) ; la Caisse a son capital
+  // plancher (parts sociales et dotation), verse ses dividendes et peut faire faillite comme les autres (l'État passe alors
+  // à la banque qui la reprend) ; le capital d'une banque reprise reste bloqué chez celle qui la reprend. Sinon toutes les
+  // hypothèques sont à la Caisse et leurs intérêts (≈ 4 M$ par an à 2 500 citoyens) n'entrent dans le revenu d'aucune
+  // banque : la Caisse paraît déficitaire et ne verse jamais de dividende, la monnaie s'accumule dans le système bancaire
+  // (déflation par la dette) et les banques commerciales, sans hypothèques, perdent de l'argent et font faillite.
+  bool equalBanks = false;
+  // Prêt d'achat fidèle (purchaseLoans, 2026-11-01, anomalie N4) : le prêt personnel « achat important (ordinateur) »
+  // n'est accordé que si un ordinateur est en stock, il couvre seulement ce qui manque au-delà du coussin pour le payer,
+  // et l'ordinateur est acheté aussitôt. Sinon le citoyen emprunte deux fois le prix de référence d'un ordinateur (plafonné
+  // seulement par son service de la dette), même quand aucun n'est en vente, et dépense le reste : avec des banques
+  // saines, ces prêts créent des centaines de millions de dollars (spirale prix-revenus-prêts, prix × 29 en 1 000 jours).
+  bool purchaseLoans = false;
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
@@ -1816,6 +1831,7 @@ class Building {
 class Mortgage {
   final int id;
   final int buildingId;
+  int bankId = 0; // banque prêteuse (Params.equalBanks ; sinon 0 : la Caisse)
   int borrowerKind; // 0 entreprise, 1 citoyen, 2 plus de débiteur (bâtiment saisi ou débiteur disparu)
   int? borrowerId;
   double principal; // capital dû (intérêts impayés capitalisés compris)

@@ -286,6 +286,10 @@ void applyParam(Params p, String k, String v) {
       p.fxSpeed = double.parse(v);
     case 'normalUtil': // prix au coût normal (A7) : utilisation normale de l'équipe, 0 = coût réel
       p.normalUtil = double.parse(v);
+    case 'purchaseLoans': // prêt d'achat : un ordinateur en stock, le montant qui manque, acheté aussitôt (N4)
+      p.purchaseLoans = b();
+    case 'equalBanks': // hypothèques dans les revenus et le plancher de la Caisse (N4)
+      p.equalBanks = b();
     case 'leases': // baux : un locataire garde son logement tant qu'il paie (A6, N11)
       p.leases = b();
     case 'planWorkforce': // plan de départ : efficacité d'équilibre et arrondi des équipes (N6)

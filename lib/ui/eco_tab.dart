@@ -602,6 +602,18 @@ Widget _creditSection(BuildContext context, SimController ctrl, void Function(vo
       value: sim.modules.banking,
       onChanged: (v) => upd(() => sim.modules.banking = v),
     ),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Prêt d’achat fidèle', style: TextStyle(fontSize: 13)),
+      subtitle: const Text(
+          'Le prêt d’un ordinateur n’est accordé que s’il y en a un en stock, couvre ce qui manque pour le payer, et '
+          'l’ordinateur est acheté aussitôt. Coupé, le citoyen emprunte deux fois le prix d’un ordinateur, même quand '
+          'aucun n’est en vente, et dépense le reste : une spirale prix-revenus-prêts (anomalie N4).',
+          style: TextStyle(fontSize: 11)),
+      value: p.purchaseLoans,
+      onChanged: (v) => upd(() => p.purchaseLoans = v),
+    ),
     ParamSlider(
         label: 'Taux de la carte de crédit (base annuelle)',
         value: p.cardRate,
@@ -664,6 +676,19 @@ Widget _banksSection(BuildContext context, SimController ctrl, void Function(voi
         'intérêts des dépôts, pertes et coûts (employés, local). Les paiements entre banques se règlent en réserves ; '
         'une banque à court emprunte aux autres au taux directeur. Les clients changent rarement de banque.',
         style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Banques à égalité', style: TextStyle(fontSize: 13)),
+      subtitle: const Text(
+          'La Caisse est une banque comme les autres : chaque hypothèque est chez la banque de l’emprunteur, qui en touche '
+          'les intérêts ; la Caisse a son capital, verse ses dividendes et peut faire faillite (l’État passe alors à la '
+          'banque qui la reprend). Coupé, toutes les hypothèques sont à la Caisse et leurs intérêts ne reviennent pas aux '
+          'ménages ; les autres banques, sans hypothèques, perdent de l’argent (anomalie N4).',
+          style: TextStyle(fontSize: 11)),
+      value: p.equalBanks,
+      onChanged: (v) => upd(() => p.equalBanks = v),
+    ),
     ParamSlider(
         label: 'Banques de départ (nouvelle partie)',
         value: p.nBanks.toDouble(),

@@ -635,6 +635,7 @@ class Sim {
   bool bankingActive = false;
   final List<Bank> banks = [];
   double consumerLent = 0;
+  int stateBank = 0; // module banking : la banque de l'État (la Caisse ; Params.equalBanks : celle qui la reprend)
   double consumerWrittenOff = 0;
   int consumerBankruptcies = 0;
   double consumerLossEma = 0;
@@ -786,6 +787,7 @@ class Sim {
     unmet = {};
     marketStats.clear();
     lastShortage.clear();
+    stateBank = 0;
     _tenants.clear();
     _leaseCapital.clear();
     unmetEma.clear();
@@ -2403,7 +2405,7 @@ class Sim {
       final paid = transfer(state, bank, interest);
       bank.interest += paid;
       bank.equity += paid;
-      if (banks.isNotEmpty) _attrib(0, paid, income: paid); // module banking : la dette publique est à la Caisse
+      if (banks.isNotEmpty) _attrib(stateBank, paid, income: paid); // module banking : la dette publique est à la Caisse
       dayFlows.interest += paid;
       stateInterest += paid;
       stateInterestToday = paid;
@@ -2414,7 +2416,7 @@ class Sim {
       stateDebt += interest; // intérêts impayés ajoutés à la dette
       bank.capitalized += interest;
       bank.equity += interest;
-      if (banks.isNotEmpty) _attrib(0, interest, income: interest);
+      if (banks.isNotEmpty) _attrib(stateBank, interest, income: interest);
       dayFlows.capitalized += interest;
       stateInterest += interest;
       stateInterestToday = interest;

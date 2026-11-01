@@ -212,6 +212,8 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.spreadHealth != d.spreadHealth) 'spreadHealth': p.spreadHealth,
     if (p.planWorkforce != d.planWorkforce) 'planWorkforce': p.planWorkforce,
     if (p.leases != d.leases) 'leases': p.leases,
+    if (p.equalBanks != d.equalBanks) 'equalBanks': p.equalBanks,
+    if (p.purchaseLoans != d.purchaseLoans) 'purchaseLoans': p.purchaseLoans,
     if (p.revival != d.revival) 'revival': p.revival,
     if (p.revivalHours != d.revivalHours) 'revivalHours': p.revivalHours,
     if (p.revivalFullCost != d.revivalFullCost) 'revivalFullCost': p.revivalFullCost,
@@ -388,7 +390,9 @@ Params _paramsFrom(Map j) => Params()
   ..planFromHouseholds = (j['planFromHouseholds'] as bool?) ?? false
   ..spreadHealth = (j['spreadHealth'] as bool?) ?? false
   ..planWorkforce = (j['planWorkforce'] as bool?) ?? false
-  ..leases = (j['leases'] as bool?) ?? false;
+  ..leases = (j['leases'] as bool?) ?? false
+  ..equalBanks = (j['equalBanks'] as bool?) ?? false
+  ..purchaseLoans = (j['purchaseLoans'] as bool?) ?? false;
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
@@ -931,12 +935,14 @@ Building _buildingFrom(List j) => Building(j[0] as int, j[1] as int, j[2] as int
 
 List<Object?> _mortgageJson(Mortgage m) => [
       m.id, m.buildingId, m.borrowerKind, m.borrowerId, _d(m.principal), _d(m.rate), m.termLeft, _d(m.payment), m.missed, m.since,
+      if (m.bankId != 0) m.bankId,
     ];
 
 Mortgage _mortgageFrom(List j) => Mortgage(
     j[0] as int, j[1] as int, j[2] as int, j[3] as int?, _rd(j[4]), _rd(j[5]), j[6] as int, j[9] as int)
   ..payment = _rd(j[7])
-  ..missed = j[8] as int;
+  ..missed = j[8] as int
+  ..bankId = j.length > 10 ? j[10] as int : 0;
 
 extension SimSnapshot on Sim {
   /// Bâtiments, hypothèques et statistiques du parc (module buildings).
@@ -987,6 +993,7 @@ extension SimSnapshot on Sim {
         if (poorEma.isNotEmpty) 'poorEma': _dm(poorEma),
         if (bankingActive) 'bankingActive': true,
         if (banks.isNotEmpty) 'banks': [for (final b in banks) _bankObjJson(b)],
+        if (stateBank != 0) 'stateBank': stateBank,
         if (bankCountHist.isNotEmpty) 'bankCountHist': bankCountHist,
         if (tradeFactor.isNotEmpty) 'tradeFactor': _dm(tradeFactor),
         if (tradeNoiseState.isNotEmpty) 'tradeNoise': _dm(tradeNoiseState),
@@ -1143,6 +1150,7 @@ extension SimSnapshot on Sim {
     banks
       ..clear()
       ..addAll([for (final l in (j['banks'] as List?) ?? const []) _bankObjFrom(l as List)]);
+    stateBank = (j['stateBank'] as int?) ?? 0;
     bankCountHist
       ..clear()
       ..addAll(_ril(j['bankCountHist'] ?? const []));
