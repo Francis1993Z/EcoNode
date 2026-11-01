@@ -522,6 +522,16 @@ Widget _productsSection(BuildContext context, SimController ctrl, void Function(
         format: (v) => '${v.round()} variétés',
         hint: 'Variétés connues au plus par catégorie ; la plus ancienne est oubliée quand une nouvelle arrive.',
         onChanged: (v) => upd(() => p.prodKnownMax = v.round())),
+    ParamSlider(
+        label: 'Marge d’entrée d’une variété',
+        value: p.prodEntryMargin,
+        min: 0,
+        max: 0.3,
+        format: pct,
+        hint: 'Un citoyen n’envisage de lancer une variété que si les vendeurs en place gagnent au moins cette part du prix '
+            '(son propre calcul de rentabilité décide ensuite). La marge habituelle est de 5 à 8 % : à 15 %, l’entrée était '
+            'presque toujours bloquée (anomalie N2).',
+        onChanged: (v) => upd(() => p.prodEntryMargin = (v * 100).round() / 100)),
     const SizedBox(height: 4),
     if (!on && sim.products.isEmpty)
       Text('Module coupé : aucune variété.', style: TextStyle(color: pal.ink3, fontSize: 12))
