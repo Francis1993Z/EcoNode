@@ -124,7 +124,7 @@ ont été tuées à la fermeture de la session tmux du lot et rejouées à l'ide
   `types_batiments_test.dart`.
 - **Aller-retour d'instantané** (`tool/allerretour.dart`, 400 citoyens, 200 + 150 j) : IDENTIQUE sans Bâtiments, avec
   Bâtiments sans types, avec Bâtiments et types (121 baux, tous rattachés).
-- **Non mesuré** : avec les Banques (retiré pour garder le lot sous 30 minutes).
+- **Avec les Banques** : voir plus bas (mesuré sur le PC le 2 novembre).
 
 ### Variante : la maison la moins chère (`cheapestHouse`)
 
@@ -163,10 +163,35 @@ Données : `rapports/donnees/types-batiments/variante/`, tableau complet : `anal
 - Les maisons coûtent moins cher en jours de salaire avec « la moins chère » (42 à 2 500 citoyens, 60 à 240), plus loin
   de la cible de ≈ 90 jours.
 
+### Avec les Banques
+
+Demandée par Francis, jouée sur son PC (12 parties à la fois, 11 minutes) : mêmes réglages avec le module Banques
+(banques à égalité, dotation de 2 000 $ par citoyen, prêt d'achat fidèle, comme l'interface), règle « la plus chère
+abordable », 10 graines × 3 000 j. Données : `rapports/donnees/types-batiments/banques/`, tableau complet :
+`analyse-banques.md`.
+
+| Banques actives | 2 500 : sans types → avec | écart [IC 95 %] | 240 : sans types → avec | écart [IC 95 %] |
+|---|---|---|---|---|
+| Sans-abri moyen | 0,04 → 0,01 | −0,03 * (10 / 10) | 0,02 → 0,01 | −0,01 [−0,02 ; 0,00] |
+| Chômage moyen | 5,9 → 4,6 % | **−1,7 pt** * (10 / 10) | 5,0 → 3,8 % | **−1,2 pt** * (8 / 10) |
+| Indice des prix au jour 250 | 1,50 → 1,61 | +0,11 * | 1,69 → 1,87 | +0,05 [−0,17 ; 0,27] |
+| Indice des prix au plus haut | 1,88 → 2,46 | +0,58 * | 2,16 → 2,64 | +0,61 * |
+| Indice des prix final | 1,73 → 2,25 | **+0,58** * | 1,67 → 2,31 | **+0,65** * |
+| Prix d'une maison (final) | 16 867 → 36 538 $ | +19 803 $ * | 26 394 → 36 983 $ | +12 032 $ * |
+| Maison en jours de salaire | 48 → 77 | +28 * | 88 → 84 | −6 [−27 ; 15] |
+| Chantiers terminés | 14 → 47 | +32 * | 2 → 2 | 0 |
+| Saisies | 0 → 0 | | 0 → 0 | |
+
+- Les Banques ne changent pas le tableau : mêmes écarts qu'avec les Banques coupées (chômage −1,7 pt, indice final
+  +0,5 à +0,6). Pas de spirale prix-crédit comme avant les correctifs N4 (prix × 29 à × 59) ; aucune saisie, aucun
+  immeuble racheté.
+- Les sans-abri, déjà rares, baissent encore un peu à 2 500 citoyens (0,04 → 0,01 en moyenne, au plus 2,5 → 2).
+
 ## 4. À décider
 
 1. ~~Règle d'achat dans l'interface~~ : **décision de Francis du 2 novembre : « la plus chère abordable » est gardée**
    (chômage −1,7 pt, prix +33 % à 2 500 citoyens). `cheapestHouse` reste une variante de mesure, coupée partout.
-2. Mesurer Bâtiments × Banques avec les types (la combinaison qui faisait exploser les prix avant N4).
+2. ~~Mesurer Bâtiments × Banques avec les types~~ : fait le 2 novembre (ci-dessus), même tableau qu'avec les Banques
+   coupées, pas de spirale.
 3. Calibration ouverte : une maison vaut 50 à 90 jours de salaire selon la taille et la partie ; les valeurs des types
    (tailles, cadences) sont des choix de jeu.

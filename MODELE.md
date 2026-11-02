@@ -763,7 +763,9 @@ de jeu, non calibrés.
   partout) : avec les types, le ménage tente la maison la moins chère, comme sans les types. Même protocole, sur le PC :
   à 2 500 citoyens, chômage 5,6 % et indice final 1,78, ni l'un ni l'autre différent de « sans types » de façon
   concluante (la règle d'achat explique donc l'écart) ; à 240 citoyens, chômage 4,4 % (−0,8 pt contre « sans types »,
-  10 graines sur 10) et indice final 2,01. Détails : `rapports/types-batiments.md`.
+  10 graines sur 10) et indice final 2,01. **Avec les Banques** (règle « la plus chère abordable », gardée ; sur le PC) :
+  mêmes écarts (2 500 citoyens : chômage 5,9 → 4,6 %, indice final 1,73 → 2,25 ; 240 : 5,0 → 3,8 %, 1,67 → 2,31), aucune
+  saisie, pas de spirale prix-crédit. Détails : `rapports/types-batiments.md`.
 4. **Santé, ordinateur, études** : §§ 6.7 à 6.9.
 5. **Loisirs.**
    - **Budget du jour, à la Godley-Lavoie :** C = α₁ × max(0 ; revenu lissé − coût de survie) + α₂ × `adsBoost` ×
