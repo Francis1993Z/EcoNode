@@ -110,6 +110,6 @@ Réglages par défaut aujourd'hui :
    de salaire à 2 500 citoyens. Cause probable : la règle d'achat (la plus chère abordable au lieu de la moins chère)
    double les reventes à crédit. **Variante mesurée le 2 novembre** (`cheapestHouse`, la maison la moins chère) : à
    2 500 citoyens, chômage 5,6 % et indice final 1,78, rien de concluant contre « sans types » : la règle d'achat
-   explique l'écart ; à 240 citoyens, les types seuls donnent chômage −0,8 pt et indice final +0,5. À décider : règle
-   d'achat de l'interface ; fusionner.
+   explique l'écart ; à 240 citoyens, les types seuls donnent chômage −0,8 pt et indice final +0,5. **Décision de
+   Francis (2 novembre) : la règle « la plus chère abordable » est gardée.** Reste : fusionner ; mesurer avec les Banques.
 6. Branches `mesure-concentration` et `tests-produits` : fusionner, garder ou supprimer.

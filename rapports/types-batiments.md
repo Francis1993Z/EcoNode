@@ -165,8 +165,8 @@ Données : `rapports/donnees/types-batiments/variante/`, tableau complet : `anal
 
 ## 4. À décider
 
-1. Règle d'achat dans l'interface : « la plus chère abordable » (actuelle : chômage −1,7 pt, prix +33 % à 2 500
-   citoyens) ou « la moins chère » (`cheapestHouse` : les types ne changent presque rien à l'économie à 2 500 citoyens).
+1. ~~Règle d'achat dans l'interface~~ : **décision de Francis du 2 novembre : « la plus chère abordable » est gardée**
+   (chômage −1,7 pt, prix +33 % à 2 500 citoyens). `cheapestHouse` reste une variante de mesure, coupée partout.
 2. Mesurer Bâtiments × Banques avec les types (la combinaison qui faisait exploser les prix avant N4).
 3. Calibration ouverte : une maison vaut 50 à 90 jours de salaire selon la taille et la partie ; les valeurs des types
    (tailles, cadences) sont des choix de jeu.
