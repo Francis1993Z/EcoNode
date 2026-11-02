@@ -96,6 +96,7 @@ class SimController extends ChangeNotifier {
               ..prodEntryMargin = 0.05 // produits : une variété peut entrer si les vendeurs en place font un profit (N2)
               ..spreadTakeovers = true // filet de renflouement : le racheteur n'est plus toujours le plus riche (N16)
               ..progressiveTax = true // impôt progressif sur le revenu du jour (onglet Impôts)
+              ..buildingTypes = true // maisons, duplex et immeubles (onglet Parc)
               ..walletAtTarget = true // démarrage à l'équilibre (anomalie N6)
               ..planFromHouseholds = true
               ..spreadHealth = true
@@ -252,7 +253,8 @@ class SimController extends ChangeNotifier {
           ..jointCostBySales = true
           ..prodEntryMargin = 0.05
           ..spreadTakeovers = true
-          ..progressiveTax = true,
+          ..progressiveTax = true
+          ..buildingTypes = true,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();

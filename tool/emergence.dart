@@ -37,6 +37,7 @@ Params parametresInterface(int population) => Params()
   ..spreadHealth = true
   ..planWorkforce = true
   ..ownersAtStart = true
+  ..buildingTypes = true
   ..reservePerCitizen = 2000
   ..prodEntryMargin = 0.05
   ..spreadTakeovers = true

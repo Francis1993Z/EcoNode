@@ -936,6 +936,18 @@ class Params {
   // monde commence locataire, 70 % des ménages achètent à crédit en 500 jours, et la monnaie créée multiplie les prix
   // (× 4,7 à 2 500 citoyens avec les banques) avant une longue baisse.
   bool ownersAtStart = false;
+  // Types de bâtiments (buildingTypes, 2026-11-01) : avec le module bâtiments, le parc est fait de maisons (petite, moyenne,
+  // grande : un logement), de duplex et d'immeubles (d'un, deux et trois étages, multilogement : 4 à 24 logements), chacun
+  // avec sa taille, sa cadence de chantier et son nombre de logements (liste buildingKinds). La taille fixe les modules de
+  // construction, donc le coût et la durée du chantier, la valeur, l'entretien et la provision pour l'usure. Les logements
+  // d'un immeuble entrent dans la capacité de son bailleur (baux) et sa valeur garantit son hypothèque. Seules les maisons
+  // se vendent aux ménages : chacun prend la plus chère que ses moyens permettent, et compare sa mensualité au loyer d'un
+  // logement de même taille. Un immeuble saisi est racheté par le bailleur qui manque le plus de logements. Un bailleur qui
+  // fait construire choisit le plus grand type qui comble son manque et dont il peut payer sa part (une maison s'il ne
+  // manque qu'un logement). Au départ, il y a assez de maisons pour les ménages qui veulent posséder et ont un emploi
+  // (plus 5 %), et le reste du parc est en duplex et en immeubles. Avec les baux, chaque locataire est rattaché à un
+  // logement de son bailleur (affichage seulement). Sinon chaque bâtiment est un logement standard.
+  bool buildingTypes = false;
   // Coproduits (jointCostBySales, 2026-11-01, anomalie A3) : le coût commun d'un lot (la ferme : céréales et bétail) se
   // répartit sur ce qui se vend, au prix mondial : coût d'une unité de g = coût du lot × prix mondial de g ÷ Σ (quantité
   // vendue par lot × prix mondial). Quand tout se vend, c'est la répartition d'avant ; un coproduit sans acheteur ne porte
@@ -1497,6 +1509,7 @@ class Citizen extends Account {
   int? schoolSince; // jour d'inscription dans la file de l'école publique
   int? homeId; // bâtiment dont il est propriétaire-occupant (module buildings) ; null : locataire
   int? leaseFirm; // bailleur dont il a un bail (Params.leases) ; null : pas de bail
+  int? dwellingId; // bâtiment de son bailleur où il loue (Params.buildingTypes avec les baux, affichage) ; null : aucun
   bool wantsToOwn = false; // trait : veut devenir propriétaire (module buildings)
   // emploi (ancienneté tenue dans tous les cas ; rôle, contrat et aplomb ne servent qu'avec le module jobs)
   int hiredDay = 0; // jour d'embauche chez l'employeur actuel (négatif : avant le début de la partie)
@@ -1839,7 +1852,35 @@ class BuyResult {
 
 // ------------------------------------------------------------------ bâtiments et hypothèques (module « buildings »)
 
-/// Un bâtiment : un logement d'une unité, en chantier (modules posés < Params.dwellingModules) ou terminé.
+/// Un type de bâtiment (Params.buildingTypes). La taille est comptée en logements standards : la construction demande
+/// taille × Params.dwellingModules modules, et la valeur, l'entretien et la provision pour l'usure suivent la taille. Le
+/// chantier pose [crew] modules par jour. Une maison (un logement) peut être achetée par un ménage ; les autres types
+/// appartiennent à des bailleurs.
+class BuildingType {
+  final String key; // nom du sprite (assets/batiments/<key>.png)
+  final String name;
+  final int units; // logements
+  final double size; // en logements standards
+  final int crew; // modules posés par jour de chantier
+  const BuildingType(this.key, this.name, this.units, this.size, this.crew);
+  bool get house => units == 1;
+}
+
+/// Les types de bâtiments, du plus petit au plus grand. L'instantané garde le rang du type : ne pas réordonner.
+/// Économies d'échelle : 8 à 15 modules par logement pour une maison, 9 pour un duplex, 7 à 8,5 pour un immeuble.
+const List<BuildingType> buildingKinds = [
+  BuildingType('maison_petite', 'Petite maison', 1, 0.8, 1), // 8 modules, 8 jours
+  BuildingType('maison_moyenne', 'Maison moyenne', 1, 1.0, 1), // 10 modules, 10 jours (le logement standard)
+  BuildingType('maison_grande', 'Grande maison', 1, 1.5, 1), // 15 modules, 15 jours
+  BuildingType('duplex', 'Duplex', 2, 1.8, 1), // 18 modules, 18 jours
+  BuildingType('immeuble_1', 'Immeuble d’un étage', 4, 3.4, 2), // 34 modules, 17 jours
+  BuildingType('immeuble_2', 'Immeuble de deux étages', 8, 6.4, 2), // 64 modules, 32 jours
+  BuildingType('immeuble_3', 'Immeuble de trois étages', 12, 9.0, 3), // 90 modules, 30 jours
+  BuildingType('multilogement', 'Multilogement', 24, 16.8, 4), // 168 modules, 42 jours
+];
+
+/// Un bâtiment, en chantier (modules posés < modules du type) ou terminé. Sans type (Params.buildingTypes coupé), un
+/// logement standard de Params.dwellingModules modules.
 class Building {
   final int id;
   int ownerKind; // 0 entreprise (bailleur), 1 citoyen (propriétaire-occupant), 2 liquidation (saisie ou succession)
@@ -1852,11 +1893,15 @@ class Building {
   int? mortgageId;
   int? listedDay; // jour de mise en vente (null : pas en vente)
   final int builtDay;
-  Building(this.id, this.ownerKind, this.ownerId, this.builtDay);
+  int? type; // rang dans buildingKinds (Params.buildingTypes) ; null : logement standard
+  Building(this.id, this.ownerKind, this.ownerId, this.builtDay, [this.type]);
 
   /// Sous ce seuil d'état, le logement est inhabitable.
   static const double minCond = 0.3;
   bool get habitable => done && cond >= minCond;
+
+  /// Nombre de logements.
+  int get units => type == null ? 1 : buildingKinds[type!].units;
 }
 
 /// Une hypothèque de la Caisse : prêt garanti par un bâtiment. Le prêt crée de la monnaie, chaque remboursement de capital

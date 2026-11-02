@@ -308,6 +308,8 @@ void applyParam(Params p, String k, String v) {
       p.jointCostBySales = b();
     case 'ownersAtStart': // propriétaires de départ, hypothèques en cours (vague d'achats du démarrage, N4)
       p.ownersAtStart = b();
+    case 'buildingTypes': // types de bâtiments : maisons, duplex, immeubles (logements, coût, durée de chantier, valeur)
+      p.buildingTypes = b();
     case 'purchaseLoans': // prêt d'achat : un ordinateur en stock, le montant qui manque, acheté aussitôt (N4)
       p.purchaseLoans = b();
     case 'equalBanks': // hypothèques dans les revenus et le plancher de la Caisse (N4)
