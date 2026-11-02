@@ -108,5 +108,8 @@ Réglages par défaut aujourd'hui :
    sans-abri avec ou sans ; chômage 6,0 → 4,2 % à 2 500 citoyens (10 graines sur 10) et 5,2 → 3,7 % à 240 ; mais prix plus
    hauts (indice final 1,71 → 2,28 et 1,58 → 2,62 ; hausse des 250 premiers jours ≈ 50 → 65-72 %), maison 50 → 72 jours
    de salaire à 2 500 citoyens. Cause probable : la règle d'achat (la plus chère abordable au lieu de la moins chère)
-   double les reventes à crédit. À décider : garder la règle, ou mesurer la variante « la moins chère » ; fusionner.
+   double les reventes à crédit. **Variante mesurée le 2 novembre** (`cheapestHouse`, la maison la moins chère) : à
+   2 500 citoyens, chômage 5,6 % et indice final 1,78, rien de concluant contre « sans types » : la règle d'achat
+   explique l'écart ; à 240 citoyens, les types seuls donnent chômage −0,8 pt et indice final +0,5. À décider : règle
+   d'achat de l'interface ; fusionner.
 6. Branches `mesure-concentration` et `tests-produits` : fusionner, garder ou supprimer.

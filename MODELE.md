@@ -376,6 +376,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `ownersAtStart` | non | démarrage (§ 5) : propriétaires de départ, logement payé (module Bâtiments) | mesure § 5 |
 | `purchaseLoans` | non | crédit (§ 6.19) : le prêt d'un ordinateur sert à l'acheter (en stock, montant qui manque) | mesure § 6.19 |
 | `buildingTypes` | non | types de bâtiments (§ 6.6) : maisons, duplex et immeubles, avec leurs logements, leur coût, leur durée de chantier et leur valeur | mesure § 6.6 |
+| `cheapestHouse` | non | types de bâtiments, variante de mesure (§ 6.6) : le ménage tente la maison la moins chère | mesure § 6.6 |
 | `leases` | non | baux (§ 6.6) : un locataire garde son logement tant qu'il paie ; le personnel du bailleur ne sert qu'aux nouveaux baux ; loyer = coût d'usage du logement | mesure § 6.6 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
 | `priceStep`, `wageStep` | 0,02, 0,015 | pas d'ajustement de la marge et du salaire | choix de jeu (tâche 3 du plan : lissage) |
@@ -758,7 +759,11 @@ de jeu, non calibrés.
   1,50 → 1,65), maison vendue 17 000 → 37 000 $ (50 → 72 jours de salaire), ventes 710 → 1 104, chantiers 22 → 44.
   240 citoyens : chômage 5,2 → 3,7 % (9 sur 10), indice final 1,58 → 2,62. Mécanisme probable : un acheteur trouve une
   maison à sa portée parmi celles en vente (sans types, il n'essaie que la moins chère), d'où 1,6 à 2,3 fois plus de
-  reventes, chacune financée à 95 % par de la monnaie nouvelle. Détails : `rapports/types-batiments.md`.
+  reventes, chacune financée à 95 % par de la monnaie nouvelle. **Variante `cheapestHouse`** (2026-11-02, coupée
+  partout) : avec les types, le ménage tente la maison la moins chère, comme sans les types. Même protocole, sur le PC :
+  à 2 500 citoyens, chômage 5,6 % et indice final 1,78, ni l'un ni l'autre différent de « sans types » de façon
+  concluante (la règle d'achat explique donc l'écart) ; à 240 citoyens, chômage 4,4 % (−0,8 pt contre « sans types »,
+  10 graines sur 10) et indice final 2,01. Détails : `rapports/types-batiments.md`.
 4. **Santé, ordinateur, études** : §§ 6.7 à 6.9.
 5. **Loisirs.**
    - **Budget du jour, à la Godley-Lavoie :** C = α₁ × max(0 ; revenu lissé − coût de survie) + α₂ × `adsBoost` ×

@@ -126,10 +126,47 @@ ont été tuées à la fermeture de la session tmux du lot et rejouées à l'ide
   Bâtiments sans types, avec Bâtiments et types (121 baux, tous rattachés).
 - **Non mesuré** : avec les Banques (retiré pour garder le lot sous 30 minutes).
 
+### Variante : la maison la moins chère (`cheapestHouse`)
+
+Demandée par Francis, jouée sur son PC (16 processeurs logiques, 12 parties à la fois, 6 minutes ; la parité PC ↔
+serveur étant identique au bit près, ces parties se comparent graine par graine à celles du serveur). Avec les types, un
+ménage tente la maison en vente la moins chère, comme sans les types. Mêmes réglages, mêmes 10 graines × 3 000 j.
+Données : `rapports/donnees/types-batiments/variante/`, tableau complet : `analyse-variante.md`.
+
+| 2 500 citoyens | sans types | types, plus chère | types, moins chère | moins chère − sans types | moins chère − plus chère |
+|---|---|---|---|---|---|
+| Chômage moyen | 6,0 % | 4,2 % | 5,6 % | −0,8 pt [−1,2 ; 0,1] (7 / 10) | **+1,0 pt** * [0,6 ; 2,0] |
+| Indice des prix au jour 250 | 1,50 | 1,65 | 1,47 | −0,04 [−0,07 ; 0,03] | −0,16 * |
+| Indice des prix final | 1,71 | 2,28 | 1,78 | +0,04 [−0,26 ; 0,21] | **−0,56** * [−0,80 ; −0,35] |
+| Salaire moyen | 313 $ | 419 $ | 334 $ | +10 $ | −84 $ * |
+| Prix d'une maison (final) | 17 142 $ | 36 532 $ | 14 715 $ | −2 477 $ * | −21 502 $ * |
+| Maison en jours de salaire | 50 | 72 | 42 | −12 * | −30 * |
+| Ventes de logements | 710 | 1 104 | 894 | | |
+| Chantiers terminés | 22 | 44 | 54 | +30 * | +10 |
+| Achats refusés | 0 | 18 | 121 | | |
+
+| 240 citoyens | sans types | types, plus chère | types, moins chère | moins chère − sans types | moins chère − plus chère |
+|---|---|---|---|---|---|
+| Chômage moyen | 5,2 % | 3,7 % | 4,4 % | **−0,8 pt** * [−1,7 ; −0,3] (10 / 10) | +0,1 pt [−0,5 ; 1,0] |
+| Indice des prix au plus haut | 1,93 | 2,96 | 2,20 | +0,41 * | −0,57 * |
+| Indice des prix final | 1,58 | 2,62 | 2,01 | **+0,53** * [0,19 ; 0,90] | −0,53 [−1,05 ; 0,25] |
+| Prix d'une maison (final) | 24 089 $ | 38 178 $ | 22 286 $ | −1 514 $ * | −15 949 $ * |
+| Ventes de logements | 50 | 116 | 88 | +40 * | |
+
+- **À 2 500 citoyens, la règle d'achat explique tout.** Avec « la moins chère », les types ne changent ni le chômage
+  ni les prix de façon concluante ; avec « la plus chère abordable », le chômage baisse d'un point de plus et les prix
+  montent d'un tiers. La baisse du chômage et l'inflation viennent ensemble des reventes à crédit plus nombreuses et
+  plus grosses (la monnaie créée par les hypothèques).
+- **À 240 citoyens, les types eux-mêmes jouent un peu** : même avec « la moins chère », chômage −0,8 pt et indice final
+  +0,5 (les petites maisons, moins chères, se revendent plus souvent : 50 → 88 ventes). La règle « la plus chère » ajoute
+  de l'inflation sans baisser davantage le chômage.
+- Les maisons coûtent moins cher en jours de salaire avec « la moins chère » (42 à 2 500 citoyens, 60 à 240), plus loin
+  de la cible de ≈ 90 jours.
+
 ## 4. À décider
 
-1. Garder la règle d'achat « la plus chère abordable » (moins de chômage, plus d'inflation) ou revenir à « la moins
-   chère » avec les types. Une variante mesurée séparerait l'effet des types de celui de la règle d'achat.
+1. Règle d'achat dans l'interface : « la plus chère abordable » (actuelle : chômage −1,7 pt, prix +33 % à 2 500
+   citoyens) ou « la moins chère » (`cheapestHouse` : les types ne changent presque rien à l'économie à 2 500 citoyens).
 2. Mesurer Bâtiments × Banques avec les types (la combinaison qui faisait exploser les prix avant N4).
 3. Calibration ouverte : une maison vaut 50 à 90 jours de salaire selon la taille et la partie ; les valeurs des types
    (tailles, cadences) sont des choix de jeu.
