@@ -661,6 +661,10 @@ class Sim {
   late double m0;
   double needCost = 0;
   double avgWage = 0;
+  /// Impôt progressif (Params.progressiveTax) : revenu brut imposable et impôt payé aujourd'hui, par citoyen (remis à zéro
+  /// chaque matin ; la fin de journée sert à l'affichage).
+  final Map<int, double> grossToday = {};
+  final Map<int, double> taxToday = {};
   double wage0 = 1; // salaire moyen au départ : base de l'indice des salaires (prix de référence corrigés)
   Map<String, double> hype = {}; // notoriété cumulée des vendeurs de chaque bien
   double adsBoost = 1; // hausse de la dépense des ménages due à la publicité
@@ -1917,6 +1921,10 @@ class Sim {
     for (final c in citizens) {
       c.incomeEma = 0.9 * c.incomeEma + 0.1 * c.income; // revenu complet de la veille (dividendes compris)
       c.income = 0;
+      if (grossToday.isNotEmpty) {
+        grossToday.clear();
+        taxToday.clear();
+      }
       c.spend = 0;
     }
     state.taxesToday = 0;
@@ -2213,9 +2221,10 @@ class Sim {
       var net = 0.0, tax = 0.0, premiums = 0.0;
       for (final id in f.workers) {
         final c = _cmap[id]!;
-        final a = transfer(f, c, each * (1 - t) - cot);
+        final tx = params.progressiveTax ? incomeTax(c, each) : 0.0; // Params.progressiveTax : barème du jour
+        final a = transfer(f, c, params.progressiveTax ? each - tx - cot : each * (1 - t) - cot);
         net += a;
-        tax += transfer(f, state, each * t);
+        tax += transfer(f, state, params.progressiveTax ? tx : each * t);
         if (ins) {
           premiums += transfer(f, state, cot);
           c.lastWage = wage;
@@ -2269,9 +2278,10 @@ class Sim {
       final wage = c.wage * hours;
       final each = k < 1 ? wage * k : wage;
       final cot = ins ? math.min(each, capIns) * params.eiRate : 0.0;
-      final a = transfer(f, c, each * (1 - t) - cot);
+      final tx = params.progressiveTax ? incomeTax(c, each) : 0.0; // Params.progressiveTax : barème du jour
+      final a = transfer(f, c, params.progressiveTax ? each - tx - cot : each * (1 - t) - cot);
       net += a;
-      tax += transfer(f, state, each * t);
+      tax += transfer(f, state, params.progressiveTax ? tx : each * t);
       if (ins) {
         premiums += transfer(f, state, cot);
         c.lastWage = wage;
@@ -3818,8 +3828,9 @@ class Sim {
           }
         }
         if (d > 0) {
-          final net = transfer(f, owner, d * (1 - p.taxRate));
-          final tax = transfer(f, state, d * p.taxRate);
+          final tx = p.progressiveTax ? incomeTax(owner, d) : 0.0; // Params.progressiveTax : barème du jour
+          final net = transfer(f, owner, p.progressiveTax ? d - tx : d * (1 - p.taxRate));
+          final tax = transfer(f, state, p.progressiveTax ? tx : d * p.taxRate);
           state.taxes += tax;
           state.taxesToday += tax;
           owner.income += net;
@@ -3844,8 +3855,9 @@ class Sim {
         final excess = f.money - keep;
         if (excess > eps) {
           final x = excess * p.excessCashRate;
-          final net = transfer(f, owner, x * (1 - p.taxRate));
-          final tax = transfer(f, state, x * p.taxRate);
+          final tx = p.progressiveTax ? incomeTax(owner, x) : 0.0; // Params.progressiveTax : barème du jour
+          final net = transfer(f, owner, p.progressiveTax ? x - tx : x * (1 - p.taxRate));
+          final tax = transfer(f, state, p.progressiveTax ? tx : x * p.taxRate);
           state.taxes += tax;
           state.taxesToday += tax;
           owner.income += net;
@@ -3976,6 +3988,43 @@ class Sim {
             total, '${citizens.length} citoyens');
       }
     }
+  }
+
+  /// Salaire moyen qui sert d'unité au barème de l'impôt progressif.
+  double get taxUnit => avgWage > 0 ? avgWage : params.startWage;
+
+  /// Seuils des tranches de l'impôt progressif, en dollars par jour.
+  List<double> taxCuts() {
+    final p = params;
+    final w = taxUnit;
+    return [p.taxCut1 * w, math.max(p.taxCut1, p.taxCut2) * w, math.max(math.max(p.taxCut1, p.taxCut2), p.taxCut3) * w];
+  }
+
+  /// Impôt du barème progressif sur un revenu brut de [x] dollars dans la journée.
+  double taxSchedule(double x) {
+    final p = params;
+    final cuts = taxCuts();
+    final rates = [p.taxRate1, p.taxRate2, p.taxRate3, p.taxRate4];
+    var tax = 0.0, low = 0.0;
+    for (var i = 0; i < 4; i++) {
+      final high = i < 3 ? cuts[i] : double.infinity;
+      if (x <= low) break;
+      tax += rates[i] * (math.min(x, high) - low);
+      low = high;
+    }
+    return tax;
+  }
+
+  /// Impôt sur le revenu d'un versement brut [gross] à [c] (Params.progressiveTax) : le barème appliqué à son revenu brut
+  /// du jour, moins ce que ses versements précédents du jour ont déjà payé ; sans la règle, le taux unique.
+  double incomeTax(Citizen c, double gross) {
+    if (!params.progressiveTax) return gross * params.taxRate;
+    final before = grossToday[c.id] ?? 0.0;
+    final after = before + gross;
+    grossToday[c.id] = after;
+    final t = math.max(0.0, taxSchedule(after) - taxSchedule(before));
+    taxToday[c.id] = (taxToday[c.id] ?? 0) + t;
+    return t;
   }
 
   double gini() {

@@ -9,6 +9,7 @@ import 'diag_tab.dart';
 import 'eco_tab.dart';
 import 'format.dart';
 import 'god_tab.dart';
+import 'tax_tab.dart';
 import 'graph.dart';
 import 'housing.dart';
 import 'inspector.dart';
@@ -377,6 +378,9 @@ class SidePanel extends StatelessWidget {
         break;
       case Tabs.housing:
         body = HousingTab(ctrl);
+        break;
+      case Tabs.taxes:
+        body = TaxTab(ctrl);
         break;
       default:
         body = InspectorTab(ctrl);

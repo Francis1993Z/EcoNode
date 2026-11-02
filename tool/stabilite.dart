@@ -286,6 +286,22 @@ void applyParam(Params p, String k, String v) {
       p.fxSpeed = double.parse(v);
     case 'normalUtil': // prix au coût normal (A7) : utilisation normale de l'équipe, 0 = coût réel
       p.normalUtil = double.parse(v);
+    case 'progressiveTax': // impôt progressif sur le revenu brut du jour (barème en salaires moyens)
+      p.progressiveTax = b();
+    case 'taxCut1':
+      p.taxCut1 = double.parse(v);
+    case 'taxCut2':
+      p.taxCut2 = double.parse(v);
+    case 'taxCut3':
+      p.taxCut3 = double.parse(v);
+    case 'taxRate1':
+      p.taxRate1 = double.parse(v);
+    case 'taxRate2':
+      p.taxRate2 = double.parse(v);
+    case 'taxRate3':
+      p.taxRate3 = double.parse(v);
+    case 'taxRate4':
+      p.taxRate4 = double.parse(v);
     case 'spreadTakeovers': // rachats du filet de renflouement répartis entre les citoyens qui en ont les moyens (N16)
       p.spreadTakeovers = b();
     case 'jointCostBySales': // coproduits : coût commun réparti sur ce qui se vend (A3)

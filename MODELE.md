@@ -383,6 +383,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `invTargetDays` | 4 | stock visé, en jours de demande | choix de jeu |
 | `jobSwitch` | 0,03 | chance quotidienne de chercher un meilleur emploi | choix de jeu |
 | `taxRate` | 0,12 | impôt sur salaires et dividendes | choix de jeu |
+| `progressiveTax`, `taxCut1`-`taxCut3`, `taxRate1`-`taxRate4` | non ; 1, 3, 10 salaires moyens ; 10, 20, 35, 50 % | impôt progressif sur le revenu brut du jour (§ 6.13, onglet Impôts) | choix de jeu |
 | `benefit` | 80 $/j | prestation forfaitaire (sans I3) ; unité des seuils de l'État | choix de jeu |
 | `minWage` | 0 | salaire minimum | outil du joueur |
 | `stateRebate` | 0,05 | part du surplus de l'État redistribuée chaque jour | choix de jeu |
@@ -878,6 +879,19 @@ Choix de jeu : c'est le débouché de la filière informatique.
 ### 6.13 État et institutions publiques
 
 - **Recettes.** Impôt sur salaires et dividendes (`taxRate`).
+- **Impôt progressif (`progressiveTax`, 2026-11-01).** Coupé par défaut dans le moteur ; l'interface l'active (onglet
+  Impôts, où se règlent le barème et le taux unique). Au lieu du taux unique, un barème à quatre tranches sur le revenu
+  brut d'une journée de chaque citoyen (salaires, dividendes, excédents de trésorerie reversés ; pas les prestations).
+  Seuils en multiples du salaire moyen du jour (`taxCut1` à `taxCut3` : 1, 3, 10), pour que le barème suive les prix ;
+  taux marginaux `taxRate1` à `taxRate4` : 10, 20, 35, 50 %. L'impôt d'un versement est le barème appliqué au revenu brut
+  du jour, moins ce que les versements précédents du jour ont déjà payé (`incomeTax`, `grossToday`, `taxToday`) : la
+  somme ne dépend pas de leur ordre, et le propriétaire de vingt entreprises paie sur le total de leurs dividendes. Les
+  recettes vont au trésor, qui reverse son surplus à parts égales (`stateRebate`). Le salaire de réserve d'un chômeur
+  compte le taux de la première tranche. **Mesure** (PC, réglages de l'interface, 10 graines × 5 000 j) : à 240 citoyens
+  au jour 400, taux effectifs 10,0 % sous un salaire moyen, 12,0 % de 1 à 3, 26,0 % de 3 à 10 ; à 2 500 citoyens, la part
+  de l'argent des ménages du 1 % le plus riche baisse nettement (graine 9 au jour 4 000 : 69 → 22 %, le plus riche
+  1,04 M$ → 79 000 $ ; graine 1 : 45 → 18 %) ; chômage des jours 4 501 à 5 000 8,3 → 7,8 % (pire graine 17,5 → 12,3 %,
+  écart dans le bruit) ; à 240 citoyens, sans effet sur le chômage.
 - **Prestations sans I3.** Un forfait `benefit` par sans-emploi, au prorata si le trésor ne suffit pas.
 - **Assurance-emploi et aide sociale (I3,** `sim.dart:_insurance`**) :**
   - **demande :** au premier jour sans emploi, avec au moins `eiQualifyingDays` jours assurables depuis la dernière
