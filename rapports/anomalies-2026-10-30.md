@@ -27,7 +27,7 @@ Réglages par défaut aujourd'hui :
 | `spreadTakeovers` (rachats répartis) | coupé | **actif** depuis le 1er novembre (section de l'excédent de trésorerie) |
 | `prodEntryMargin` (marge d'entrée d'une variété) | 15 % | **5 %** depuis le 1er novembre (section Produits) |
 | `ownersAtStart` (propriétaires de départ) | coupé | **actif** depuis le 1er novembre (démarrage à l'équilibre) |
-| `buildingTypes` (types de bâtiments : maisons, duplex, immeubles) | coupés | **actifs** sur la branche `feature/types-batiments` (onglet Parc), pas encore fusionnés |
+| `buildingTypes` (types de bâtiments : maisons, duplex, immeubles) | coupés | **actifs** depuis le 2 novembre (onglet Parc ; règle d'achat « la plus chère abordable ») |
 | `equalBanks`, `purchaseLoans` (banques à égalité, prêt d'achat fidèle) ; `reservePerCitizen` | coupés ; 100 000 $ | **actifs** depuis le 1er novembre ; **2 000 $** (onglet Modèle, sections Banques et Crédit) |
 | `healthWearIfDeprived` | coupée | coupée (décision du 1er novembre : usure continue) |
 | `jointCostBySales` (coproduits) | coupé | **actif** depuis le 1er novembre (section « Fixation des prix ») |
@@ -111,5 +111,5 @@ Réglages par défaut aujourd'hui :
    double les reventes à crédit. **Variante mesurée le 2 novembre** (`cheapestHouse`, la maison la moins chère) : à
    2 500 citoyens, chômage 5,6 % et indice final 1,78, rien de concluant contre « sans types » : la règle d'achat
    explique l'écart ; à 240 citoyens, les types seuls donnent chômage −0,8 pt et indice final +0,5. **Décision de
-   Francis (2 novembre) : la règle « la plus chère abordable » est gardée.** Reste : fusionner ; mesurer avec les Banques.
+   Francis (2 novembre) : la règle « la plus chère abordable » est gardée.** Fusionné dans main le 2 novembre (9cb03f1). Reste : mesurer avec les Banques.
 6. Branches `mesure-concentration` et `tests-produits` : fusionner, garder ou supprimer.
