@@ -31,7 +31,10 @@ class Tabs {
   static const model = 5;
   static const housing = 6;
   static const taxes = 7;
-  static const labels = ['Inspecteur', 'Diagnostic', 'God mode', 'Économie', 'Journal', 'Modèle', 'Immobilier', 'Impôts'];
+  static const parc = 8;
+  static const labels = [
+    'Inspecteur', 'Diagnostic', 'God mode', 'Économie', 'Journal', 'Modèle', 'Immobilier', 'Impôts', 'Parc'
+  ];
 }
 
 /// Pilote la simulation : boucle de temps, vitesse, sélection, notifications d'interface.

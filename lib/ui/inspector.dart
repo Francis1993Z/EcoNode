@@ -12,6 +12,7 @@ import 'controller.dart';
 import 'format.dart';
 import 'housing.dart';
 import 'palette.dart';
+import 'parc_tab.dart' show kindName;
 import 'widgets.dart';
 
 class InspectorTab extends StatelessWidget {
@@ -802,6 +803,7 @@ class _CitizenViewState extends State<_CitizenView> {
     final role = sim.roleOf(c);
     final owned = sim.firms.where((f) => f.ownerId == c.id).toList();
     final home = c.homeId != null ? sim.building(c.homeId!) : null;
+    final rented = sim.modules.buildings ? sim.dwellingOf(c) : null; // Params.buildingTypes : logement loué
     final aids = (sim.nets.byAgent['famine']?[c.name] ?? 0) + (sim.nets.byAgent['shelter']?[c.name] ?? 0);
     return ListView(padding: const EdgeInsets.all(12), children: [
       _title(context, c.name),
@@ -817,6 +819,18 @@ class _CitizenViewState extends State<_CitizenView> {
         KV('Jours de faim', '${c.hungerDays}', color: c.hungerDays > 0 ? pal.bad : null),
         KV('Logement', c.homeless ? 'sans logis (${c.homelessDays} j)' : 'logé', color: c.homeless ? pal.bad : null),
         if (c.leaseFirm != null && sim.firm(c.leaseFirm!) != null) KV('Bail', sim.firm(c.leaseFirm!)!.name),
+        if (rented != null)
+          Row(children: [
+            Text('Loue un logement dans', style: TextStyle(color: pal.ink2, fontSize: 12.5)),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                    onPressed: () => widget.ctrl.select(Selection('building', rented.id)),
+                    child: Text('${kindName(rented)} n° ${rented.id}', overflow: TextOverflow.ellipsis)),
+              ),
+            ),
+          ]),
         if (sim.modules.buildings && home != null)
           Row(children: [
             Text('Propriétaire de son logement', style: TextStyle(color: pal.ink2, fontSize: 12.5)),

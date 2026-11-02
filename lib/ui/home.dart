@@ -14,6 +14,7 @@ import 'graph.dart';
 import 'housing.dart';
 import 'inspector.dart';
 import 'palette.dart';
+import 'parc_tab.dart';
 import 'start_params.dart';
 import 'widgets.dart';
 
@@ -75,8 +76,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 value: housing,
                 onChanged: (v) => set(() => housing = v),
                 title: const Text('Marché immobilier', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Bâtiments construits, loués, achetés et revendus ; hypothèques de la Caisse.',
-                    style: TextStyle(fontSize: 12)),
+                subtitle: const Text('Maisons, duplex et immeubles construits, loués, achetés et revendus ; hypothèques '
+                    'de la Caisse. Le parc s’explore dans l’onglet Parc.', style: TextStyle(fontSize: 12)),
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -381,6 +382,9 @@ class SidePanel extends StatelessWidget {
         break;
       case Tabs.taxes:
         body = TaxTab(ctrl);
+        break;
+      case Tabs.parc:
+        body = ParcTab(ctrl);
         break;
       default:
         body = InspectorTab(ctrl);
