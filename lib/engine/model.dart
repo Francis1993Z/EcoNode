@@ -948,6 +948,10 @@ class Params {
   // (plus 5 %), et le reste du parc est en duplex et en immeubles. Avec les baux, chaque locataire est rattaché à un
   // logement de son bailleur (affichage seulement). Sinon chaque bâtiment est un logement standard.
   bool buildingTypes = false;
+  // Variante (cheapestHouse, 2026-11-02, mesure) : avec les types de bâtiments, un ménage tente la maison en vente la moins
+  // chère, comme sans les types, au lieu de la plus chère que ses moyens permettent. Sert à séparer l'effet des types de
+  // celui de la règle d'achat (rapports/types-batiments.md). Sans les types, elle ne change rien.
+  bool cheapestHouse = false;
   // Coproduits (jointCostBySales, 2026-11-01, anomalie A3) : le coût commun d'un lot (la ferme : céréales et bétail) se
   // répartit sur ce qui se vend, au prix mondial : coût d'une unité de g = coût du lot × prix mondial de g ÷ Σ (quantité
   // vendue par lot × prix mondial). Quand tout se vend, c'est la répartition d'avant ; un coproduit sans acheteur ne porte

@@ -216,6 +216,7 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.purchaseLoans != d.purchaseLoans) 'purchaseLoans': p.purchaseLoans,
     if (p.ownersAtStart != d.ownersAtStart) 'ownersAtStart': p.ownersAtStart,
     if (p.buildingTypes != d.buildingTypes) 'buildingTypes': p.buildingTypes,
+    if (p.cheapestHouse != d.cheapestHouse) 'cheapestHouse': p.cheapestHouse,
     if (p.jointCostBySales != d.jointCostBySales) 'jointCostBySales': p.jointCostBySales,
     if (p.spreadTakeovers != d.spreadTakeovers) 'spreadTakeovers': p.spreadTakeovers,
     if (p.progressiveTax != d.progressiveTax) 'progressiveTax': p.progressiveTax,
@@ -407,6 +408,7 @@ Params _paramsFrom(Map j) => Params()
   ..purchaseLoans = (j['purchaseLoans'] as bool?) ?? false
   ..ownersAtStart = (j['ownersAtStart'] as bool?) ?? false
   ..buildingTypes = (j['buildingTypes'] as bool?) ?? false
+  ..cheapestHouse = (j['cheapestHouse'] as bool?) ?? false
   ..jointCostBySales = (j['jointCostBySales'] as bool?) ?? false
   ..spreadTakeovers = (j['spreadTakeovers'] as bool?) ?? false
   ..progressiveTax = (j['progressiveTax'] as bool?) ?? false

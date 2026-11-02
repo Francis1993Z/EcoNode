@@ -101,6 +101,7 @@ void main(List<String> a) {
     'population': pop,
     'jours': days,
     'types': p.buildingTypes,
+    'moinsChere': p.cheapestHouse,
     'banques': banques,
     for (final e in sum.entries) e.key: e.value / n,
     'sansAbriMax': homelessMax,

@@ -584,8 +584,9 @@ extension SimBuildings on Sim {
   }
 
   /// Un ménage regarde le logement en vente le moins cher et tente de l'acheter. Il n'achète que des maisons (un logement).
+  /// Types de bâtiments : il prend la plus chère que ses moyens permettent, sauf avec Params.cheapestHouse.
   void _tryBuy(Citizen c, List<Building> listed) {
-    if (params.buildingTypes) {
+    if (params.buildingTypes && !params.cheapestHouse) {
       _tryBuyTyped(c, listed);
       return;
     }

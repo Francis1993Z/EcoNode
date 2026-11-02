@@ -310,6 +310,8 @@ void applyParam(Params p, String k, String v) {
       p.ownersAtStart = b();
     case 'buildingTypes': // types de bâtiments : maisons, duplex, immeubles (logements, coût, durée de chantier, valeur)
       p.buildingTypes = b();
+    case 'cheapestHouse': // types de bâtiments, variante : un ménage tente la maison la moins chère
+      p.cheapestHouse = b();
     case 'purchaseLoans': // prêt d'achat : un ordinateur en stock, le montant qui manque, acheté aussitôt (N4)
       p.purchaseLoans = b();
     case 'equalBanks': // hypothèques dans les revenus et le plancher de la Caisse (N4)
