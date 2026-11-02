@@ -255,7 +255,7 @@ variable de tirages et décalait toute la suite de la partie.
 | 14 | `offres` | départage des offres à prix voisins : un tirage par (acheteur, bien, n-ième achat du jour, vendeur) | `buy` |
 | 15 | `prix` | pas d'ajustement de la marge | `_decide` |
 | 16 | `divin` | actions du god mode (épidémie) | `godEpidemic` |
-| 17 | `logement` | bâtiments : état à la naissance, déménagement, regard sur le marché (module `buildings`) | `buildings.dart` |
+| 17 | `logement` | bâtiments : état à la naissance, déménagement, regard sur le marché ; types de bâtiments : type au départ (sous-tirage 13), taille d'une maison à construire (14) (module `buildings`) | `buildings.dart` |
 | 18 | `vendeurs` | recherche limitée : tirage des vendeurs examinés par un achat de ménage dans la liste des vendeurs avec stock (`sellerSample` > 0) | `_AllOffers.sampled` |
 | 19 | `anciennete` | ancienneté des employés du départ (0 à 4 ans ; l'encadrement, au moins celle qu'il exige) | `reset` |
 | 20 | `entrepreneuriat` | un citoyen examine-t-il aujourd'hui la possibilité de fonder (module `entrepreneurship`, § 6.17) | `entrepreneuriat.dart:_entrepreneurship` |
@@ -375,6 +375,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `jointCostBySales` | non | coproduits (§ 6.4) : le coût d'un lot se répartit sur ce qui se vend | mesure § 6.4 |
 | `ownersAtStart` | non | démarrage (§ 5) : propriétaires de départ, logement payé (module Bâtiments) | mesure § 5 |
 | `purchaseLoans` | non | crédit (§ 6.19) : le prêt d'un ordinateur sert à l'acheter (en stock, montant qui manque) | mesure § 6.19 |
+| `buildingTypes` | non | types de bâtiments (§ 6.6) : maisons, duplex et immeubles, avec leurs logements, leur coût, leur durée de chantier et leur valeur | mesure § 6.6 |
 | `leases` | non | baux (§ 6.6) : un locataire garde son logement tant qu'il paie ; le personnel du bailleur ne sert qu'aux nouveaux baux ; loyer = coût d'usage du logement | mesure § 6.6 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
 | `priceStep`, `wageStep` | 0,02, 0,015 | pas d'ajustement de la marge et du salaire | choix de jeu (tâche 3 du plan : lissage) |
@@ -701,6 +702,63 @@ Modèle, section « Logement »).
   graines sur 10, écart-type 1,9), propriétaires 1 757 → 466 (274 à 1 749 selon la graine), loyer 45 → 9,65 $, indice
   des prix final 4,31 → 1,67 (la vague d'hypothèques, anomalie N4, est plus petite). 240 citoyens, 5 graines, 300 j :
   aucun sans-abri au-delà de 1 par jour, avec ou sans Banques.
+
+**Types de bâtiments (`buildingTypes`, 2026-11-01, module Bâtiments).** Coupés par défaut dans le moteur ; l'interface
+les active (onglet Parc, qui montre chaque bâtiment avec son sprite). Sans eux, chaque bâtiment est un logement standard
+de `dwellingModules` modules ; avec eux, le parc est fait de huit types (`model.dart:buildingKinds`) :
+
+| Type | Logements | Taille (logements standards) | Modules | Modules par jour de chantier | Durée du chantier |
+|---|---|---|---|---|---|
+| Petite maison | 1 | 0,8 | 8 | 1 | 8 j |
+| Maison moyenne | 1 | 1 | 10 | 1 | 10 j |
+| Grande maison | 1 | 1,5 | 15 | 1 | 15 j |
+| Duplex | 2 | 1,8 | 18 | 1 | 18 j |
+| Immeuble d'un étage | 4 | 3,4 | 34 | 2 | 17 j |
+| Immeuble de deux étages | 8 | 6,4 | 64 | 2 | 32 j |
+| Immeuble de trois étages | 12 | 9 | 90 | 3 | 30 j |
+| Multilogement | 24 | 16,8 | 168 | 4 | 42 j |
+
+(Modules et durées pour `dwellingModules` = 10 ; les modules d'un type sont sa taille × `dwellingModules`, arrondie.)
+Économies d'échelle : 8 à 15 modules par logement pour une maison, 9 pour un duplex, 7 à 8,5 pour un immeuble. Choix
+de jeu, non calibrés.
+- **Ce que la taille fixe** (`modulesOf`, `sizeOf`, `buildingCost`) : le coût et la durée du chantier, la valeur
+  courante (coût de remplacement du bâtiment, rabattu selon l'état, ± 15 % selon la chaleur du marché), l'entretien
+  (`maintHoursPerDwelling` × taille) et la provision pour l'usure dans le coût du bailleur.
+- **Logements.** Les logements des bâtiments habitables d'un bailleur font sa capacité, donc la limite de ses baux ;
+  la valeur d'un immeuble garantit son hypothèque et entre dans le coût du capital du loyer (`_leaseCapital`).
+- **Achats des ménages.** Un ménage n'achète que des maisons (un logement). Il prend la plus chère que ses moyens
+  permettent (mise de fonds et coussin de 10 jours ; versement + entretien sous 35 % du revenu et sous `buyRentRatio`
+  fois le loyer d'un logement de même taille) ; s'il n'en peut payer aucune, il tente la moins chère, et le refus est
+  compté. Un bailleur ne met en vente que des maisons ; son objectif de 3 % et sa règle de demande se comptent en
+  logements.
+- **Immeubles saisis** (`_landlordPurchases`). Un duplex ou un immeuble en liquidation est vendu au prix demandé au
+  bailleur qui manque le plus de logements (demande de nuitées au-delà de `landlordBuildAbove` fois son parc, chantiers
+  compris), s'il a la mise de fonds (30 %) au-delà de sa réserve et que la Caisse lui prête le reste (`ltvFirm`, durée
+  `mortgageTermFirm`). Le produit rembourse l'ancienne hypothèque, le surplus va à l'ancien propriétaire ou à l'État, le
+  solde non couvert est radié (`bstats.bought`).
+- **Construction** (`_siteType`). Un bailleur à qui il manque n logements (⌈demande ÷ `landlordBuildAbove`⌉ − parc,
+  chantiers compris) lance le plus grand duplex ou immeuble d'au plus n logements dont il peut payer un jour et demi
+  de chantier et la part du coût que la Caisse ne prête pas ; à défaut, une maison (petite, moyenne ou grande : 35, 45
+  et 20 %, flux `logement`, sous-tirage 14). Un chantier achète chaque jour les modules de sa cadence.
+- **Parc de départ** (`_seedTypedBuildings`). Chaque bailleur a autant de logements que sa capacité fixée. Il y a
+  assez de maisons pour les ménages qui veulent posséder et ont un emploi, plus 5 %, réparties entre les bailleurs
+  selon leur parc (taille au hasard, 35 / 45 / 20 %) ; le reste du parc d'un bailleur est en duplex et en immeubles,
+  tirés parmi ceux qui tiennent dans ce qui reste à loger (poids 2, 3, 3, 2 et 1 du duplex au multilogement ; flux
+  `logement`, sous-tirage 13). Les propriétaires de départ (`ownersAtStart`) reçoivent des maisons. À 2 500 citoyens :
+  1 728 maisons et 118 duplex ou immeubles (dont 12 multilogements) pour 2 650 logements.
+- **Locataires rattachés** (`_assignDwellings`, avec les baux, en fin de journée). Chaque locataire est rattaché à un
+  logement de son bailleur : un rattachement qui tient est gardé (bail chez le propriétaire du bâtiment, bâtiment
+  habitable, pas plus de locataires que de logements), les autres prennent le premier logement libre de leur bailleur.
+  Affichage seulement (fiche d'un bâtiment, onglet Parc) : rien d'autre dans le moteur ne lit ce rattachement.
+- **En cours de partie**, l'interrupteur vaut pour les nouveaux chantiers et les achats ; le parc existant garde ses
+  bâtiments (un bâtiment a toujours le type avec lequel il a été construit).
+- **Mesure** (serveur de calcul, `tool/parc.dart`, réglages de l'interface avec Bâtiments, sans Banques, 10 graines
+  appariées × 3 000 j, moyennes des jours 101 à 3 000 ; types coupés → actifs). Sans-abri : aucun dans les deux cas.
+  2 500 citoyens : chômage 6,0 → 4,2 % (mieux dans 10 graines sur 10), indice des prix final 1,71 → 2,28 (au jour 250 :
+  1,50 → 1,65), maison vendue 17 000 → 37 000 $ (50 → 72 jours de salaire), ventes 710 → 1 104, chantiers 22 → 44.
+  240 citoyens : chômage 5,2 → 3,7 % (9 sur 10), indice final 1,58 → 2,62. Mécanisme probable : un acheteur trouve une
+  maison à sa portée parmi celles en vente (sans types, il n'essaie que la moins chère), d'où 1,6 à 2,3 fois plus de
+  reventes, chacune financée à 95 % par de la monnaie nouvelle. Détails : `rapports/types-batiments.md`.
 4. **Santé, ordinateur, études** : §§ 6.7 à 6.9.
 5. **Loisirs.**
    - **Budget du jour, à la Godley-Lavoie :** C = α₁ × max(0 ; revenu lissé − coût de survie) + α₂ × `adsBoost` ×
@@ -1270,6 +1328,8 @@ Les relances meurent de faillite, faute de ventes. 150 relances sur 174 viennent
   - `proprietes_test.dart` : propriétés sur des parties tirées au hasard ;
   - `extremes_test.dart` : cas extrêmes au résultat connu d'avance ;
   - `batiments_test.dart` : module bâtiments et hypothèques ;
+  - `types_batiments_test.dart` : types de bâtiments (parc de départ, capacités en logements, achats réservés aux
+    maisons, rachat d'un immeuble saisi, chantier d'un immeuble, locataires rattachés, instantanés) ;
   - `emplois_test.dart` : module rôles et négociation (organigrammes, contrats cohérents chaque jour, bornes de la
     négociation, renouvellements, salaire minimum, activation en cours de partie, instantanés).
 - **Protocole** (`tool/stabilite.dart`) : 30 graines × 1 500 jours, sans puis avec filets, chocs standard, comparaisons
