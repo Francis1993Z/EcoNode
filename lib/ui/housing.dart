@@ -13,6 +13,7 @@ import 'charts.dart';
 import 'controller.dart';
 import 'format.dart';
 import 'palette.dart';
+import 'parc_tab.dart';
 import 'widgets.dart';
 
 // ------------------------------------------------------------------ journal du marché
@@ -138,7 +139,7 @@ class BuildingView extends StatelessWidget {
     final st = buildingStatus(pal, b);
     final m = sim.mortgageOf(b);
     final fair = sim.fairValue(b);
-    final rc = sim.replacementCost();
+    final rc = sim.buildingCost(b);
     final listed = b.listedDay != null && b.done;
     final ask = listed ? sim.askPrice(b) : 0.0;
     final owe = m?.principal ?? 0.0;
@@ -151,7 +152,9 @@ class BuildingView extends StatelessWidget {
 
     return ListView(padding: const EdgeInsets.all(12), children: [
       Row(children: [
-        Expanded(child: _title(context, 'Logement n° ${b.id}')),
+        buildingSprite(b, 48),
+        const SizedBox(width: 8),
+        Expanded(child: _title(context, '${b.type == null ? 'Logement' : kindName(b)} n° ${b.id}')),
         Pill(st.label, st.color),
       ]),
       const SizedBox(height: 10),
@@ -161,7 +164,8 @@ class BuildingView extends StatelessWidget {
             child: Text('Le module Bâtiments est coupé : ce logement est figé.', style: TextStyle(color: pal.warn, fontSize: 12))),
       Section('Le bien', [
         KV('Construit le jour', '${b.builtDay}'),
-        KV('Modules posés', '${b.modules} / ${p.dwellingModules}${b.done ? '' : '  (chantier en cours)'}'),
+        if (b.type != null) KV('Logements', '${b.units}'),
+        KV('Modules posés', '${b.modules} / ${sim.modulesOf(b)}${b.done ? '' : '  (chantier en cours)'}'),
         _Meter('État', b.cond, threshold: Building.minCond),
         KV('Habitable', b.habitable ? 'oui' : (b.done ? 'non (état sous ${pct(Building.minCond)})' : 'non (en chantier)'),
             color: b.habitable || !b.done ? null : pal.bad),
@@ -214,8 +218,11 @@ class BuildingView extends StatelessWidget {
         if (landlord != null) ...[
           if (rent != null) KV('Loyer demandé', '${money(rent)} / jour'),
           if (rent != null && fair > 0) KV('Rendement brut annuel', pct(rent * 365 / fair)),
-          Text('Les locataires ne sont pas rattachés à un logement précis : le bailleur loue au marché.',
-              style: TextStyle(color: pal.ink3, fontSize: 11.5)),
+          if (p.buildingTypes && p.leases)
+            KV('Locataires rattachés', '${sim.citizens.where((c) => sim.dwellingOf(c)?.id == b.id).length} / ${b.units}')
+          else
+            Text('Les locataires ne sont pas rattachés à un logement précis : le bailleur loue au marché.',
+                style: TextStyle(color: pal.ink3, fontSize: 11.5)),
         ],
         if (b.ownerKind == 2 && b.payee != null) KV('Surplus de la vente pour', sim.citizen(b.payee!)?.name ?? '—'),
         if (b.ownerKind == 2 && b.payee == null) const KV('Surplus de la vente pour', 'l’État'),
@@ -239,13 +246,16 @@ class BuildingView extends StatelessWidget {
         ])
       else if (b.done)
         Section('Hypothèque', [Text('Aucune hypothèque sur ce bien.', style: TextStyle(color: pal.ink2, fontSize: 12.5))]),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
+      Wrap(spacing: 4, children: [
+        TextButton.icon(
             onPressed: () => ctrl.setTab(Tabs.housing),
             icon: const Icon(Icons.home_work_outlined, size: 16),
             label: const Text('Voir le marché immobilier')),
-      ),
+        TextButton.icon(
+            onPressed: () => showBuilding(context, ctrl, b.id),
+            icon: const Icon(Icons.apartment_outlined, size: 16),
+            label: const Text('Logements et locataires')),
+      ]),
       const SizedBox(height: 24),
     ]);
   }
@@ -394,7 +404,7 @@ class HousingTab extends StatelessWidget {
       _title(context, 'Marché immobilier'),
       const SizedBox(height: 10),
       Section('Parc', [
-        KV('Bâtiments', '${bs.length}  (habitables : ${sim.dwellings})'),
+        KV('Bâtiments', '${bs.length}  (logements habitables : ${sim.dwellings})'),
         KV('En construction', '$building'),
         KV('Inhabitables (état sous ${pct(Building.minCond)})', '$ruined', color: ruined > 0 ? pal.warn : null),
         KV('En liquidation (saisis)', '$liquidation', color: liquidation > 0 ? pal.bad : null),
@@ -510,23 +520,29 @@ Widget landlordSection(BuildContext context, SimController ctrl, Firm f) {
     fair += sim.fairValue(b);
   }
   final rent = f.price['logement'];
+  final units = done.fold(0, (n, b) => n + b.units);
+  final habitable = done.where((b) => b.habitable).fold(0, (n, b) => n + b.units);
   return Section('Parc de logements', [
-    KV('Logements', '${done.length}  (habitables : ${done.where((b) => b.habitable).length})'),
+    KV('Logements', '$units  (habitables : $habitable)'),
+    if (done.any((b) => b.type != null)) KV('Bâtiments', '${done.length}'),
     KV('En vente', '${forSale.length}'),
     KV('En construction', '$site'),
     KV('Valeur courante du parc', kmoney(fair)),
     KV('Dette hypothécaire', kmoney(debt), color: debt > fair * 0.8 ? pal.warn : null),
     if (rent != null) KV('Loyer demandé', '${money(rent)} / jour'),
-    if (rent != null && done.isNotEmpty && fair > 0) KV('Rendement brut annuel', pct(rent * done.length * 365 / fair)),
+    if (rent != null && done.isNotEmpty && fair > 0) KV('Rendement brut annuel', pct(rent * units * 365 / fair)),
     for (final b in forSale.take(8)) _BuildingRow(ctrl, b),
     if (forSale.length > 8) Text('… et ${forSale.length - 8} autres en vente', style: TextStyle(color: pal.ink3, fontSize: 12)),
-    Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton.icon(
+    Wrap(spacing: 4, children: [
+      TextButton.icon(
           onPressed: () => ctrl.setTab(Tabs.housing),
           icon: const Icon(Icons.home_work_outlined, size: 16),
           label: const Text('Voir le marché immobilier')),
-    ),
+      TextButton.icon(
+          onPressed: () => ctrl.setTab(Tabs.parc),
+          icon: const Icon(Icons.apartment_outlined, size: 16),
+          label: const Text('Explorer le parc')),
+    ]),
   ]);
 }
 
@@ -550,7 +566,9 @@ class _BuildingRow extends StatelessWidget {
           SizedBox(width: 44, child: Text('n° ${b.id}', style: mono(pal.ink2, 11.5))),
           Container(width: 8, height: 8, margin: const EdgeInsets.only(right: 6), decoration: BoxDecoration(color: st.color, shape: BoxShape.circle)),
           Expanded(
-              child: Text('${ownerLabel(sim, b)} · ${b.done ? 'état ${pct(b.cond)}' : '${b.modules}/${sim.params.dwellingModules} modules'}',
+              child: Text(
+                  '${b.type != null ? '${kindName(b)} · ' : ''}${ownerLabel(sim, b)} · '
+                  '${b.done ? 'état ${pct(b.cond)}' : '${b.modules}/${sim.modulesOf(b)} modules'}',
                   overflow: TextOverflow.ellipsis, style: TextStyle(color: pal.ink, fontSize: 12.5))),
           if (b.listedDay != null) Text('${sim.day - b.listedDay!} j  ', style: TextStyle(color: pal.ink3, fontSize: 11)),
           if (b.done) Text(money0(price), style: mono(pal.ink2, 12)),
@@ -573,7 +591,8 @@ class _MarketMap extends StatelessWidget {
   Widget build(BuildContext context) {
     final pal = Pal.of(context);
     final sim = ctrl.sim;
-    final pts = [for (final b in listed) _Pt(b, b.cond, sim.askPrice(b))];
+    // prix par logement standard (Params.buildingTypes : une grande maison vaut 1,5 logement standard), comparable au trait
+    final pts = [for (final b in listed) _Pt(b, b.cond, sim.askPrice(b) / sim.sizeOf(b))];
     final rc = sim.replacementCost();
     final heat = sim.housingHeat;
     double fairAt(double cond) => rc * (0.25 + 0.75 * cond) * (1 + 0.15 * heat);
@@ -582,7 +601,11 @@ class _MarketMap extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(color: pal.sheet, borderRadius: BorderRadius.circular(8), border: Border.all(color: pal.rule2)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Carte des logements en vente (état et prix demandé)', style: TextStyle(color: pal.ink, fontSize: 12, fontWeight: FontWeight.w700)),
+        Text(
+            listed.any((b) => b.type != null)
+                ? 'Carte des logements en vente (état et prix demandé par logement standard)'
+                : 'Carte des logements en vente (état et prix demandé)',
+            style: TextStyle(color: pal.ink, fontSize: 12, fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
         Wrap(spacing: 10, runSpacing: 2, children: [
           for (final e in [('Bailleur', pal.transfo), ('Ménage', pal.conso), ('Caisse (saisi)', pal.bad), ('Valeur courante', pal.ink3)])

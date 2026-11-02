@@ -1975,6 +1975,7 @@ class Sim {
       _entryExit();
       _purgeFlows();
     }
+    if (modules.buildings && p.buildingTypes && p.leases) _assignDwellings(); // locataires rattachés à un logement
     _record();
     _netSummary();
     if (p.floatingFx && p.trade) _updateFx(); // avant la vérification, qui remet les flux du jour à zéro
@@ -2763,6 +2764,7 @@ class Sim {
       // règle coupée en cours de partie : les baux prennent fin, chacun loue de nouveau sa nuitée au jour le jour
       for (final c in citizens) {
         c.leaseFirm = null;
+        c.dwellingId = null;
       }
       return;
     }

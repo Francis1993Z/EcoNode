@@ -27,12 +27,13 @@ class BuildingStats {
   int opened = 0; // hypothèques accordées
   int refused = 0; // achats refusés (mise de fonds, service de la dette, fonds propres de la Caisse)
   int abandoned = 0; // chantiers abandonnés (propriétaire disparu)
+  int bought = 0; // immeubles saisis rachetés par un bailleur (Params.buildingTypes)
   double gains = 0; // somme des gains de revente (prix − coût d'acquisition du vendeur), quand positifs
   double losses = 0; // somme des pertes de revente (valeur absolue)
   double priceEma = 0; // prix de vente moyen, lissé
 
   void clear() {
-    built = sales = foreclosures = opened = refused = abandoned = 0;
+    built = sales = foreclosures = opened = refused = abandoned = bought = 0;
     gains = losses = priceEma = 0;
   }
 }
@@ -76,7 +77,13 @@ extension SimBuildings on Sim {
   int get homeOwners => citizens.where((c) => c.homeId != null).length;
 
   /// Logements habitables (loués ou occupés par leur propriétaire).
-  int get dwellings => buildings.where((b) => b.habitable).length;
+  int get dwellings {
+    var n = 0;
+    for (final b in buildings) {
+      if (b.habitable) n += b.units;
+    }
+    return n;
+  }
 
   // ------------------------------------------------------------------ valeurs
 
@@ -86,9 +93,19 @@ extension SimBuildings on Sim {
   /// Coût de remplacement d'un logement neuf.
   double replacementCost() => params.dwellingModules * moduleCost();
 
+  /// Modules de construction d'un bâtiment : ceux de son type (Params.buildingTypes), sinon ceux d'un logement standard.
+  int modulesOf(Building b) =>
+      b.type == null ? params.dwellingModules : (buildingKinds[b.type!].size * params.dwellingModules).round();
+
+  /// Taille d'un bâtiment en logements standards (entretien, provision pour l'usure) : 1 sans type.
+  double sizeOf(Building b) => b.type == null ? 1.0 : modulesOf(b) / params.dwellingModules;
+
+  /// Coût de remplacement d'un bâtiment neuf (sans type : celui d'un logement standard).
+  double buildingCost(Building b) => modulesOf(b) * moduleCost();
+
   /// Valeur courante : coût de remplacement, rabattu selon l'état (un logement à l'état 0 vaut encore le quart : le
   /// terrain et les fondations), un peu plus cher quand les logements manquent (chaleur du marché, de −1 à +1 : ±15 %).
-  double fairValue(Building b) => replacementCost() * (0.25 + 0.75 * b.cond) * (1 + 0.15 * housingHeat);
+  double fairValue(Building b) => buildingCost(b) * (0.25 + 0.75 * b.cond) * (1 + 0.15 * housingHeat);
 
   /// Prix demandé aujourd'hui pour un bâtiment en vente : valeur courante plus une marge (la Caisse vend à 10 % sous la
   /// valeur), qui baisse chaque jour sans acheteur jusqu'à un plancher.
@@ -274,6 +291,10 @@ extension SimBuildings on Sim {
   void _seedBuildings() {
     _buildingsSeeded = true;
     final landlords = firms.where((f) => f.type == 'immobilier').toList();
+    if (params.buildingTypes) {
+      _seedTypedBuildings(landlords);
+      return;
+    }
     for (final f in landlords) {
       final n = f.capacity != null ? f.capacity!.round() : (1.06 * citizens.length / landlords.length).ceil();
       for (var i = 0; i < n; i++) {
@@ -288,6 +309,67 @@ extension SimBuildings on Sim {
     }
   }
 
+  /// Parc de départ par types (Params.buildingTypes) : chaque bailleur a autant de logements que sa capacité fixée. Les
+  /// maisons suffisent aux ménages qui veulent posséder et ont un emploi (plus 5 %) ; chaque bailleur en a sa part, selon
+  /// son parc ; une maison est petite, moyenne ou grande au hasard (35, 45 et 20 %). Le reste du parc d'un bailleur est en
+  /// duplex et en immeubles, tirés au hasard parmi ceux qui tiennent dans ce qui reste à loger.
+  void _seedTypedBuildings(List<Firm> landlords) {
+    const weights = [0.0, 0.0, 0.0, 2.0, 3.0, 3.0, 2.0, 1.0]; // duplex, immeubles d'un, deux et trois étages, multilogement
+    final sizes = [
+      for (final f in landlords) f.capacity != null ? f.capacity!.round() : (1.06 * citizens.length / landlords.length).ceil()
+    ];
+    final total = sizes.fold(0, (a, b) => a + b);
+    final owners = citizens.where((c) => c.wantsToOwn && c.employer != null).length;
+    final houses = math.min(total, (1.05 * owners).ceil());
+    void add(Firm f, int Function(double u) typeOf) {
+      final id = _nextBuildingId++;
+      final b = Building(id, 0, f.id, day, typeOf(draw(Flux.logement, id, 13)));
+      b.done = true;
+      b.modules = modulesOf(b);
+      b.cond = 1 - 0.3 * draw(Flux.logement, id, 7);
+      b.basis = quantize(fairValue(b));
+      buildings.add(b);
+      _bmap[b.id] = b;
+    }
+
+    int house(double u) => u < 0.35 ? 0 : (u < 0.8 ? 1 : 2);
+    var given = 0, acc = 0;
+    for (var i = 0; i < landlords.length; i++) {
+      final f = landlords[i];
+      acc += sizes[i];
+      final upto = total > 0 ? (houses * acc / total).round() : 0; // parts arrondies sans perte : la somme fait [houses]
+      final h = upto - given;
+      given = upto;
+      for (var k = 0; k < h; k++) {
+        add(f, house);
+      }
+      var rest = sizes[i] - h;
+      while (rest > 0) {
+        var sum = 0.0;
+        for (var t = 3; t < buildingKinds.length; t++) {
+          if (buildingKinds[t].units <= rest) sum += weights[t];
+        }
+        if (sum == 0) {
+          add(f, house); // il reste un logement : une maison
+          rest--;
+          continue;
+        }
+        var chosen = 3;
+        add(f, (u) {
+          var x = u * sum;
+          for (var t = 3; t < buildingKinds.length; t++) {
+            if (buildingKinds[t].units > rest) continue;
+            chosen = t;
+            x -= weights[t];
+            if (x < 0) break;
+          }
+          return chosen;
+        });
+        rest -= buildingKinds[chosen].units;
+      }
+    }
+  }
+
   /// Propriétaires de départ (Params.ownersAtStart) : chaque citoyen qui veut posséder et a un emploi reçoit un logement du
   /// parc des bailleurs (à tour de rôle), entièrement payé : ni hypothèque, ni argent qui bouge. Une hypothèque de départ
   /// sans la monnaie qu'elle a créée ferait une économie qui doit plusieurs fois l'argent qu'elle possède (essayé : les
@@ -296,7 +378,8 @@ extension SimBuildings on Sim {
   void _seedOwners() {
     final stock = <List<Building>>[
       for (final f in firms)
-        if (f.type == 'immobilier') [for (final b in buildings) if (b.ownerKind == 0 && b.ownerId == f.id && b.done) b]
+        if (f.type == 'immobilier')
+          [for (final b in buildings) if (b.ownerKind == 0 && b.ownerId == f.id && b.done && b.units == 1) b]
     ];
     final next = List<int>.filled(stock.length, 0);
     var turn = 0;
@@ -332,7 +415,7 @@ extension SimBuildings on Sim {
     if (!_buildingsSeeded) _seedBuildings();
     final units = <int, int>{};
     for (final b in buildings) {
-      if (b.ownerKind == 0 && b.habitable) units[b.ownerId!] = (units[b.ownerId!] ?? 0) + 1;
+      if (b.ownerKind == 0 && b.habitable) units[b.ownerId!] = (units[b.ownerId!] ?? 0) + b.units;
     }
     var cap = 0.0, demand = 0.0;
     for (final f in firms) {
@@ -369,7 +452,11 @@ extension SimBuildings on Sim {
     for (final e in perFirm.entries) {
       final f = _fmap[e.key];
       if (f == null) continue;
-      final need = p.maintHoursPerDwelling * e.value.length;
+      var load = 0.0; // logements standards à entretenir
+      for (final b in e.value) {
+        load += sizeOf(b);
+      }
+      final need = p.maintHoursPerDwelling * load;
       final budget = math.max(0.0, f.money - 3 * f.wage * f.workers.length);
       final r = buy(f, f.id.toString(), 'reparation', need, budget, false);
       f.costs += r.spent;
@@ -385,7 +472,7 @@ extension SimBuildings on Sim {
         final c = _cmap[b.ownerId];
         var cover = 0.0;
         if (c != null) {
-          final need = p.maintHoursPerDwelling;
+          final need = p.maintHoursPerDwelling * sizeOf(b);
           final budget = math.max(0.0, c.money - 3 * needCost);
           final r = buy(c, 'M', 'reparation', need, budget, false);
           cover = need > eps ? math.min(1.0, r.qty / need) : 1.0;
@@ -466,19 +553,25 @@ extension SimBuildings on Sim {
     for (final f in firms) {
       if (f.type != 'immobilier') continue;
       final mine = [for (final b in buildings) if (b.ownerKind == 0 && b.ownerId == f.id && b.done) b];
-      final forSale = mine.where((b) => b.listedDay != null).length;
-      final target = math.max(1, (0.03 * mine.length).round());
+      var units = 0, forSale = 0; // en logements ; un bailleur ne met en vente que des maisons
+      for (final b in mine) {
+        units += b.units;
+        if (b.listedDay != null) forSale += b.units;
+      }
+      final target = math.max(1, (0.03 * units).round());
       final demand = f.demandEma['logement'] ?? 0.0;
-      if (forSale < target && demand < p.landlordBuildAbove * (mine.length - forSale)) {
+      if (forSale < target && demand < p.landlordBuildAbove * (units - forSale)) {
         for (final b in mine) {
-          if (b.listedDay == null && b.cond >= 0.5) {
+          if (b.listedDay == null && b.cond >= 0.5 && b.units == 1) {
             b.listedDay = day;
             break;
           }
         }
       }
     }
-    // 2. acheteurs : un locataire en emploi qui veut devenir propriétaire regarde le marché de temps en temps
+    // 2. un immeuble saisi est racheté par un bailleur (Params.buildingTypes ; sans types, il n'y en a pas)
+    _landlordPurchases();
+    // 3. acheteurs : un locataire en emploi qui veut devenir propriétaire regarde le marché de temps en temps
     final listed = [for (final b in buildings) if (b.done && b.listedDay != null) b];
     if (listed.isEmpty) return;
     for (final c in _ordered(citizens, Flux.logement, (c) => c.id)) {
@@ -490,12 +583,17 @@ extension SimBuildings on Sim {
     }
   }
 
-  /// Un ménage regarde le logement en vente le moins cher et tente de l'acheter.
+  /// Un ménage regarde le logement en vente le moins cher et tente de l'acheter. Il n'achète que des maisons (un logement).
+  /// Types de bâtiments : il prend la plus chère que ses moyens permettent, sauf avec Params.cheapestHouse.
   void _tryBuy(Citizen c, List<Building> listed) {
+    if (params.buildingTypes && !params.cheapestHouse) {
+      _tryBuyTyped(c, listed);
+      return;
+    }
     Building? best;
     var bestAsk = double.infinity;
     for (final b in listed) {
-      if (b.listedDay == null || (b.ownerKind == 1 && b.ownerId == c.id)) continue;
+      if (b.listedDay == null || b.units > 1 || (b.ownerKind == 1 && b.ownerId == c.id)) continue;
       final a = askPrice(b);
       if (a < bestAsk) {
         bestAsk = a;
@@ -505,17 +603,68 @@ extension SimBuildings on Sim {
     if (best != null) _buyAt(c, best, bestAsk);
   }
 
+  /// Types de bâtiments : parmi les maisons en vente, le ménage prend la plus chère que ses moyens permettent ; s'il n'en
+  /// peut payer aucune, il tente la moins chère (et le refus est compté, comme sans les types).
+  void _tryBuyTyped(Citizen c, List<Building> listed) {
+    Building? best, cheapest;
+    var bestAsk = 0.0, cheapAsk = double.infinity;
+    for (final b in listed) {
+      if (b.listedDay == null || b.units > 1 || (b.ownerKind == 1 && b.ownerId == c.id)) continue;
+      final a = askPrice(b);
+      if (a < cheapAsk) {
+        cheapAsk = a;
+        cheapest = b;
+      }
+      if (a > bestAsk && _means(c, b, a) == 0) {
+        bestAsk = a;
+        best = b;
+      }
+    }
+    if (best != null) {
+      _buyAt(c, best, bestAsk);
+    } else if (cheapest != null) {
+      _buyAt(c, cheapest, cheapAsk);
+    }
+  }
+
   /// Le citoyen (locataire) tente d'acheter ce bâtiment en vente, au prix demandé aujourd'hui, aux conditions du marché.
-  /// Rend vrai si la vente a lieu. Pour les tests et le god mode.
+  /// Rend vrai si la vente a lieu. Pour les tests et le god mode. Un ménage n'achète que des maisons.
   bool buyHome(Citizen c, Building b) {
-    if (c.homeId != null || !b.done || b.listedDay == null || (b.ownerKind == 1 && b.ownerId == c.id)) return false;
+    if (c.homeId != null || !b.done || b.listedDay == null || b.units > 1 || (b.ownerKind == 1 && b.ownerId == c.id)) {
+      return false;
+    }
     return _buyAt(c, b, askPrice(b));
+  }
+
+  /// Conditions de crédit d'un achat à ce prix : prêt (mise de fonds minimale), taux, versement quotidien et entretien
+  /// (qui suit la taille du bâtiment).
+  ({double loan, double rate, double pay, double maint}) _terms(Building b, double price) {
+    final p = params;
+    final loan = modules.credit ? quantize(price * p.ltvHousehold) : 0.0;
+    final rate = mortgageRate(loan / price);
+    final maint = p.maintHoursPerDwelling * bestPrice('reparation') * sizeOf(b);
+    final pay = loan > 0 ? _annuity(loan, rate / 365, p.mortgageTermHousehold) : 0.0;
+    return (loan: loan, rate: rate, pay: pay, maint: maint);
+  }
+
+  /// Les moyens du ménage suffisent-ils ? 0 : oui ; 1 : il n'a pas la mise de fonds et un coussin de 10 jours de besoins ;
+  /// 2 : le service de la dette (versement + entretien) dépasse 35 % de son revenu ou 1,2 fois le loyer d'un logement de
+  /// même taille.
+  int _means(Citizen c, Building b, double price) {
+    final p = params;
+    final t = _terms(b, price);
+    if (c.money < price - t.loan + 10 * needCost) return 1;
+    if (t.loan > 0 &&
+        (t.pay + t.maint > safeguards.maxPaymentRatio * c.incomeEma ||
+            t.pay + t.maint > p.buyRentRatio * bestPrice('logement') * sizeOf(b))) {
+      return 2;
+    }
+    return 0;
   }
 
   /// Conditions d'achat : mise de fonds et coussin de 10 jours de besoins, service de la dette (versement + entretien) sous
   /// 35 % du revenu et sous 1,2 fois le loyer, fonds propres de la Caisse (hypothèques pondérées à 35 %).
   bool _buyAt(Citizen c, Building b, double price) {
-    final p = params;
     if (!(price > 0)) return false;
     final owe = mortgageOf(b)?.principal ?? 0.0;
     if (b.ownerKind != 2) {
@@ -523,15 +672,12 @@ extension SimBuildings on Sim {
       final Account? sellerAcct = b.ownerKind == 0 ? _fmap[b.ownerId] : _cmap[b.ownerId];
       if (sellerAcct == null || sellerAcct.money + price < owe) return false;
     }
-    final loan = modules.credit ? quantize(price * p.ltvHousehold) : 0.0;
-    final down = price - loan;
-    final buffer = 10 * needCost;
-    if (c.money < down + buffer) return false;
-    final rate = mortgageRate(loan / price);
-    final maint = p.maintHoursPerDwelling * bestPrice('reparation');
+    final means = _means(c, b, price);
+    if (means == 1) return false;
+    final t = _terms(b, price);
+    final loan = t.loan, rate = t.rate;
     if (loan > 0) {
-      final pay = _annuity(loan, rate / 365, p.mortgageTermHousehold);
-      if (pay + maint > safeguards.maxPaymentRatio * c.incomeEma || pay + maint > p.buyRentRatio * bestPrice('logement')) {
+      if (means == 2) {
         bstats.refused++;
         return false;
       }
@@ -611,6 +757,84 @@ extension SimBuildings on Sim {
     }
   }
 
+  /// Un immeuble (ou un duplex) saisi, en vente par la Caisse, est racheté au prix demandé par le bailleur qui manque le plus
+  /// de logements (sa demande de nuitées au-delà de landlordBuildAbove fois son parc, chantiers compris), s'il a la mise de
+  /// fonds au-delà de sa réserve et que la Caisse lui prête le reste (ltvFirm). Les ménages n'achètent que des maisons :
+  /// sans cela, un immeuble saisi resterait vide et sans entretien. Sans types de bâtiments, il n'y a pas d'immeuble.
+  void _landlordPurchases() {
+    final offers = [for (final b in buildings) if (b.done && b.listedDay != null && b.units > 1 && b.ownerKind == 2) b];
+    if (offers.isEmpty) return;
+    final p = params;
+    final park = <int, int>{};
+    for (final b in buildings) {
+      if (b.ownerKind == 0) park[b.ownerId!] = (park[b.ownerId!] ?? 0) + b.units;
+    }
+    final landlords = [for (final f in firms) if (f.type == 'immobilier') f];
+    final short = {
+      for (final f in landlords) f.id: (f.demandEma['logement'] ?? 0.0) / p.landlordBuildAbove - (park[f.id] ?? 0)
+    };
+    stableSort<Building>(offers, (a, b) => askPrice(a).compareTo(askPrice(b)));
+    for (final b in offers) {
+      final price = askPrice(b);
+      if (!(price > 0)) continue;
+      final loan = modules.credit ? quantize(price * p.ltvFirm) : 0.0;
+      Firm? buyer;
+      var most = 0.0;
+      for (final f in landlords) {
+        final s = short[f.id]!;
+        if (s < 1 || s <= most) continue;
+        if (f.money - 3 * f.wage * f.workers.length < price - loan) continue;
+        if (loan > 0 && !_firmMayBorrow(f, loan)) continue;
+        buyer = f;
+        most = s;
+      }
+      if (buyer == null) continue;
+      _sellToFirm(b, buyer, price, loan);
+      short[buyer.id] = short[buyer.id]! - b.units;
+    }
+  }
+
+  /// Vente d'un bâtiment saisi à un bailleur : la Caisse prête la part [loan] (nouvelle hypothèque), le produit rembourse
+  /// l'ancienne hypothèque, le surplus va à l'ancien propriétaire ou à l'État, le solde non couvert est radié.
+  void _sellToFirm(Building b, Firm f, double price, double loan) {
+    final p = params;
+    final old = mortgageOf(b);
+    final gain = price - b.basis;
+    b.mortgageId = null; // celui du bâtiment sera la nouvelle hypothèque
+    if (loan > 0) _originate(f, 0, f.id, b, loan, mortgageRate(p.ltvFirm), p.mortgageTermFirm);
+    final applied = old != null ? _repayMortgage(old, f, price) : 0.0;
+    final rest = price - applied;
+    if (rest > 0) {
+      final payee = b.payee != null ? _cmap[b.payee] : null;
+      transfer(f, payee ?? state, rest);
+    }
+    if (old != null) {
+      if (old.principal > eps) {
+        _writeOffMortgage(old, 'vente à perte d’un immeuble saisi');
+      } else {
+        _dropMortgage(old);
+      }
+    }
+    f.reinvest = math.max(0.0, f.reinvest - price);
+    b.ownerKind = 0;
+    b.ownerId = f.id;
+    b.payee = null;
+    b.listedDay = null;
+    b.basis = price;
+    bstats.sales++;
+    bstats.bought++;
+    if (gain >= 0) {
+      bstats.gains += gain;
+    } else {
+      bstats.losses -= gain;
+    }
+    _flow('B', f.id.toString(), '\$logements', 1, price);
+    if (trace != null) {
+      _t('compta', 'vente_logement', f.name, f.id, 'marché des logements', 'rachat d’un immeuble saisi', price,
+          '${b.units} logements, hypothèque ${fmtMoney0(loan)}');
+    }
+  }
+
   // ------------------------------------------------------------------ chantiers
 
   /// Un bailleur peut-il financer un tirage hypothécaire ? Crédit actif, pas d'interdit, versements sous 35 % de sa valeur
@@ -631,35 +855,67 @@ extension SimBuildings on Sim {
     return true;
   }
 
-  /// Un nouveau chantier de logement pour ce bailleur (aucun module posé).
-  Building newSite(Firm f) {
-    final b = Building(_nextBuildingId++, 0, f.id, day);
+  /// Un nouveau chantier pour ce bailleur (aucun module posé), d'un type de buildingKinds ou, sans type, d'un logement
+  /// standard.
+  Building newSite(Firm f, [int? type]) {
+    final b = Building(_nextBuildingId++, 0, f.id, day, type);
     buildings.add(b);
     _bmap[b.id] = b;
     return b;
   }
 
-  /// Un bailleur dont la demande dépasse son parc (chantiers compris) lance un chantier ; chaque chantier achète un module
-  /// de construction par jour, financé en partie par un tirage hypothécaire.
+  /// Type du chantier qu'un bailleur lance (Params.buildingTypes) quand il lui manque [short] logements : le plus grand
+  /// duplex ou immeuble qui ne dépasse pas ce manque et dont il peut payer sa part ([cash] au-delà de sa réserve couvre un
+  /// jour et demi de chantier et la part du coût que la Caisse ne prête pas) ; à défaut, une maison (petite, moyenne ou
+  /// grande au hasard : 35, 45 et 20 %) s'il peut en payer un jour et demi de chantier ; sinon null.
+  int? _siteType(Firm f, int short, double cash) {
+    final p = params;
+    final mc = moduleCost();
+    for (var t = buildingKinds.length - 1; t >= 3; t--) {
+      final bt = buildingKinds[t];
+      if (bt.units > short) continue;
+      final cost = (bt.size * p.dwellingModules).round() * mc;
+      if (cash >= 1.5 * bt.crew * mc && cash >= (1 - p.ltvFirm) * cost) return t;
+    }
+    if (cash < 1.5 * mc) return null;
+    final u = draw(Flux.logement, f.id, 14);
+    return u < 0.35 ? 0 : (u < 0.8 ? 1 : 2);
+  }
+
+  /// Un bailleur dont la demande dépasse son parc (chantiers compris) lance un chantier ; chaque chantier achète ses
+  /// modules de construction (un par jour, ou la cadence de son type), financés en partie par un tirage hypothécaire.
   void _construction() {
     final p = params;
     for (final f in firms) {
       if (f.type != 'immobilier') continue;
       final mine = [for (final b in buildings) if (b.ownerKind == 0 && b.ownerId == f.id) b];
       final sites = [for (final b in mine) if (!b.done) b];
-      final units = mine.length - sites.length;
+      var units = 0, siteUnits = 0; // logements terminés et en chantier
+      for (final b in mine) {
+        if (b.done) {
+          units += b.units;
+        } else {
+          siteUnits += b.units;
+        }
+      }
       final demand = f.demandEma['logement'] ?? 0.0;
       final reserve = 3 * f.wage * f.workers.length;
-      if (sites.length < 2 && day >= 5 && f.workers.isNotEmpty && demand > p.landlordBuildAbove * (units + sites.length) &&
-          f.money - reserve >= 1.5 * moduleCost()) {
-        sites.add(newSite(f));
+      if (sites.length < 2 && day >= 5 && f.workers.isNotEmpty && demand > p.landlordBuildAbove * (units + siteUnits)) {
+        if (!p.buildingTypes) {
+          if (f.money - reserve >= 1.5 * moduleCost()) sites.add(newSite(f));
+        } else {
+          final short = (demand / p.landlordBuildAbove).ceil() - (units + siteUnits);
+          final t = _siteType(f, short, f.money - reserve);
+          if (t != null) sites.add(newSite(f, t));
+        }
       }
       for (final b in sites) {
         final budget = f.money - 3 * f.wage * f.workers.length;
         if (budget <= 0) continue;
-        final r = buy(f, f.id.toString(), 'batiment', 1, budget, true);
+        final q = b.type == null ? 1 : math.min(buildingKinds[b.type!].crew, modulesOf(b) - b.modules);
+        final r = buy(f, f.id.toString(), 'batiment', q.toDouble(), budget, true);
         if (r.qty < 1) continue;
-        b.modules++;
+        b.modules += r.qty.round();
         b.basis += r.spent;
         f.reinvest = math.max(0.0, f.reinvest - r.spent);
         var m = mortgageOf(b);
@@ -671,13 +927,14 @@ extension SimBuildings on Sim {
             _draw(m, f, d);
           }
         }
-        if (b.modules >= p.dwellingModules) {
+        if (b.modules >= modulesOf(b)) {
           b.done = true;
           b.cond = 1;
           bstats.built++;
           if (m != null) m.payment = quantize(_annuity(m.principal, m.rate / 365, m.termLeft));
           if (trace != null) {
-            _t('compta', 'chantier_termine', f.name, f.id, 'construction', 'logement terminé', b.basis, 'bâtiment ${b.id}');
+            _t('compta', 'chantier_termine', f.name, f.id, 'construction',
+                b.type == null ? 'logement terminé' : '${buildingKinds[b.type!].name} terminé', b.basis, 'bâtiment ${b.id}');
           }
         }
       }
@@ -695,11 +952,61 @@ extension SimBuildings on Sim {
       for (final m in mortgages) {
         if (m.borrowerKind == 0 && m.borrowerId == f.id) interest += m.principal * (m.rate / 365);
       }
-      var n = 0;
+      var load = 0.0; // logements standards
       for (final b in buildings) {
-        if (b.ownerKind == 0 && b.ownerId == f.id && b.done) n++;
+        if (b.ownerKind == 0 && b.ownerId == f.id && b.done) load += sizeOf(b);
       }
-      f.carry = interest + prov * n;
+      f.carry = interest + prov * load;
+    }
+  }
+
+  // ------------------------------------------------------------------ locataires des immeubles
+
+  /// Bâtiment où loue ce citoyen (Params.buildingTypes avec les baux), s'il tient encore : bail chez le propriétaire du
+  /// bâtiment, bâtiment habitable. Null sinon.
+  Building? dwellingOf(Citizen c) {
+    final id = c.dwellingId;
+    if (id == null || c.leaseFirm == null || c.homeId != null) return null;
+    final b = _bmap[id];
+    return b != null && b.habitable && b.ownerKind == 0 && b.ownerId == c.leaseFirm ? b : null;
+  }
+
+  /// Types de bâtiments avec les baux, en fin de journée : chaque locataire est rattaché à un logement de son bailleur. Un
+  /// rattachement qui tient est gardé (dwellingOf, et pas plus de locataires que de logements) ; les autres locataires
+  /// prennent le premier logement libre de leur bailleur, dans l'ordre du parc. Affichage seulement : rien d'autre dans le
+  /// moteur ne lit ce rattachement.
+  void _assignDwellings() {
+    final used = <int, int>{};
+    for (final c in citizens) {
+      if (c.dwellingId == null) continue;
+      final b = dwellingOf(c);
+      if (b == null || (used[b.id] ?? 0) >= b.units) {
+        c.dwellingId = null;
+        continue;
+      }
+      used[b.id] = (used[b.id] ?? 0) + 1;
+    }
+    Map<int, List<Building>>? free;
+    final next = <int, int>{};
+    for (final c in citizens) {
+      final lf = c.leaseFirm;
+      if (lf == null || c.homeId != null || c.dwellingId != null) continue;
+      if (free == null) {
+        free = {};
+        for (final b in buildings) {
+          if (b.ownerKind == 0 && b.habitable) (free[b.ownerId!] ??= <Building>[]).add(b);
+        }
+      }
+      final list = free[lf];
+      if (list == null) continue;
+      var i = next[lf] ?? 0;
+      while (i < list.length && (used[list[i].id] ?? 0) >= list[i].units) {
+        i++;
+      }
+      next[lf] = i;
+      if (i == list.length) continue;
+      c.dwellingId = list[i].id;
+      used[list[i].id] = (used[list[i].id] ?? 0) + 1;
     }
   }
 }
