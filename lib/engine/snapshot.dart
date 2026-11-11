@@ -124,6 +124,7 @@ Map<String, Object?> _paramsJson(Params p) => {
       'hireFlexBase': _d(p.hireFlexBase),
       'hireFlexMax': _d(p.hireFlexMax),
       'maxInterviews': p.maxInterviews,
+      if (p.directedSearch) 'directedSearch': true,
       'reviewDays': p.reviewDays,
       'reviewCutMax': _d(p.reviewCutMax),
       'seniorityStep': _d(p.seniorityStep),
@@ -320,6 +321,7 @@ Params _paramsFrom(Map j) => Params()
   ..hireFlexBase = _rdOr(j['hireFlexBase'], 0.05)
   ..hireFlexMax = _rdOr(j['hireFlexMax'], 0.25)
   ..maxInterviews = (j['maxInterviews'] as int?) ?? 3
+  ..directedSearch = (j['directedSearch'] as bool?) ?? false
   ..reviewDays = (j['reviewDays'] as int?) ?? 90
   ..reviewCutMax = _rdOr(j['reviewCutMax'], 1)
   ..seniorityStep = _rdOr(j['seniorityStep'], 0.015)

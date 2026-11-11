@@ -666,6 +666,15 @@ class Params {
   double hireFlexMax = 0.25;
   // Candidats reçus par poste et par jour avant de renoncer à ce rôle pour la journée.
   int maxInterviews = 3;
+  // Candidature ciblée (directedSearch, 2026-11-11, anomalie N18) : un chômeur ne se présente qu'aux postes dont le
+  // plafond couvre son salaire de réserve (recherche dirigée, Moen 1997) ; parmi eux, l'entreprise reçoit le moins
+  // surqualifié. Sans elle, les entrevues vont au moins surqualifié quel que soit son salaire de réserve : à 2 500
+  // citoyens sans Produits, la tête de file est faite de professionnels tout juste licenciés qui demandent 1,25 fois le
+  // plafond, l'entreprise renonce après maxInterviews refus (≈ 200 refus/j pour 25 embauches) alors que 75 % des
+  // chômeurs, au plancher de leur prestation, accepteraient ; ses postes restent vacants, son offre monte, salaires et
+  // prix suivent, et le chômage atteint 55 % (8 graines × 3 000 j). Coupée dans le moteur (référence), active dans
+  // l'interface.
+  bool directedSearch = false;
   // Renouvellement du contrat tous les reviewDays jours depuis l'embauche (contrats échelonnés, Taylor 1980) : le
   // salaire est renégocié à l'offre du rôle majorée de seniorityStep par année d'ancienneté (au plus seniorityCap).
   // Hausse gelée si l'entreprise perd de l'argent. Baisse : au plus reviewCutMax du salaire (1 : retour au taux du

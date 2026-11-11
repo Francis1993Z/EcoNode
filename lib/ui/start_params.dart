@@ -58,6 +58,7 @@ Params freshParams(Params start, int population) {
     ..planFromHouseholds = start.planFromHouseholds
     ..spreadHealth = start.spreadHealth
     ..planWorkforce = start.planWorkforce
+    ..planFreshSolve = start.planFreshSolve
     ..ownersAtStart = start.ownersAtStart;
   for (final d in startParamDefs) {
     d.set(n, d.get(start));
@@ -133,12 +134,18 @@ class StartParamsEditor extends StatelessWidget {
             'tout le monde locataire, d’où une flambée des prix et des salaires les premiers mois (et une vague d’achats '
             'à crédit avec le marché immobilier).',
             style: TextStyle(fontSize: 11)),
-        value: p.walletAtTarget && p.planFromHouseholds && p.spreadHealth && p.planWorkforce && p.ownersAtStart,
+        value: p.walletAtTarget &&
+            p.planFromHouseholds &&
+            p.spreadHealth &&
+            p.planWorkforce &&
+            p.planFreshSolve &&
+            p.ownersAtStart,
         onChanged: (v) {
           p.walletAtTarget = v;
           p.planFromHouseholds = v;
           p.spreadHealth = v;
           p.planWorkforce = v;
+          p.planFreshSolve = v;
           p.ownersAtStart = v;
           onChanged();
         },
@@ -166,6 +173,7 @@ class StartParamsEditor extends StatelessWidget {
           p.planFromHouseholds = true;
           p.spreadHealth = true;
           p.planWorkforce = true;
+          p.planFreshSolve = true;
           p.ownersAtStart = true;
           p.reservePerCitizen = 2000; // banques : dotation réaliste (anomalie N4)
           onChanged();

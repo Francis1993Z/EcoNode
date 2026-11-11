@@ -397,6 +397,8 @@ void applyParam(Params p, String k, String v) {
       p.hireFlexMax = double.parse(v);
     case 'maxInterviews':
       p.maxInterviews = int.parse(v);
+    case 'directedSearch': // candidature ciblée : seuls se présentent les chômeurs que le plafond couvre (N18)
+      p.directedSearch = b();
     case 'reviewDays':
       p.reviewDays = int.parse(v);
     case 'reviewCutMax':
