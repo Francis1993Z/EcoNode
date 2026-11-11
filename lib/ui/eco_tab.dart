@@ -315,6 +315,7 @@ class _ModelTabState extends State<ModelTab> {
             hint: 'Avec entretien ; sans entretien, l’usure est 2,5 fois plus rapide.',
             onChanged: (v) => upd(() => p.depreciation = v)),
       ]),
+      _hiringSection(context, ctrl, upd),
       _entrepreneurSection(context, ctrl, upd),
       _productsSection(context, ctrl, upd),
       _creditSection(context, ctrl, upd),
@@ -381,6 +382,34 @@ class _ModelTabState extends State<ModelTab> {
 
 
 /// Entrepreneuriat des citoyens : l'interrupteur du module, ses réglages et ce qu'il produit.
+/// Candidature ciblée (Params.directedSearch, anomalie N18, MODELE.md § 6.16).
+Widget _hiringSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final p = sim.params;
+  return Section('Embauche', [
+    Text(
+        'Une entreprise qui a un poste ouvert reçoit des chômeurs en entrevue, le moins surqualifié d’abord, au plus trois '
+        'par jour. Un candidat refuse si son salaire de réserve (son dernier salaire, qui baisse avec la durée du chômage, '
+        'jamais sous sa prestation) dépasse le plafond de l’employeur. Avec la candidature ciblée, un chômeur ne se présente '
+        'qu’aux postes dont le plafond couvre son salaire de réserve : l’entrevue aboutit.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Candidature ciblée', style: TextStyle(fontSize: 13)),
+      subtitle: Text(
+          'Prend effet au prochain jour. Coupée : à 2 500 citoyens sans le module Produits, des licenciés récents trop '
+          'chers occupent la tête de file (≈ 200 refus par jour), les postes restent vacants, offres et prix montent et le '
+          'chômage atteint 55 % (anomalie N18).'
+          '${sim.modules.jobs ? '' : ' Sans effet tant que le module « ${Modules.labels['jobs']} » est coupé.'}',
+          style: const TextStyle(fontSize: 11)),
+      value: p.directedSearch,
+      onChanged: (v) => upd(() => p.directedSearch = v),
+    ),
+  ]);
+}
+
 Widget _entrepreneurSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
   final pal = Pal.of(context);
   final sim = ctrl.sim;

@@ -32,7 +32,7 @@ Réglages par défaut aujourd'hui :
 | `healthWearIfDeprived` | coupée | coupée (décision du 1er novembre : usure continue) |
 | `jointCostBySales` (coproduits) | coupé | **actif** depuis le 1er novembre (section « Fixation des prix ») |
 | `planFreshSolve` (plan de départ sans mémoire) | coupé | **actif** depuis le 11 novembre, fusionné dans `main` (démarrage à l'équilibre) |
-| `directedSearch` (candidature ciblée) | coupée | **active** depuis le 11 novembre, fusionné dans `main` (sans interrupteur à l'écran) |
+| `directedSearch` (candidature ciblée) | coupée | **active** depuis le 11 novembre, fusionné dans `main` (onglet Modèle, section « Embauche ») |
 | `excessCashDays` (réserve gardée avant de verser l'excédent) | 60 j | **20 j** depuis le 11 novembre, fusionné dans `main` (curseur de l'excédent de trésorerie) |
 
 ## 1. Anomalies d'origine (A1 à A9)

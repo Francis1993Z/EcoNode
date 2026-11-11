@@ -1100,7 +1100,8 @@ les offres, alors que le modèle de base ne retrouve l'emploi qu'en baissant tou
 (21 %) ; renouvellement annuel, 15 % ; trimestriel, 12 %. Résultat de décision (30 graines × 1 500 jours, avec
 filets) : chômage médian 10,2 % contre 7,0 % sans le module ; sans filets, 10,8 % contre 8,0 %.
 
-**Candidature ciblée (`directedSearch`, 2026-11-11, anomalie N18).** Coupée dans le moteur, active dans l'interface.
+**Candidature ciblée (`directedSearch`, 2026-11-11, anomalie N18).** Coupée dans le moteur, active dans l'interface
+(interrupteur de l'onglet Modèle, section « Embauche »).
 Sans elle, à 2 500 citoyens sans Produits, l'embauche se bouche : la tête de file (le moins surqualifié) est faite de
 professionnels tout juste licenciés dont le salaire de réserve vaut 1,25 fois le plafond ; l'entreprise renonce après
 `maxInterviews` refus (≈ 200 refus par jour pour 20 à 30 embauches), alors que 75 % des chômeurs, au plancher de leur
