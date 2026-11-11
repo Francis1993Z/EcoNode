@@ -666,6 +666,16 @@ class Params {
   double hireFlexMax = 0.25;
   // Candidats reçus par poste et par jour avant de renoncer à ce rôle pour la journée.
   int maxInterviews = 3;
+  // Candidature ciblée (directedSearch, 2026-11-11, anomalie N18) : un chômeur ne se présente qu'aux postes dont le
+  // plafond couvre son salaire de réserve (recherche dirigée, Moen 1997) ; parmi eux, l'entreprise reçoit le moins
+  // surqualifié. Sans elle, les entrevues vont au moins surqualifié quel que soit son salaire de réserve : à 2 500
+  // citoyens sans Produits, la tête de file est faite de professionnels tout juste licenciés qui demandent 1,25 fois le
+  // plafond, l'entreprise renonce après maxInterviews refus (≈ 200 refus/j pour 25 embauches) alors que 75 % des
+  // chômeurs, au plancher de leur prestation, accepteraient ; ses postes restent vacants, son offre monte, salaires et
+  // prix suivent, et le chômage atteint 55 % (8 graines × 3 000 j). Avec elle (réglages de l'interface, 10 graines
+  // appariées × 3 000 j, rapports/n6-n18.md) : chômage des jours 2 501-3 000 54,5 → 5,0 %, plus aucun refus ; avec
+  // Produits, 8,4 → 6,6 %. Coupée dans le moteur (référence), active dans l'interface.
+  bool directedSearch = false;
   // Renouvellement du contrat tous les reviewDays jours depuis l'embauche (contrats échelonnés, Taylor 1980) : le
   // salaire est renégocié à l'offre du rôle majorée de seniorityStep par année d'ancienneté (au plus seniorityCap).
   // Hausse gelée si l'entreprise perd de l'argent. Baisse : au plus reviewCutMax du salaire (1 : retour au taux du
@@ -801,6 +811,9 @@ class Params {
   // fonds de réinvestissement, en reverse chaque jour la part excessCashRate de l'excédent à son propriétaire (imposée comme
   // un dividende). Sans elle, l'argent d'une vente de logements financée par hypothèque reste dans la caisse du bailleur :
   // ce n'est pas un bénéfice, le dividende (I1) ne le distribue pas, et les ménages s'appauvrissent en remboursant.
+  // L'interface garde 20 jours (2026-11-11, anomalie N6) : avec 60, le capital apporté par les ménages (fondations,
+  // renflouements) restait entre la réserve du dividende (8 jours) et ce seuil, et prix et salaires baissaient
+  // (inflation des jours 500 à 1 500 −10,2 → −1,2 %/an à 240 citoyens, 10 graines ; rapports/n6-n18.md).
   bool excessCashReturn = false;
   double excessCashDays = 60;
   double excessCashRate = 0.02;
@@ -908,6 +921,14 @@ class Params {
   // l'arrondi des équipes (≈ 0,3 employé par entreprise : effectif voulu = ⌈lots / productivité − 0,2⌉) dans son objectif
   // de 94 % d'emploi. Sinon, dès le premier jour, les entreprises veulent ≈ 104 % de la population active.
   bool planWorkforce = false;
+  // Plan sans mémoire (planFreshSolve, 2026-11-10, anomalie N18) : chaque essai d'échelle du plan de départ (recherche
+  // de la part discrétionnaire qui emploie 94 % de la population) repart des prix, effectifs et machines par employé
+  // initiaux, au lieu de partir de l'essai précédent. Sinon, avec le panier mesuré (planFromHouseholds), le premier essai
+  // (part nulle : le logement seul, 20 à 60 employés pour 2 500 citoyens) peut faire exploser le prix des machines
+  // (≈ 740 000 $) ; plus aucune entreprise n'en veut, cet état se transmet aux essais suivants et l'économie de départ
+  // naît sans machines, sans Machinerie, mine de fer, fonderie ni garage (toutes les graines à 2 500 citoyens sans le
+  // module Produits, certaines avec).
+  bool planFreshSolve = false;
   // Baux (leases, 2026-11-01, anomalies A6 et N11) : un locataire garde son logement tant qu'il paie le loyer affiché de
   // son bailleur, chaque jour, sans passer par le stock de nuitées ; le personnel du bailleur ne produit plus que les
   // nuitées des nouveaux baux (louer sur le marché ouvre un bail chez ce bailleur). Le bail prend fin si le loyer devient

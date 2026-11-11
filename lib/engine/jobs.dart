@@ -16,7 +16,9 @@ part of 'sim.dart';
 //  3. rondes d'embauche : à chaque ronde, chaque entreprise qui a des postes ouverts pourvoit le prochain poste de son
 //     organigramme (méthode D'Hondt), la mieux payante d'abord. Promotion interne d'abord (l'employé le plus ancien d'un
 //     rôle moins payé qui a la qualification et l'ancienneté voulues) ; sinon, entrevues avec les chômeurs admissibles,
-//     le moins surqualifié d'abord, au plus maxInterviews. L'offre du rôle est le milieu d'une fourchette de ± hireRange.
+//     le moins surqualifié d'abord, au plus maxInterviews (avec directedSearch, seuls se présentent ceux dont le salaire
+//     de réserve tient sous le plafond de l'employeur : candidature ciblée). L'offre du rôle est le milieu d'une
+//     fourchette de ± hireRange.
 //     Négociation : plancher = max(bas de la fourchette, salaire de réserve), plafond = haut de la fourchette majoré
 //     d'une souplesse et du bonus de qualification, borné par la valeur ajoutée par employé ; si le plancher dépasse le
 //     plafond, le candidat refuse ; sinon salaire = plancher + β × (plafond − plancher) ;
@@ -226,13 +228,14 @@ extension SimJobs on Sim {
     }
   }
 
-  /// Candidat admissible le moins surqualifié, hors [skip] (le premier dans l'ordre du jour, à égalité).
-  Citizen? _pickCandidate(List<Citizen> pool, double req, Set<int> skip) {
+  /// Candidat admissible le moins surqualifié, hors [skip] (le premier dans l'ordre du jour, à égalité) ; avec [fits],
+  /// seulement parmi ceux qui s'y présentent.
+  Citizen? _pickCandidate(List<Citizen> pool, double req, Set<int> skip, [bool Function(Citizen)? fits]) {
     Citizen? best;
     for (var i = pool.length - 1; i >= 0; i--) {
       final c = pool[i];
       if (c.skill + eps < req || skip.contains(c.id)) continue;
-      if (best == null || c.skill <= best.skill) best = c;
+      if ((best == null || c.skill <= best.skill) && (fits == null || fits(c))) best = c;
     }
     return best;
   }
@@ -267,8 +270,10 @@ extension SimJobs on Sim {
     final p = params;
     final role = roles[f.type]![r];
     final offer = roleOffer(f, r);
+    // candidature ciblée (N18) : seuls se présentent les chômeurs dont le salaire de réserve tient sous le plafond
+    final fits = p.directedSearch ? (Citizen c) => reservationWage(c) <= wageCap(f, r, c, va) + 1e-9 : null;
     for (var k = 0; k < p.maxInterviews; k++) {
-      final c = _pickCandidate(unemployed, role.minSkill, refused);
+      final c = _pickCandidate(unemployed, role.minSkill, refused, fits);
       if (c == null) return false;
       final res = reservationWage(c);
       final cap = wageCap(f, r, c, va);

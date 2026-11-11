@@ -89,6 +89,8 @@ class SimController extends ChangeNotifier {
               ..revival = true // renaissance des filières éteintes (MODELE.md § 6.22)
               ..revivalPlannedDemand = true // demande dérivée comptée au plan de l'aval : moins de relances vouées à l'échec
               ..excessCashReturn = true // excédent de trésorerie reversé aux propriétaires (dérive N16, rapports/anomalies)
+              ..excessCashDays = 20 // au-delà de 20 jours de coûts : le capital apporté revient aux ménages (déflation N6)
+              ..directedSearch = true // candidature ciblée : l'embauche ne se bouche plus de candidats trop chers (N18)
               ..publicImports = true // hôpital : importations de secours de ses intrants (anomalie A1)
               ..stateBorrowing = true // l'État emprunte plutôt que de couper l'enveloppe de l'hôpital (anomalie A1)
               ..normalUtil = 0.5 // prix au coût normal : plus de prix aberrants (anomalie A7)
@@ -104,6 +106,7 @@ class SimController extends ChangeNotifier {
               ..planFromHouseholds = true
               ..spreadHealth = true
               ..planWorkforce = true
+              ..planFreshSolve = true // plan de départ : la Machinerie et ses fournisseurs ne disparaissent plus (N18)
               ..ownersAtStart = true
               ..reservePerCitizen = 2000, // banques : dotation réaliste (voir startParams)
             modules: Modules()
@@ -232,6 +235,7 @@ class SimController extends ChangeNotifier {
     ..planFromHouseholds = true
     ..spreadHealth = true
     ..planWorkforce = true
+    ..planFreshSolve = true // plan de départ sans mémoire entre ses essais (N18)
     ..ownersAtStart = true // propriétaires de départ, logement payé (vague d'achats du démarrage, N4)
     ..reservePerCitizen = 2000; // banques : dotation réaliste (≈ 3 fois le capital qu'exigent les prêts, anomalie N4)
 
@@ -247,6 +251,8 @@ class SimController extends ChangeNotifier {
           ..revival = true // renaissance des filières : voir le constructeur
           ..revivalPlannedDemand = true
           ..excessCashReturn = true
+          ..excessCashDays = 20
+          ..directedSearch = true
           ..publicImports = true
           ..stateBorrowing = true
           ..normalUtil = 0.5

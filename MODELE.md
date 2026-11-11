@@ -348,6 +348,14 @@ graine ne compte plus. Il sert aux cas extrêmes (`test/extremes_test.dart`) et 
   occuper ce monde-là, l'échelle est réduite.
 - **Seconde passe.** Avec la pénalité d'échelle minimale, machines figées. Sinon, des machines chères font disparaître
   la demande de machines, et la machinerie avec.
+- **Plan sans mémoire (`planFreshSolve`, 2026-11-11, anomalie N18).** Coupé dans le moteur, actif dans l'interface (avec
+  le démarrage à l'équilibre). Chaque essai de la dichotomie sur λ repart des prix, des lots et des machines de
+  départ. Sinon, avec `planFromHouseholds`, l'essai à λ = 0 (le logement seul, quelques dizaines d'employés) laisse un
+  prix des machines d'≈ 740 000 $ : plus aucune entreprise n'en veut, cet état passe aux essais suivants, et l'économie
+  naît sans machines, ni Machinerie, mine de fer, fonderie ou garage. Mesure (`tool/plan_depart.dart`, réglages de
+  l'interface, 30 graines) : Produits coupé, 30 graines sur 30 à 1 000, 2 500 et 5 000 citoyens ; Produits actif, 3 sur
+  30 à 1 000 et 2 500, 30 sur 30 à 5 000 ; jamais à 240. Avec le réglage, aucune (≈ 4 240 machines au jour 50 à 2 500
+  citoyens sans Produits, contre 0).
 
 Justification : partir d'un état cohérent, où l'offre égale la demande estimée et où presque tout le monde travaille,
 pour que la dynamique observée soit celle des règles et non un artefact de démarrage.
@@ -423,6 +431,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `hireRange` | 0,10 | `jobs` : fourchette salariale ± 10 % autour de l'offre du rôle | choix de jeu ; mesuré (§ 6.16) |
 | `hireFlexBase`, `hireFlexMax` | 0,05, 0,25 | `jobs` : souplesse du plafond de l'employeur, selon les postes vacants et la demande non servie | choix de jeu |
 | `maxInterviews` | 3 | `jobs` : candidats reçus par poste et par jour | choix de jeu |
+| `directedSearch` | non (**oui** dans l'interface) | `jobs` : candidature ciblée, seuls se présentent les chômeurs dont le salaire de réserve tient sous le plafond de l'employeur | recherche dirigée (Moen 1997) ; mesure § 6.16 (anomalie N18) |
 | `reviewDays`, `reviewCutMax` | 90 j, 1 | `jobs` : renouvellement du contrat tous les 90 jours depuis l'embauche ; baisse permise jusqu'au taux du marché | contrats échelonnés (Taylor 1980) ; 90 jours : choix de jeu mesuré (§ 6.16) ; `reviewCutMax` = 0 : rigidité à la baisse (Bewley 1999) |
 | `seniorityStep`, `seniorityCap` | 1,5 %/an, 15 % | `jobs` : majoration d'ancienneté au renouvellement | choix de jeu |
 | `promotionRaise` | 0,05 | `jobs` : hausse minimale d'une promotion | choix de jeu |
@@ -446,7 +455,7 @@ règle au § 6.
 
 ### Démarrage à l'équilibre (anomalies N6 et A5)
 
-Quatre réglages, coupés par défaut dans le moteur, actifs dans l'interface (interrupteur « Démarrage à l'équilibre » de
+Six réglages, coupés par défaut dans le moteur, actifs dans l'interface (interrupteur « Démarrage à l'équilibre » de
 l'écran de départ, paramètres de départ seulement) :
 
 - `walletAtTarget` : chaque ménage démarre à la cible de sa fonction de consommation, coussin + (1 − α₁) / α₂ × (revenu −
@@ -464,6 +473,8 @@ l'écran de départ, paramètres de départ seulement) :
 - `planWorkforce` : le plan compte chaque employé à son efficacité d'équilibre (facteur santé 0,4 + 0,6 × 0,875) et
   réserve l'arrondi des équipes (≈ 0,3 employé par entreprise) dans son objectif de 94 % d'emploi ; sinon, dès le premier
   jour, les entreprises veulent ≈ 104 % de la population active.
+- `planFreshSolve` (2026-11-11) : chaque essai d'échelle du plan repart des valeurs initiales ; sinon, au-delà de 1 000
+  citoyens, l'économie naît souvent sans machines (§ 5.2, anomalie N18).
 - `ownersAtStart` (2026-11-01, avec le module Bâtiments) : chaque citoyen qui veut posséder et a un emploi commence
   propriétaire-occupant, d'un logement du parc des bailleurs entièrement payé (`_seedOwners`) ; ≈ 70 % des citoyens.
   Sinon tout le monde commence locataire et 70 % des ménages achètent à crédit en 500 jours : ces hypothèques (≈ 50 M$
@@ -484,7 +495,9 @@ Sans ces réglages, le marché du travail est saturé dès les premiers jours (c
 240 citoyens, 10 graines : 1,44 → 1,05 ; 2 500 citoyens, 5 graines : 1,52 → 1,16. Sur 3 000 jours à 240 citoyens,
 inflation annuelle moyenne +4 % (jours 100-500), −8,9 % (500-1 500 : un creux de déflation qui existait déjà, −7 %),
 +2,1 % (1 500-3 000) ; chômage des 500 derniers jours 4,9 %. À 2 500 citoyens, chômage des jours 1 001-1 500
-9,1 → 6,6 %.
+9,1 → 6,6 %. Le creux de déflation des jours 500 à 1 500 venait du capital apporté aux entreprises, qui ne revenait
+jamais aux ménages : corrigé le 2026-11-11 par une réserve de 20 jours au lieu de 60 pour l'excédent de trésorerie
+(§ 6.11, anomalie N6).
 
 ## 6. Sous-modèles
 
@@ -877,6 +890,15 @@ Choix de jeu : c'est le débouché de la filière informatique.
     2501-3000) : chômage 13,2 → 6,9 %, ménages qui gardent leur argent. À 240 citoyens : 14,1 → 12,3 %, effet mêlé, et
     plus d'inflation (indice des prix médian ≈ 2,3 → 3,3 en 3 000 j). Bâtiments × Banques à 240 citoyens : chômage
     75 → 11 % (`rapports/stabilisation.md`).
+  - **Réserve de 20 jours dans l'interface** (2026-11-11, anomalie N6 ; 60 dans le moteur). Le capital que les ménages
+    apportent aux entreprises (fondations, renflouements : 400 à 600 $/j à 240 citoyens) restait entre la réserve du
+    dividende (8 jours de coûts) et celle de l'excédent : ni bénéfice, que le dividende distribuerait, ni excédent. En
+    1 000 jours, la trésorerie des entreprises entre ces deux réserves passait de 316 à 586 k$, l'argent des ménages
+    de 479 à 290 k$ ; salaires et prix baissaient ensemble (creux de déflation des jours 500 à 1 500, indice 1,14 →
+    0,80). Mesure (réglages de l'interface, 240 citoyens, 10 graines appariées × 3 000 j, avec la candidature ciblée
+    et le plan sans mémoire, `rapports/n6-n18.md`) : inflation des jours 500 à 1 500 −10,2 → −1,2 %/an (Produits
+    actif ; 9 graines sur 10) et −10,5 → 0,0 %/an (Produits coupé ; 10 sur 10) ; indice moyen des jours 1 001-1 500
+    0,81 → 1,09 ; argent des ménages au jour 3 000 242 → 376 k$ ; chômage des jours 2 501-3 000 5,0 → 3,9 %.
 - **Renflouement (filet).** Une entreprise privée qui a des clients et moins de 4 jours de salaires de l'équipe voulue
   reçoit de son propriétaire jusqu'à la moitié de son surplus, pour revenir à 10 jours. Un propriétaire sans moyens est
   remplacé par le citoyen le plus riche (rachat).
@@ -1049,6 +1071,8 @@ pour ses parties. Mesures et choix : [`rapports/emplois-negociation.md`](rapport
      le plus ancien d'un rôle moins payé qui a la qualification et l'ancienneté voulues ; il obtient max(+`promotionRaise`
      ; l'offre du rôle) et le poste qu'il libère se pourvoit à la ronde suivante. Sinon, entrevues (`_interview`) :
      les chômeurs admissibles, le moins surqualifié d'abord, dans l'ordre du flux `embauche`, au plus `maxInterviews`.
+     Avec `directedSearch` (candidature ciblée, active dans l'interface), seuls se présentent les chômeurs dont le
+     salaire de réserve tient sous le plafond de l'employeur (recherche dirigée, Moen 1997) : l'entrevue aboutit.
      Un rôle sans preneur est laissé pour la journée ; un rôle d'encadrement sans candidat interne aussi ;
   4. mobilité : un employé qui regarde ailleurs (flux `depart`, chance `jobSwitch`) reçoit la meilleure offre négociée
      d'un concurrent qui a un poste ouvert à sa portée (hors encadrement). Son employeur, s'il est rentable et a encore
@@ -1075,6 +1099,16 @@ de l'offre (24 %) ; sans renouvellement à la baisse, les contrats ne descendent
 les offres, alors que le modèle de base ne retrouve l'emploi qu'en baissant tous les salaires, d'environ 40 % par an
 (21 %) ; renouvellement annuel, 15 % ; trimestriel, 12 %. Résultat de décision (30 graines × 1 500 jours, avec
 filets) : chômage médian 10,2 % contre 7,0 % sans le module ; sans filets, 10,8 % contre 8,0 %.
+
+**Candidature ciblée (`directedSearch`, 2026-11-11, anomalie N18).** Coupée dans le moteur, active dans l'interface.
+Sans elle, à 2 500 citoyens sans Produits, l'embauche se bouche : la tête de file (le moins surqualifié) est faite de
+professionnels tout juste licenciés dont le salaire de réserve vaut 1,25 fois le plafond ; l'entreprise renonce après
+`maxInterviews` refus (≈ 200 refus par jour pour 20 à 30 embauches), alors que 75 % des chômeurs, au plancher de leur
+prestation, accepteraient. Ses postes restent vacants, son offre monte, salaires et prix suivent (indice × 4 en
+3 000 j) et le chômage atteint 55 %. Mesure (réglages de l'interface, 10 graines appariées × 3 000 j, avec le plan sans
+mémoire et la réserve de 20 jours, `rapports/n6-n18.md`) : 2 500 citoyens sans Produits, chômage des jours 2 501-3 000
+54,5 → 5,0 % (10 graines sur 10 ; la candidature ciblée seule : 3,9 %), indice final 4,36 → 1,07, plus aucun refus ;
+avec Produits, 8,4 → 6,6 % (7 sur 10 ; pire graine 13,8 → 10,3 %), indice +0,06 ; à 240 citoyens, 5,0 → 3,9 %.
 
 ### 6.17 Entrepreneuriat des citoyens (module `entrepreneurship`, `entrepreneuriat.dart`)
 

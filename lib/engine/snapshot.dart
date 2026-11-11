@@ -124,6 +124,7 @@ Map<String, Object?> _paramsJson(Params p) => {
       'hireFlexBase': _d(p.hireFlexBase),
       'hireFlexMax': _d(p.hireFlexMax),
       'maxInterviews': p.maxInterviews,
+      if (p.directedSearch) 'directedSearch': true,
       'reviewDays': p.reviewDays,
       'reviewCutMax': _d(p.reviewCutMax),
       'seniorityStep': _d(p.seniorityStep),
@@ -211,6 +212,7 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.planFromHouseholds != d.planFromHouseholds) 'planFromHouseholds': p.planFromHouseholds,
     if (p.spreadHealth != d.spreadHealth) 'spreadHealth': p.spreadHealth,
     if (p.planWorkforce != d.planWorkforce) 'planWorkforce': p.planWorkforce,
+    if (p.planFreshSolve != d.planFreshSolve) 'planFreshSolve': p.planFreshSolve,
     if (p.leases != d.leases) 'leases': p.leases,
     if (p.equalBanks != d.equalBanks) 'equalBanks': p.equalBanks,
     if (p.purchaseLoans != d.purchaseLoans) 'purchaseLoans': p.purchaseLoans,
@@ -319,6 +321,7 @@ Params _paramsFrom(Map j) => Params()
   ..hireFlexBase = _rdOr(j['hireFlexBase'], 0.05)
   ..hireFlexMax = _rdOr(j['hireFlexMax'], 0.25)
   ..maxInterviews = (j['maxInterviews'] as int?) ?? 3
+  ..directedSearch = (j['directedSearch'] as bool?) ?? false
   ..reviewDays = (j['reviewDays'] as int?) ?? 90
   ..reviewCutMax = _rdOr(j['reviewCutMax'], 1)
   ..seniorityStep = _rdOr(j['seniorityStep'], 0.015)
@@ -403,6 +406,7 @@ Params _paramsFrom(Map j) => Params()
   ..planFromHouseholds = (j['planFromHouseholds'] as bool?) ?? false
   ..spreadHealth = (j['spreadHealth'] as bool?) ?? false
   ..planWorkforce = (j['planWorkforce'] as bool?) ?? false
+  ..planFreshSolve = (j['planFreshSolve'] as bool?) ?? false
   ..leases = (j['leases'] as bool?) ?? false
   ..equalBanks = (j['equalBanks'] as bool?) ?? false
   ..purchaseLoans = (j['purchaseLoans'] as bool?) ?? false
