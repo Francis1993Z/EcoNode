@@ -908,6 +908,14 @@ class Params {
   // l'arrondi des équipes (≈ 0,3 employé par entreprise : effectif voulu = ⌈lots / productivité − 0,2⌉) dans son objectif
   // de 94 % d'emploi. Sinon, dès le premier jour, les entreprises veulent ≈ 104 % de la population active.
   bool planWorkforce = false;
+  // Plan sans mémoire (planFreshSolve, 2026-11-10, anomalie N18) : chaque essai d'échelle du plan de départ (recherche
+  // de la part discrétionnaire qui emploie 94 % de la population) repart des prix, effectifs et machines par employé
+  // initiaux, au lieu de partir de l'essai précédent. Sinon, avec le panier mesuré (planFromHouseholds), le premier essai
+  // (part nulle : le logement seul, 20 à 60 employés pour 2 500 citoyens) peut faire exploser le prix des machines
+  // (≈ 740 000 $) ; plus aucune entreprise n'en veut, cet état se transmet aux essais suivants et l'économie de départ
+  // naît sans machines, sans Machinerie, mine de fer, fonderie ni garage (toutes les graines à 2 500 citoyens sans le
+  // module Produits, certaines avec).
+  bool planFreshSolve = false;
   // Baux (leases, 2026-11-01, anomalies A6 et N11) : un locataire garde son logement tant qu'il paie le loyer affiché de
   // son bailleur, chaque jour, sans passer par le stock de nuitées ; le personnel du bailleur ne produit plus que les
   // nuitées des nouveaux baux (louer sur le marché ouvre un bail chez ce bailleur). Le bail prend fin si le loyer devient

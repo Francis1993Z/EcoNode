@@ -320,6 +320,8 @@ void applyParam(Params p, String k, String v) {
       p.leases = b();
     case 'planWorkforce': // plan de départ : efficacité d'équilibre et arrondi des équipes (N6)
       p.planWorkforce = b();
+    case 'planFreshSolve': // plan de départ : chaque essai d'échelle repart des valeurs initiales (N18)
+      p.planFreshSolve = b();
     case 'spreadHealth': // santé de départ étalée sur le cycle usure-consultation (N6)
       p.spreadHealth = b();
     case 'planFromHouseholds': // plan de départ dimensionné sur le panier mesuré des ménages (N6)

@@ -1131,6 +1131,19 @@ class Sim {
     var scaled = false;
 
     void solve(double lambda) {
+      if (p.planFreshSolve && !scaled) {
+        // chaque essai d'échelle repart des valeurs initiales (N18) : sinon l'essai à λ = 0 (avec le panier mesuré, le
+        // logement seul) laisse un prix des machines exorbitant, plus aucune entreprise n'en veut, et l'économie de départ
+        // naît sans machines, sans Machinerie, mine de fer, fonderie ni garage
+        for (final g in goods.keys) {
+          price[g] = goods[g]!.guess;
+        }
+        for (final t in types) {
+          b[t] = 1.0;
+          w[t] = 1.0;
+          k[t] = m.capital ? 0.5 * templates[t]!.capital : 0.0;
+        }
+      }
       for (var it = 0; it < 80; it++) {
         final d = <String, double>{
           for (final g in goods.keys)

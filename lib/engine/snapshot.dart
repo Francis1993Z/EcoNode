@@ -211,6 +211,7 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.planFromHouseholds != d.planFromHouseholds) 'planFromHouseholds': p.planFromHouseholds,
     if (p.spreadHealth != d.spreadHealth) 'spreadHealth': p.spreadHealth,
     if (p.planWorkforce != d.planWorkforce) 'planWorkforce': p.planWorkforce,
+    if (p.planFreshSolve != d.planFreshSolve) 'planFreshSolve': p.planFreshSolve,
     if (p.leases != d.leases) 'leases': p.leases,
     if (p.equalBanks != d.equalBanks) 'equalBanks': p.equalBanks,
     if (p.purchaseLoans != d.purchaseLoans) 'purchaseLoans': p.purchaseLoans,
@@ -403,6 +404,7 @@ Params _paramsFrom(Map j) => Params()
   ..planFromHouseholds = (j['planFromHouseholds'] as bool?) ?? false
   ..spreadHealth = (j['spreadHealth'] as bool?) ?? false
   ..planWorkforce = (j['planWorkforce'] as bool?) ?? false
+  ..planFreshSolve = (j['planFreshSolve'] as bool?) ?? false
   ..leases = (j['leases'] as bool?) ?? false
   ..equalBanks = (j['equalBanks'] as bool?) ?? false
   ..purchaseLoans = (j['purchaseLoans'] as bool?) ?? false
