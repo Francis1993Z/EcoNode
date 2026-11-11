@@ -31,9 +31,9 @@ Réglages par défaut aujourd'hui :
 | `equalBanks`, `purchaseLoans` (banques à égalité, prêt d'achat fidèle) ; `reservePerCitizen` | coupés ; 100 000 $ | **actifs** depuis le 1er novembre ; **2 000 $** (onglet Modèle, sections Banques et Crédit) |
 | `healthWearIfDeprived` | coupée | coupée (décision du 1er novembre : usure continue) |
 | `jointCostBySales` (coproduits) | coupé | **actif** depuis le 1er novembre (section « Fixation des prix ») |
-| `planFreshSolve` (plan de départ sans mémoire) | coupé | **actif** depuis le 11 novembre, branche `fix/n6-n18` (démarrage à l'équilibre) |
-| `directedSearch` (candidature ciblée) | coupée | **active** depuis le 11 novembre, branche `fix/n6-n18` (sans interrupteur à l'écran) |
-| `excessCashDays` (réserve gardée avant de verser l'excédent) | 60 j | **20 j** depuis le 11 novembre, branche `fix/n6-n18` (curseur de l'excédent de trésorerie) |
+| `planFreshSolve` (plan de départ sans mémoire) | coupé | **actif** depuis le 11 novembre, fusionné dans `main` (démarrage à l'équilibre) |
+| `directedSearch` (candidature ciblée) | coupée | **active** depuis le 11 novembre, fusionné dans `main` (sans interrupteur à l'écran) |
+| `excessCashDays` (réserve gardée avant de verser l'excédent) | 60 j | **20 j** depuis le 11 novembre, fusionné dans `main` (curseur de l'excédent de trésorerie) |
 
 ## 1. Anomalies d'origine (A1 à A9)
 
@@ -101,8 +101,8 @@ Réglages par défaut aujourd'hui :
 
 ## 6. Décisions de Francis en attente
 
-1. Module Produits : N1 et N2 traités ; N16 en grande partie (rachats répartis) : reste la concentration chez le propriétaire d'une entreprise dominante et le plafond d'achats des plus riches ; N18 traité le 11 novembre (plan sans mémoire, candidature ciblée ; branche `fix/n6-n18`, à fusionner).
-2. ~~Creux de déflation des jours 500 à 1 500 (N6)~~ : traité le 11 novembre (réserve de l'excédent à 20 jours dans l'interface ; branche `fix/n6-n18`, à fusionner). Reste la hausse des prix des 250 premiers jours. (Le paradoxe A7 à 2 500 citoyens est résolu : c'était l'échantillon.)
+1. Module Produits : N1 et N2 traités ; N16 en grande partie (rachats répartis) : reste la concentration chez le propriétaire d'une entreprise dominante et le plafond d'achats des plus riches ; N18 traité le 11 novembre (plan sans mémoire, candidature ciblée ; branche `fix/n6-n18`, fusionnée dans `main` le 11 novembre).
+2. ~~Creux de déflation des jours 500 à 1 500 (N6)~~ : traité le 11 novembre (réserve de l'excédent à 20 jours dans l'interface ; branche `fix/n6-n18`, fusionnée dans `main` le 11 novembre). Reste la hausse des prix des 250 premiers jours. (Le paradoxe A7 à 2 500 citoyens est résolu : c'était l'échantillon.)
 3. N4 (Bâtiments × Banques) : traité (banques à égalité, dotation réaliste, prêt d'achat fidèle, propriétaires de départ) ; restent, avec Bâtiments, une hausse des prix d'≈ 50 % les 250 premiers jours et, sans baux, l'hyperinflation (prix × 40).
 4. ~~`healthWearIfDeprived` (A1) et répartition des coûts des coproduits (A3)~~ : réglés le 1er novembre (usure continue conservée ; coproduits sur ce qui se vend).
 5. Bâtiments : les sans-abri sont traités (baux, A6) ; reste le calibrage (prix d'un logement ≈ 90 jours de salaire).
