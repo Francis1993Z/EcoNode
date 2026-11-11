@@ -672,8 +672,9 @@ class Params {
   // citoyens sans Produits, la tête de file est faite de professionnels tout juste licenciés qui demandent 1,25 fois le
   // plafond, l'entreprise renonce après maxInterviews refus (≈ 200 refus/j pour 25 embauches) alors que 75 % des
   // chômeurs, au plancher de leur prestation, accepteraient ; ses postes restent vacants, son offre monte, salaires et
-  // prix suivent, et le chômage atteint 55 % (8 graines × 3 000 j). Coupée dans le moteur (référence), active dans
-  // l'interface.
+  // prix suivent, et le chômage atteint 55 % (8 graines × 3 000 j). Avec elle (réglages de l'interface, 10 graines
+  // appariées × 3 000 j, rapports/n6-n18.md) : chômage des jours 2 501-3 000 54,5 → 5,0 %, plus aucun refus ; avec
+  // Produits, 8,4 → 6,6 %. Coupée dans le moteur (référence), active dans l'interface.
   bool directedSearch = false;
   // Renouvellement du contrat tous les reviewDays jours depuis l'embauche (contrats échelonnés, Taylor 1980) : le
   // salaire est renégocié à l'offre du rôle majorée de seniorityStep par année d'ancienneté (au plus seniorityCap).
@@ -810,6 +811,9 @@ class Params {
   // fonds de réinvestissement, en reverse chaque jour la part excessCashRate de l'excédent à son propriétaire (imposée comme
   // un dividende). Sans elle, l'argent d'une vente de logements financée par hypothèque reste dans la caisse du bailleur :
   // ce n'est pas un bénéfice, le dividende (I1) ne le distribue pas, et les ménages s'appauvrissent en remboursant.
+  // L'interface garde 20 jours (2026-11-11, anomalie N6) : avec 60, le capital apporté par les ménages (fondations,
+  // renflouements) restait entre la réserve du dividende (8 jours) et ce seuil, et prix et salaires baissaient
+  // (inflation des jours 500 à 1 500 −10,2 → −1,2 %/an à 240 citoyens, 10 graines ; rapports/n6-n18.md).
   bool excessCashReturn = false;
   double excessCashDays = 60;
   double excessCashRate = 0.02;
