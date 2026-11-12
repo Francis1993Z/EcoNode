@@ -80,7 +80,7 @@ void main() {
     expect(lines.map((e) => e['categorie']).toSet().difference(traceCategories.toSet()), isEmpty);
     expect(series.toString().split('\n').where((l) => l.isNotEmpty).length, 251); // en-tête + 250 jours
     final header = series.toString().split('\n').first.split(',');
-    expect(header.length, Tracer.seriesColumns.length);
+    expect(header.length, tr.seriesColumns.length);
     expect(tr.agentsCsv().split('\n').where((l) => l.isNotEmpty).length, traced.citizens.length + 1);
   });
 

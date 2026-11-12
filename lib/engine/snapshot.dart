@@ -218,6 +218,9 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.purchaseLoans != d.purchaseLoans) 'purchaseLoans': p.purchaseLoans,
     if (p.ownersAtStart != d.ownersAtStart) 'ownersAtStart': p.ownersAtStart,
     if (p.buildingTypes != d.buildingTypes) 'buildingTypes': p.buildingTypes,
+    if (p.renoTrigger != d.renoTrigger) 'renoTrigger': _d(p.renoTrigger),
+    if (p.renoShare != d.renoShare) 'renoShare': _d(p.renoShare),
+    if (p.renoArtisans != d.renoArtisans) 'renoArtisans': p.renoArtisans,
     if (p.cheapestHouse != d.cheapestHouse) 'cheapestHouse': p.cheapestHouse,
     if (p.jointCostBySales != d.jointCostBySales) 'jointCostBySales': p.jointCostBySales,
     if (p.spreadTakeovers != d.spreadTakeovers) 'spreadTakeovers': p.spreadTakeovers,
@@ -412,6 +415,9 @@ Params _paramsFrom(Map j) => Params()
   ..purchaseLoans = (j['purchaseLoans'] as bool?) ?? false
   ..ownersAtStart = (j['ownersAtStart'] as bool?) ?? false
   ..buildingTypes = (j['buildingTypes'] as bool?) ?? false
+  ..renoTrigger = _rdOr(j['renoTrigger'], 0.6)
+  ..renoShare = _rdOr(j['renoShare'], 0.6)
+  ..renoArtisans = (j['renoArtisans'] as bool?) ?? false
   ..cheapestHouse = (j['cheapestHouse'] as bool?) ?? false
   ..jointCostBySales = (j['jointCostBySales'] as bool?) ?? false
   ..spreadTakeovers = (j['spreadTakeovers'] as bool?) ?? false
@@ -965,18 +971,20 @@ int _fnv(String t) {
 
 List<Object?> _buildingJson(Building b) => [
       b.id, b.ownerKind, b.ownerId, b.payee, b.modules, b.done, _d(b.cond), _d(b.basis), b.mortgageId, b.listedDay, b.builtDay,
-      if (b.type != null) b.type, // Params.buildingTypes : rang dans buildingKinds
+      if (b.type != null || b.renoLeft != 0) b.type, // Params.buildingTypes : rang dans buildingKinds (null : sans type)
+      if (b.renoLeft != 0) b.renoLeft, // Modules.renovation : modules de rénovation restants
     ];
 
 Building _buildingFrom(List j) =>
-    Building(j[0] as int, j[1] as int, j[2] as int?, j[10] as int, j.length > 11 ? j[11] as int : null)
+    Building(j[0] as int, j[1] as int, j[2] as int?, j[10] as int, j.length > 11 ? j[11] as int? : null)
   ..payee = j[3] as int?
   ..modules = j[4] as int
   ..done = j[5] as bool
   ..cond = _rd(j[6])
   ..basis = _rd(j[7])
   ..mortgageId = j[8] as int?
-  ..listedDay = j[9] as int?;
+  ..listedDay = j[9] as int?
+  ..renoLeft = j.length > 12 ? j[12] as int : 0;
 
 List<Object?> _mortgageJson(Mortgage m) => [
       m.id, m.buildingId, m.borrowerKind, m.borrowerId, _d(m.principal), _d(m.rate), m.termLeft, _d(m.payment), m.missed, m.since,
@@ -1001,6 +1009,7 @@ extension SimSnapshot on Sim {
           _d(bstats.gains), _d(bstats.losses), _d(bstats.priceEma),
           if (bstats.bought != 0) bstats.bought, // Params.buildingTypes : immeubles saisis rachetés par un bailleur
         ],
+        if (renovationActive) 'renovation': [bstats.renovated, _d(bstats.renoSpent)], // Modules.renovation
         'list': [for (final b in buildings) _buildingJson(b)],
         'mortgages': [for (final m in mortgages) _mortgageJson(m)],
       };
@@ -1168,6 +1177,7 @@ extension SimSnapshot on Sim {
     for (final e in (j['modules'] as Map).entries) {
       modules.set(e.key as String, e.value as bool);
     }
+    _setKeys();
     safeguards = _safeguardsFrom(j['safeguards'] as Map);
     _nextCitizenId = j['nextCitizenId'] as int;
     _firmSeq
@@ -1367,6 +1377,10 @@ extension SimSnapshot on Sim {
         ..losses = _rd(st[7])
         ..priceEma = _rd(st[8])
         ..bought = st.length > 9 ? st[9] as int : 0;
+      final rs = bj['renovation'] as List?;
+      bstats
+        ..renovated = rs != null ? rs[0] as int : 0
+        ..renoSpent = rs != null ? _rd(rs[1]) : 0.0;
       buildings.addAll([for (final b in bj['list'] as List) _buildingFrom(b as List)]);
       for (final b in buildings) {
         _bmap[b.id] = b;

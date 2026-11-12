@@ -1,9 +1,10 @@
 // Dérive longue (anomalie N16), lecture seule : relevé tous les 250 jours d'une partie aux réglages de l'interface.
 //
 //   dart run tool/derive.dart graine population jours [--produits 0|1] [--batiments 0|1] [--banques 0|1]
-//        [--filets 0|1] [--sortie fichier] [--param nom=valeur,...]
+//        [--filets 0|1] [--renovation 0|1] [--sortie fichier] [--param nom=valeur,...]
 //
 // --filets : filets de sécurité actifs (1, défaut) ou tous coupés (0).
+// --renovation : module « Rénovation et métiers du bâtiment » (suppose --batiments 1).
 // --sortie : les lignes vont dans ce fichier (ajoutées à la fin), écrites sur le disque à chaque relevé : une partie
 //            coupée en route (arrêt du serveur) garde tous ses relevés. Sans elle, sur la sortie standard.
 //
@@ -25,7 +26,7 @@ String f2(double v) => v.toStringAsFixed(2);
 void main(List<String> a) {
   final seed = int.parse(a[0]), pop = int.parse(a[1]), days = int.parse(a[2]);
   final p = parametresInterface(pop);
-  var produits = true, batiments = false, banques = false, filets = true;
+  var produits = true, batiments = false, banques = false, filets = true, renovation = false;
   String? fichier;
   for (var i = 3; i < a.length; i++) {
     switch (a[i]) {
@@ -37,6 +38,8 @@ void main(List<String> a) {
         banques = a[++i] == '1';
       case '--filets':
         filets = a[++i] == '1';
+      case '--renovation':
+        renovation = a[++i] == '1';
       case '--sortie':
         fichier = a[++i];
       case '--param':
@@ -54,7 +57,8 @@ void main(List<String> a) {
         ..entrepreneurship = true
         ..products = produits
         ..buildings = batiments
-        ..banking = banques,
+        ..banking = banques
+        ..renovation = renovation,
       safeguards: filets ? Safeguards() : Safeguards.none());
   final sortie = fichier == null ? null : File(fichier).openSync(mode: FileMode.writeOnlyAppend);
   void emit(String ligne) {
@@ -141,6 +145,21 @@ void main(List<String> a) {
           'gini': h.gini,
           'pib': h.gdp,
           'population': h.pop,
+          // parc : état moyen des bâtiments terminés, inhabitables, rénovations en cours et terminées, chantiers terminés
+          'etatParc': s.buildings.where((b) => b.done).fold(0.0, (x, b) => x + b.cond) /
+              s.buildings.where((b) => b.done).length.clamp(1, 1 << 30),
+          'inhabitables': s.buildings.where((b) => b.done && !b.habitable).length,
+          'enRenovation': s.buildings.where((b) => b.renoLeft > 0).length,
+          'renovees': s.bstats.renovated,
+          'depensesReno': s.bstats.renoSpent,
+          'construits': s.bstats.built,
+          'prixModule': s.bestPrice('batiment'),
+          // employés de la construction par type (module renovation : métiers et fournisseurs ; sinon la Construction)
+          'construction': {
+            for (final ty in [...renovationTypes, 'construction'])
+              if (s.firms.any((f) => f.type == ty))
+                ty: s.firms.where((f) => f.type == ty).fold(0, (x, f) => x + f.workers.length),
+          },
           'secondes': chrono.elapsedMilliseconds / 1000,
         })}');
     u = ipc = sal = 0;

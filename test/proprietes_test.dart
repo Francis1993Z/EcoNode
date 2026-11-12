@@ -63,7 +63,9 @@ class Case {
           final a = between(-2000, 5000);
           shocks.add((day, (s) => s.godMoney(const Target('allCitizens'), a), 'argent $a'));
         case 1:
-          final g = goods.keys.elementAt(pick(0, goods.length - 1));
+          // les biens d'avant le module renovation (à la fin de la table) : les cas restent ceux d'avant lui
+          final before = [for (final g in goods.keys) if (!renovationGoods.contains(g)) g];
+          final g = before[pick(0, before.length - 1)];
           final pct = between(0.3, 1);
           shocks.add((day, (s) => s.godDestroy(g, pct), 'stocks de $g ×${1 - pct}'));
         case 2:

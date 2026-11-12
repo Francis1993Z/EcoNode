@@ -145,7 +145,7 @@ extension Douane on Sim {
   void _updateTradeFactors() {
     final p = params;
     var gi = 0;
-    for (final g in goods.keys) {
+    for (final g in goodKeys) {
       gi++;
       final (phase, period, amp) = tradeWaveOf(gi);
       var t = day / period + phase;

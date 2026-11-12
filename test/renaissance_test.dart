@@ -43,7 +43,7 @@ void main() {
       s.step();
     }
     expect(s.importEma, isEmpty);
-    for (final g in goods.keys) {
+    for (final g in s.goodKeys) {
       expect(s.revivalWant(g), 0, reason: g);
     }
   });
@@ -54,7 +54,7 @@ void main() {
       s.step();
     }
     expect(s.importEma, isNotEmpty);
-    for (final g in goods.keys) {
+    for (final g in s.goodKeys) {
       if (s.hasActiveProducer(g)) expect(s.revivalWant(g), 0, reason: g);
     }
   });
@@ -75,7 +75,7 @@ void main() {
     for (var d = 0; d < 300; d++) {
       s.step();
     }
-    for (final ty in templates.keys) {
+    for (final ty in s.typeKeys) {
       expect(s.revivalCostRefusal(ty, 1, 1, 100, 100, 0, 0, 0), isNull, reason: ty);
     }
   });
@@ -94,7 +94,7 @@ void main() {
     for (var d = 0; d < 400; d++) {
       s.step();
       if (d % 20 != 0) continue;
-      for (final g in goods.keys) {
+      for (final g in s.goodKeys) {
         s.params.revivalPlannedDemand = false;
         final crew = s.derivedWant(g);
         s.params.revivalPlannedDemand = true;

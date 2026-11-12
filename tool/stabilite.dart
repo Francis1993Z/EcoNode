@@ -399,6 +399,12 @@ void applyParam(Params p, String k, String v) {
       p.maxInterviews = int.parse(v);
     case 'directedSearch': // candidature ciblée : seuls se présentent les chômeurs que le plafond couvre (N18)
       p.directedSearch = b();
+    case 'renoTrigger': // module renovation : état sous lequel un propriétaire rénove
+      p.renoTrigger = double.parse(v);
+    case 'renoShare': // module renovation : part des modules du neuf que coûte une remise à neuf
+      p.renoShare = double.parse(v);
+    case 'renoArtisans': // module renovation : artisans à temps partiel plutôt qu'à l'échelle minimale
+      p.renoArtisans = b();
     case 'reviewDays':
       p.reviewDays = int.parse(v);
     case 'reviewCutMax':
@@ -620,7 +626,7 @@ void observe(Sim s, RunStats r, int warmup) {
       c[2] += e.value.length;
       c[3] += 1;
     }
-    for (final g in goods.keys) {
+    for (final g in s.goodKeys) {
       final u = r.unmetSum[g] ??= [0, 0];
       u[0] += s.unmet[g] ?? 0;
       u[1] += s.marketStats[g]?.qty ?? 0;

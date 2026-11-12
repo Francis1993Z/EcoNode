@@ -55,7 +55,26 @@ const Map<String, Good> goods = {
   'logement': Good('Logement', 'nuitée', true, 40, 'tertiaire'),
   // Module de construction (module « buildings ») : un logement en demande Params.dwellingModules. Ni importé ni exporté.
   'batiment': Good('Construction (module)', 'module', false, 1800, 'secondaire', tradable: false),
+  // Module « renovation » : matériaux et heures des métiers du bâtiment. Ajoutés après la référence du moteur : sans le
+  // module, aucune boucle du moteur ne les voit (Sim.goodKeys).
+  'planches': Good('Planches', 'paquet', false, 30, 'secondaire'),
+  'briques': Good('Briques', 'palette', false, 60, 'secondaire'),
+  'tuyaux': Good('Tuyaux', 'longueur', false, 20, 'secondaire'),
+  'fils': Good('Fils électriques', 'rouleau', false, 40, 'secondaire'),
+  'fusibles': Good('Fusibles', 'boîte', false, 25, 'secondaire'),
+  'charpente': Good('Charpenterie', 'heure', true, 60, 'secondaire'),
+  'electricite': Good('Électricité du bâtiment', 'heure', true, 70, 'secondaire'),
+  'plomberie': Good('Plomberie', 'heure', true, 70, 'secondaire'),
 };
+
+/// Biens du module « renovation » (matériaux et heures des métiers du bâtiment).
+const Set<String> renovationGoods = {
+  'planches', 'briques', 'tuyaux', 'fils', 'fusibles', 'charpente', 'electricite', 'plomberie',
+};
+
+/// Heures des métiers qui font l'entretien courant d'un bâtiment (module « renovation ») : part de chaque métier dans les
+/// Params.maintHoursPerDwelling heures par logement et par jour (choix de jeu).
+const Map<String, double> buildingCareShares = {'charpente': 0.4, 'plomberie': 0.3, 'electricite': 0.3};
 
 const List<String> sectors = ['primaire', 'secondaire', 'tertiaire'];
 const Map<String, String> sectorLabels = {'primaire': 'Primaire', 'secondaire': 'Secondaire', 'tertiaire': 'Tertiaire'};
@@ -265,6 +284,31 @@ const Map<String, Template> templates = {
   // en demande Params.dwellingModules (10 par défaut). Créée au départ seulement si le module est actif.
   'construction': Template('Construction', 'CO', 'secondaire', {'bois': 5, 'acier': 2}, {'batiment': 1}, 0.17,
       capital: 0.5, rnd: 'genie'),
+  // ---- module « renovation » : matériaux, métiers du bâtiment et entrepreneur général. Ajoutés après la référence du
+  // moteur : sans le module, ils ne sont jamais créés (Sim.typeKeys). Avec lui, l'entrepreneur général remplace la
+  // Construction : il vend les modules de chantier, pour le neuf comme pour la rénovation, et sous-traite aux métiers.
+  // Travail par module : ≈ 2 jours-personnes chez l'entrepreneur, ≈ 2,7 chez les métiers, ≈ 1,4 pour les matériaux, soit
+  // ≈ 6 comme la Construction (choix de jeu, rapports/renovation.md).
+  'scierie': Template('Scierie', 'SC', 'secondaire', {'bois': 1}, {'planches': 4}, 4, capital: 0.8),
+  'briqueterie': Template('Briqueterie', 'BR', 'secondaire', {'carburant': 0.1}, {'briques': 1}, 3, capital: 1.0),
+  'tuyauterie':
+      Template('Tuyauterie', 'TU', 'secondaire', {'cuivre': 0.05, 'plastique': 0.3}, {'tuyaux': 1}, 4, capital: 0.8),
+  'cablerie': Template('Câblerie', 'CB', 'secondaire', {'cuivre': 0.1, 'plastique': 0.1}, {'fils': 1}, 4, capital: 0.8),
+  'fusibles': Template('Fusibles', 'FS', 'secondaire', {'cuivre': 0.02, 'plastique': 0.05}, {'fusibles': 1}, 6,
+      skill: 1, capital: 0.8),
+  'charpentier': Template('Charpentier', 'CH', 'secondaire', {'planches': 0.5}, {'charpente': 1}, 6, capital: 0.3),
+  'electricien': Template('Électricien', 'ET', 'secondaire', {'fils': 0.2, 'fusibles': 0.1}, {'electricite': 1}, 6,
+      skill: 1, capital: 0.3),
+  'plombier':
+      Template('Plombier', 'PB', 'secondaire', {'tuyaux': 0.3}, {'plomberie': 1}, 6, skill: 1, capital: 0.3),
+  'entrepreneur': Template('Entrepreneur général', 'EG', 'secondaire',
+      {'briques': 3, 'charpente': 10, 'electricite': 3, 'plomberie': 3}, {'batiment': 1}, 0.5,
+      capital: 0.5, rnd: 'genie'),
+};
+
+/// Types d'entreprises du module « renovation ». Avec lui, l'entrepreneur général remplace la Construction.
+const Set<String> renovationTypes = {
+  'scierie', 'briqueterie', 'tuyauterie', 'cablerie', 'fusibles', 'charpentier', 'electricien', 'plombier', 'entrepreneur',
 };
 
 // ------------------------------------------------------------------ rôles en entreprise (module « jobs »)
@@ -457,6 +501,56 @@ const Map<String, List<Role>> roles = {
   'construction': [
     Role('Manœuvre de chantier', 0, 1.0, 0.50),
     Role('Spécialiste en charpente', 0.5, 1.12, 0.35),
+    Role('Chef de chantier', 1, 1.1, 0.15, minTenure: 365),
+  ],
+  // ---- module « renovation »
+  'scierie': [
+    Role('Manœuvre de scierie', 0, 1.0, 0.45),
+    Role('Opérateur(trice) de scie', 0.5, 1.1, 0.40),
+    Role('Contremaître de scierie', 1, 1.1, 0.15, minTenure: 365),
+  ],
+  'briqueterie': [
+    Role('Manœuvre de briqueterie', 0, 1.0, 0.50),
+    Role('Opérateur(trice) de four', 0.6, 1.1, 0.35),
+    Role('Contremaître de briqueterie', 1, 1.1, 0.15, minTenure: 365),
+  ],
+  'tuyauterie': [
+    Role('Manœuvre d’usine', 0, 1.0, 0.40),
+    Role('Opérateur(trice) d’extrudeuse', 0.5, 1.08, 0.40),
+    Role('Technicien(ne) de procédés', 1, 1.0, 0.10),
+    Role('Contremaître de production', 1, 1.15, 0.10, minTenure: 365),
+  ],
+  'cablerie': [
+    Role('Manœuvre d’usine', 0, 1.0, 0.40),
+    Role('Opérateur(trice) de tréfileuse', 0.5, 1.08, 0.40),
+    Role('Technicien(ne) de procédés', 1, 1.0, 0.10),
+    Role('Contremaître de production', 1, 1.15, 0.10, minTenure: 365),
+  ],
+  'fusibles': [
+    Role('Assembleur(se)', 0.3, 1.05, 0.35),
+    Role('Technicien(ne) en électrotechnique', 1, 1.0, 0.45),
+    Role('Contrôleur(se) de la qualité', 1, 1.05, 0.10),
+    Role('Responsable de la production', 1.5, 1.1, 0.10, minTenure: 365),
+  ],
+  'charpentier': [
+    Role('Apprenti(e) charpentier', 0, 1.0, 0.40),
+    Role('Charpentier-menuisier', 0.6, 1.12, 0.45),
+    Role('Chef d’équipe en charpenterie', 1, 1.1, 0.15, minTenure: 365),
+  ],
+  'electricien': [
+    Role('Apprenti(e) électricien(ne)', 0.5, 1.0, 0.35),
+    Role('Électricien(ne)', 1, 1.05, 0.50),
+    Role('Maître électricien(ne)', 1.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'plombier': [
+    Role('Apprenti(e) plombier', 0.5, 1.0, 0.35),
+    Role('Plombier(ère)', 1, 1.05, 0.50),
+    Role('Maître plombier', 1.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'entrepreneur': [
+    Role('Manœuvre de chantier', 0, 1.0, 0.45),
+    Role('Maçon(ne)', 0.6, 1.12, 0.35),
+    Role('Estimateur(trice)', 1, 1.0, 0.05),
     Role('Chef de chantier', 1, 1.1, 0.15, minTenure: 365),
   ],
 };
@@ -736,6 +830,18 @@ class Params {
   double landlordBuildAbove = 0.96;
   // Un ménage achète si son coût mensuel de propriétaire (versement + entretien) ne dépasse pas ce multiple du loyer.
   double buyRentRatio = 1.2;
+  // Rénovation (Modules.renovation, 2026-11-12) : sous l'état renoTrigger, le propriétaire rénove jusqu'à l'état neuf en
+  // achetant des modules de chantier à l'entrepreneur général ; remettre à neuf un bâtiment coûte renoShare des modules
+  // de sa construction (chaque module ajoute 1 / (renoShare × modules du bâtiment) à son état). À 0,6, un bâtiment
+  // entretenu (−1 %/an) se rénove tous les ≈ 40 ans pour ≈ 24 % du prix du neuf. Choix de jeu (rapports/renovation.md).
+  double renoTrigger = 0.6;
+  double renoShare = 0.6;
+  // Artisans à temps partiel (renoArtisans, avec Modules.renovation et partTime) : les métiers, l'entrepreneur général et
+  // leurs fournisseurs gardent la productivité de leur type et ne paient que les heures travaillées (au moins
+  // Sim.minHours), au lieu de naître à l'« échelle minimale » (productivité réduite à la taille de la demande). Neuf
+  // petites entreprises pour une demande d'environ un employé à 240 citoyens : à l'échelle minimale, le module coûte
+  // ≈ 11 800 $ au départ, contre ≈ 4 000 $ à temps partiel et ≈ 4 900 $ sans le module (rapports/renovation.md).
+  bool renoArtisans = false;
 
   // ---- Entrepreneuriat des citoyens (Modules.entrepreneurship). Aucune de ces valeurs n'est réglée sur une cible : ce sont
   // des ordres de grandeur a priori, exposés pour être changés. Repère (non visé) : au Canada, environ 10 % d'entrées et 9 %
@@ -1062,6 +1168,11 @@ class Modules {
   // Crédit aux citoyens (prêt personnel, carte de crédit, cote, faillite personnelle) et, à partir de deux banques,
   // concurrence bancaire (réserves, marché interbancaire, fondations et faillites de banques). Coupé par défaut.
   bool banking = false;
+  // Rénovation et métiers du bâtiment (suppose « buildings » ; réglé au départ d'une partie) : une chaîne de matériaux
+  // (scierie, briqueterie, tuyauterie, câblerie, fusibles), trois métiers (charpentier, électricien, plombier) et un
+  // entrepreneur général qui remplace la Construction. Les propriétaires rénovent un bâtiment usé en achetant des modules
+  // de chantier, et l'entretien courant passe aux métiers. Coupé par défaut (MODELE.md § 6.6).
+  bool renovation = false;
 
   Modules();
 
@@ -1088,12 +1199,12 @@ class Modules {
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
     'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation', 'bankruptcy', 'buildings', 'jobs',
-    'entrepreneurship', 'products', 'banking',
+    'entrepreneurship', 'products', 'banking', 'renovation',
   ];
 
   /// Modules apparus après la référence du moteur : ils n'apparaissent dans les instantanés, les empreintes et les
   /// synthèses que lorsqu'ils sont actifs.
-  static const List<String> lateKeys = ['entrepreneurship', 'products', 'banking'];
+  static const List<String> lateKeys = ['entrepreneurship', 'products', 'banking', 'renovation'];
 
   /// Les modules sous forme de table pour les instantanés et les empreintes. Un module apparu après la référence du moteur
   /// n'y figure que lorsqu'il est actif : coupé, la sérialisation est celle d'avant lui.
@@ -1122,6 +1233,7 @@ class Modules {
     'entrepreneurship': 'Entrepreneuriat des citoyens',
     'products': 'Variétés de produits et marques',
     'banking': 'Crédit aux citoyens et banques',
+    'renovation': 'Rénovation et métiers du bâtiment',
   };
 
   bool get(String k) {
@@ -1166,6 +1278,8 @@ class Modules {
         return products;
       case 'banking':
         return banking;
+      case 'renovation':
+        return renovation;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -1212,6 +1326,8 @@ class Modules {
         products = v;
       case 'banking':
         banking = v;
+      case 'renovation':
+        renovation = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -1486,6 +1602,20 @@ const List<ScenarioFirm> defaultScenario = [
   ScenarioFirm('ecole', 'Cégep du Nord'),
   ScenarioFirm('immobilier', 'Gestion Bédard'),
   ScenarioFirm('divertissement', 'Bar Le Trappeur'),
+];
+
+/// Module renovation : la chaîne des matériaux, les métiers et l'entrepreneur général, une entreprise de chaque, comme la
+/// Construction qu'ils remplacent (elle n'est pas répétée avec la population : le plan dimensionne leurs équipes).
+const List<ScenarioFirm> renovationScenario = [
+  ScenarioFirm('scierie', 'Scierie Ouellet'),
+  ScenarioFirm('briqueterie', 'Briqueterie Laprairie'),
+  ScenarioFirm('tuyauterie', 'Tuyaux Cloutier'),
+  ScenarioFirm('cablerie', 'Câbles Paquette'),
+  ScenarioFirm('fusibles', 'Fusibles Girard'),
+  ScenarioFirm('charpentier', 'Charpenterie Dubé'),
+  ScenarioFirm('electricien', 'Électricité Poirier'),
+  ScenarioFirm('plombier', 'Plomberie Fournier'),
+  ScenarioFirm('entrepreneur', 'Entreprise générale Pelletier'),
 ];
 
 const List<String> firstNames = [
@@ -1919,6 +2049,7 @@ class Building {
   int? listedDay; // jour de mise en vente (null : pas en vente)
   final int builtDay;
   int? type; // rang dans buildingKinds (Params.buildingTypes) ; null : logement standard
+  int renoLeft = 0; // modules de rénovation restant à poser (Modules.renovation) ; 0 : pas de rénovation en cours
   Building(this.id, this.ownerKind, this.ownerId, this.builtDay, [this.type]);
 
   /// Sous ce seuil d'état, le logement est inhabitable.

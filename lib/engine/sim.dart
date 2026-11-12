@@ -633,6 +633,14 @@ class Sim {
   /// Crédit et banques (module banking) : les banques (vide : la Caisse seule), totaux des prêts aux particuliers, pertes
   /// lissées, et caches du jour (dette pondérée au début de la consommation, crédit accordé depuis).
   bool bankingActive = false;
+  /// Rénovation et métiers du bâtiment (module renovation) : actif pour toute la partie si le module (et celui des
+  /// bâtiments) l'est au départ ; ses entreprises naissent avec le scénario. Biens et types d'entreprises en jeu : sans
+  /// le module, ses biens et ses types n'existent pas pour le moteur (ni prix, ni statistiques, ni création), et les
+  /// boucles parcourent exactement les biens et les types d'avant lui ; avec lui, l'entrepreneur général remplace la
+  /// Construction.
+  bool renovationActive = false;
+  List<String> goodKeys = const [];
+  List<String> typeKeys = const [];
   final List<Bank> banks = [];
   double consumerLent = 0;
   int stateBank = 0; // module banking : la banque de l'État (la Caisse ; Params.equalBanks : celle qui la reprend)
@@ -748,6 +756,17 @@ class Sim {
   static final Map<String, int> _goodIndex = {for (final (i, g) in goods.keys.indexed) g: i};
   static final Map<String, int> _typeIndex = {for (final (i, t) in templates.keys.indexed) t: i};
 
+  /// Biens et types d'entreprises en jeu dans cette partie (voir renovationActive). Les biens et les types du module
+  /// renovation sont à la fin des tables : coupé, l'ordre et les index des autres ne changent pas.
+  void _setKeys() {
+    renovationActive = modules.renovation && modules.buildings;
+    goodKeys = [for (final g in goods.keys) if (renovationActive || !renovationGoods.contains(g)) g];
+    typeKeys = [
+      for (final t in templates.keys)
+        if (renovationActive ? t != 'construction' : !renovationTypes.contains(t)) t,
+    ];
+  }
+
   /// Identifiant d'un compte acheteur pour les tirages : citoyen, entreprise, ou 0 pour l'État.
   int _accountId(Account a) => a is Citizen ? a.id : (a is Firm ? a.id : 0);
 
@@ -758,6 +777,7 @@ class Sim {
     this.params = params ?? Params();
     this.modules = modules ?? Modules();
     this.safeguards = safeguards ?? Safeguards();
+    _setKeys();
     day = 0;
     _nextCitizenId = 1;
     _firmSeq.clear();
@@ -850,7 +870,7 @@ class Sim {
     state = StateAccount(250.0 * p.population);
     bank = BankAccount(quantize(p.bankCapitalPerCitizen * p.population));
     bank.capital = bank.money;
-    for (final g in goods.keys) {
+    for (final g in goodKeys) {
       marketStats[g] = MarketStat();
     }
 
@@ -864,7 +884,13 @@ class Sim {
           ]),
     ];
     // module buildings : l'entreprise de construction fait partie du scénario ; elle n'est créée que si elle a une demande
-    if (this.modules.buildings && !full.any((s) => s.type == 'construction')) {
+    if (renovationActive) {
+      // module renovation : l'entrepreneur général et ses fournisseurs remplacent la Construction
+      full.removeWhere((s) => s.type == 'construction');
+      for (final s in renovationScenario) {
+        if (!full.any((x) => x.type == s.type)) full.add(s);
+      }
+    } else if (this.modules.buildings && !full.any((s) => s.type == 'construction')) {
       full.add(const ScenarioFirm('construction', 'Construction Pelletier'));
     }
     final perType = <String, int>{};
@@ -926,7 +952,7 @@ class Sim {
     for (final s in scen) {
       final f = _newFirm(s.type, s.name, 0, null, 0, 0, plan.price);
       // échelle minimale : si la demande n'occupe pas un employé à plein temps, la petite production est moins productive
-      f.rate = f.template.rate * _minScale(plan.workers[s.type]!, perType[s.type]!);
+      f.rate = _artisan(s.type) ? f.template.rate : f.template.rate * _minScale(plan.workers[s.type]!, perType[s.type]!);
       created.add(f);
     }
     // les postes les plus qualifiés d'abord, chacun pris par le candidat le moins surqualifié
@@ -976,7 +1002,7 @@ class Sim {
       }
       var inputCost = 0.0;
       for (final e in f.inputs.entries) {
-        f.inv[e.key] = batches * e.value * 5;
+        f.inv[e.key] = batches * e.value * (goods[e.key]!.perish ? 1 : 5);
         inputCost += batches * e.value * plan.price[e.key]!;
       }
       f.machines = (plan.machinesPerWorker[f.type]! * f.workers.length).roundToDouble();
@@ -1074,7 +1100,7 @@ class Sim {
   _Plan _plan(Params p, List<ScenarioFirm> scen, Map<String, int> count, {Map<String, double>? basket}) {
     final m = modules;
     final types = count.keys.toList();
-    final price = <String, double>{for (final g in goods.keys) g: goods[g]!.guess};
+    final price = <String, double>{for (final g in goodKeys) g: goods[g]!.guess};
     final pop = p.population.toDouble();
     final r = (p.policyPassThrough ? p.policyRate + p.policySpread : p.interestRate) / 365; // banque centrale
     final b = <String, double>{for (final t in types) t: 1.0};
@@ -1084,6 +1110,14 @@ class Sim {
     if (!m.health) basic.remove('soins');
     if (!m.education) basic.remove('cours');
     if (!m.buildings) basic.remove('batiment');
+    if (renovationActive) {
+      // module renovation : l'entretien courant du parc (≈ 1,06 logement par citoyen) en heures des métiers
+      for (final e in buildingCareShares.entries) {
+        basic[e.key] = 1.06 * p.maintHoursPerDwelling * e.value;
+      }
+    }
+    // besoins fixes du parc (module renovation) : jamais pris dans le panier mesuré, que les ménages ne paient qu'en partie
+    bool fixedNeed(String g) => renovationActive && (g == 'batiment' || buildingCareShares.containsKey(g));
 
     // effectifs réalistes (Params.planWorkforce) : efficacité d'équilibre des employés (facteur santé)
     final planEff = p.planWorkforce && m.health ? 0.4 + 0.6 * 0.875 : 1.0;
@@ -1135,7 +1169,7 @@ class Sim {
         // chaque essai d'échelle repart des valeurs initiales (N18) : sinon l'essai à λ = 0 (avec le panier mesuré, le
         // logement seul) laisse un prix des machines exorbitant, plus aucune entreprise n'en veut, et l'économie de départ
         // naît sans machines, sans Machinerie, mine de fer, fonderie ni garage
-        for (final g in goods.keys) {
+        for (final g in goodKeys) {
           price[g] = goods[g]!.guess;
         }
         for (final t in types) {
@@ -1146,12 +1180,12 @@ class Sim {
       }
       for (var it = 0; it < 80; it++) {
         final d = <String, double>{
-          for (final g in goods.keys)
+          for (final g in goodKeys)
             // panier mesuré des ménages ; le logement reste un besoin fixe, une nuit par personne : mesuré, il manquait
             // les propriétaires-occupants et les sans-abri de la partie provisoire, et l'échelle lambda le réduisait
             // (bailleurs sous-dimensionnés, jusqu'à 1 086 sans-abri au jour 1 à 2 500 citoyens avec bâtiments et banques)
             g: basket != null
-                ? pop * (basket.containsKey(g) && g != 'logement' ? lambda * basket[g]! : (basic[g] ?? 0))
+                ? pop * (basket.containsKey(g) && g != 'logement' && !fixedNeed(g) ? lambda * basket[g]! : (basic[g] ?? 0))
                 : pop * ((basic[g] ?? 0) + lambda * (_extraDemand[g] ?? 0)),
         };
         for (final ty in types) {
@@ -1190,7 +1224,8 @@ class Sim {
           final wage = m.jobs ? p.startWage * classWage[t.skill] * avgRoleRel(ty) : p.startWage * classWage[t.skill];
           if (!scaled) k[ty] = kStar(t, wage);
           final mach = k[ty]! * w[ty]!;
-          var cost = wage * staffShare(ty) / (perW(ty) * (scaled ? _minScale(w[ty]!, n) : 1.0));
+          final sc = !scaled ? 1.0 : (_artisan(ty) ? math.min(1.0, w[ty]! / n) / math.max(math.min(1.0, w[ty]! / n), minHours) : _minScale(w[ty]!, n));
+          var cost = wage * staffShare(ty) / (perW(ty) * sc);
           for (final e in t.inputs.entries) {
             cost += e.value * price[e.key]!;
           }
@@ -1250,6 +1285,11 @@ class Sim {
     solve(lambda);
     return _Plan(price, w, b, k, lambda, basket);
   }
+
+  /// Module renovation avec Params.renoArtisans : les métiers, l'entrepreneur général et leurs fournisseurs gardent la
+  /// productivité de leur type et travaillent à temps partiel (Params.partTime) au lieu de naître à l'échelle minimale.
+  bool _artisan(String ty) =>
+      renovationActive && params.renoArtisans && params.partTime && renovationTypes.contains(ty);
 
   /// Params.leases : part des nuits louées que le personnel d'un bailleur produit au départ (les nouveaux baux).
   static const double leaseStaffShare = 0.05;
@@ -1918,7 +1958,7 @@ class Sim {
     flows = {};
     unmet = {};
     householdSpend = 0;
-    for (final g in goods.keys) {
+    for (final g in goodKeys) {
       marketStats[g] = MarketStat();
     }
     for (final f in firms) {
@@ -1977,7 +2017,7 @@ class Sim {
     _quoteCache = null;
     _decide();
     _finance();
-    for (final g in goods.keys) {
+    for (final g in goodKeys) {
       unmetEma[g] = 0.9 * (unmetEma[g] ?? 0) + 0.1 * (unmet[g] ?? 0);
     }
     if (p.revival) _revivalEvening();
@@ -2612,7 +2652,8 @@ class Sim {
         final want = <String, double>{};
         var wantValue = 0.0;
         for (final e in f.inputs.entries) {
-          final target = plan * e.value * 5;
+          // une heure de sous-traitant (module renovation) ne se garde pas : un jour d'avance, pas cinq
+          final target = plan * e.value * (goods[e.key]!.perish ? 1 : 5);
           final deficit = target - (f.inv[e.key] ?? 0);
           if (deficit > eps) {
             want[e.key] = deficit;
@@ -2739,9 +2780,10 @@ class Sim {
       }
       c.hungerDays = c.sat['faim']! < 0.5 ? c.hungerDays + 1 : 0;
       // 2. se loger
-      // un propriétaire-occupant habite chez lui (module buildings) : pas de nuitée à payer
+      // un propriétaire-occupant habite chez lui (module buildings) : pas de nuitée à payer ; module renovation : si son
+      // logement est inhabitable, il loue ailleurs jusqu'à la fin de la rénovation
       // Params.leases : un locataire paie son loyer à son bailleur ; sans bail (ou bail perdu), il loue sur le marché
-      var rl = c.homeId != null
+      var rl = livesAtHome(c)
           ? const BuyResult(1, 0)
           : (p.leases && c.leaseFirm != null ? _payRent(c) : const BuyResult(0, 0));
       if (rl.qty < 1) {
@@ -2785,7 +2827,7 @@ class Sim {
       final id = c.leaseFirm;
       if (id == null) continue;
       final f = _fmap[id];
-      if (f == null || c.homeId != null || !f.outputs.containsKey('logement')) {
+      if (f == null || livesAtHome(c) || !f.outputs.containsKey('logement')) {
         c.leaseFirm = null;
         continue;
       }
@@ -3479,7 +3521,7 @@ class Sim {
     // Entonnoir (mesure) : les conditions sont lues dans un ordre qui permet de nommer la première qui manque ; la
     // décision est la même qu'avant (toutes les conditions sont requises, une seule création par jour).
     var created = false;
-    for (final ty in templates.keys) {
+    for (final ty in typeKeys) {
       final t = templates[ty]!;
       final g = t.outputs.keys.first;
       if (publicGood(g)) continue; // l'État fournit ce service : pas de concurrent privé
@@ -3578,7 +3620,7 @@ class Sim {
     final f = _newFirm(ty, '${t.label} ${founder.name.split(' ').last}', 0, founder.id, slot[0], slot[1]);
     // échelle minimale si la demande n'occupe pas un employé ; module products, catégorie différenciée : pas de fraction
     // d'employé, la variété doit faire vivre un employé entier
-    f.rate = (productsActive && isDifferentiated(g)) || hours ? t.rate : t.rate * _minScale(w, 1);
+    f.rate = (productsActive && isDifferentiated(g)) || hours || _artisan(ty) ? t.rate : t.rate * _minScale(w, 1);
     f.wage = wage;
     if (modules.jobs) {
       f.offer = marketOffer(t.skill);
@@ -4096,7 +4138,7 @@ class Sim {
       tech += f.techLevel;
     }
     final prices = <String, double>{};
-    for (final g in goods.keys) {
+    for (final g in goodKeys) {
       final ms = marketStats[g];
       // sans transaction aujourd'hui, on reprend le dernier prix observé (comme les instituts statistiques) :
       // un bien qui ne se vend pas ne fait pas bouger l'indice quand son vendeur ferme ou change d'affiche
