@@ -1271,7 +1271,10 @@ class _WorldView extends StatelessWidget {
       ctrl.touch();
     }
 
-    final traded = [for (final e in goods.entries) if (e.value.tradable && !e.value.perish) e];
+    final traded = [
+      for (final e in goods.entries)
+        if (e.value.tradable && !e.value.perish && sim.goodKeys.contains(e.key)) e,
+    ];
     TextStyle head() => TextStyle(color: pal.ink3, fontSize: 11);
     return ListView(padding: const EdgeInsets.all(12), children: [
       _title(context, 'Douane'),

@@ -952,7 +952,7 @@ class Sim {
     for (final s in scen) {
       final f = _newFirm(s.type, s.name, 0, null, 0, 0, plan.price);
       // échelle minimale : si la demande n'occupe pas un employé à plein temps, la petite production est moins productive
-      f.rate = _artisan(s.type) ? f.template.rate : f.template.rate * _minScale(plan.workers[s.type]!, perType[s.type]!);
+      f.rate = f.template.rate * _minScale(plan.workers[s.type]!, perType[s.type]!);
       created.add(f);
     }
     // les postes les plus qualifiés d'abord, chacun pris par le candidat le moins surqualifié
@@ -1224,8 +1224,7 @@ class Sim {
           final wage = m.jobs ? p.startWage * classWage[t.skill] * avgRoleRel(ty) : p.startWage * classWage[t.skill];
           if (!scaled) k[ty] = kStar(t, wage);
           final mach = k[ty]! * w[ty]!;
-          final sc = !scaled ? 1.0 : (_artisan(ty) ? math.min(1.0, w[ty]! / n) / math.max(math.min(1.0, w[ty]! / n), minHours) : _minScale(w[ty]!, n));
-          var cost = wage * staffShare(ty) / (perW(ty) * sc);
+          var cost = wage * staffShare(ty) / (perW(ty) * (scaled ? _minScale(w[ty]!, n) : 1.0));
           for (final e in t.inputs.entries) {
             cost += e.value * price[e.key]!;
           }
@@ -1285,11 +1284,6 @@ class Sim {
     solve(lambda);
     return _Plan(price, w, b, k, lambda, basket);
   }
-
-  /// Module renovation avec Params.renoArtisans : les métiers, l'entrepreneur général et leurs fournisseurs gardent la
-  /// productivité de leur type et travaillent à temps partiel (Params.partTime) au lieu de naître à l'échelle minimale.
-  bool _artisan(String ty) =>
-      renovationActive && params.renoArtisans && params.partTime && renovationTypes.contains(ty);
 
   /// Params.leases : part des nuits louées que le personnel d'un bailleur produit au départ (les nouveaux baux).
   static const double leaseStaffShare = 0.05;
@@ -3620,7 +3614,7 @@ class Sim {
     final f = _newFirm(ty, '${t.label} ${founder.name.split(' ').last}', 0, founder.id, slot[0], slot[1]);
     // échelle minimale si la demande n'occupe pas un employé ; module products, catégorie différenciée : pas de fraction
     // d'employé, la variété doit faire vivre un employé entier
-    f.rate = (productsActive && isDifferentiated(g)) || hours || _artisan(ty) ? t.rate : t.rate * _minScale(w, 1);
+    f.rate = (productsActive && isDifferentiated(g)) || hours ? t.rate : t.rate * _minScale(w, 1);
     f.wage = wage;
     if (modules.jobs) {
       f.offer = marketOffer(t.skill);

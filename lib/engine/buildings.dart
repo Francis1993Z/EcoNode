@@ -560,29 +560,36 @@ extension SimBuildings on Sim {
     }
   }
 
-  /// Un bailleur achète [q] modules de rénovation avec sa trésorerie au-dessus de sa réserve, comme un chantier, et tire
-  /// sur l'hypothèque du bâtiment la part ltvFirm de la dépense (sans dépasser ltvFirm × le coût du neuf). Rend les modules
-  /// posés.
+  /// Un bailleur achète [q] modules de rénovation avec sa trésorerie au-dessus de sa réserve (la provision pour l'usure,
+  /// comptée dans son loyer, la finance) ; s'il lui en manque, il tire le manque sur l'hypothèque du bâtiment, sans
+  /// dépasser ltvFirm × le coût du neuf et si sa banque le lui prête. Mesuré : tirer ltvFirm de chaque dépense, comme un
+  /// chantier, créait assez de monnaie pour 18 % d'inflation de plus en 2 000 jours (rapports/renovation.md). Rend les
+  /// modules posés.
   int _renovateLandlord(Building b, int q) {
     final p = params;
     final f = _fmap[b.ownerId];
     if (f == null) return 0;
-    final budget = f.money - 3 * f.wage * f.workers.length;
+    final price = moduleCost();
+    if (!(price > 0) || !price.isFinite) return 0;
+    final reserve = 3 * f.wage * f.workers.length;
+    final short = quantize(q * price - math.max(0.0, f.money - reserve));
+    if (short > 0) {
+      final m = mortgageOf(b);
+      if ((m?.principal ?? 0.0) + short <= p.ltvFirm * buildingCost(b) && _firmMayBorrow(f, short)) {
+        if (m == null) {
+          _originate(f, 0, f.id, b, short, mortgageRate(p.ltvFirm), p.mortgageTermFirm);
+        } else {
+          _draw(m, f, short);
+        }
+      }
+    }
+    final budget = f.money - reserve;
     if (budget <= 0) return 0;
     final r = buy(f, f.id.toString(), 'batiment', q.toDouble(), budget, true);
     if (r.qty < 1) return 0;
     b.basis += r.spent;
     f.reinvest = math.max(0.0, f.reinvest - r.spent);
     bstats.renoSpent += r.spent;
-    final m = mortgageOf(b);
-    final d = quantize(r.spent * p.ltvFirm);
-    if (d > 0 && (m?.principal ?? 0.0) + d <= p.ltvFirm * buildingCost(b) && _firmMayBorrow(f, d)) {
-      if (m == null) {
-        _originate(f, 0, f.id, b, d, mortgageRate(p.ltvFirm), p.mortgageTermFirm);
-      } else {
-        _draw(m, f, d);
-      }
-    }
     return r.qty.round();
   }
 

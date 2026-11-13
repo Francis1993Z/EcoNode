@@ -241,9 +241,7 @@ extension SimEntrepreneurship on Sim {
     if (c.employer != null) _fire(firm(c.employer!), c, 'départ pour fonder une entreprise');
     final f = _newFirm(pr.type, '${t.label} ${c.name.split(' ').last}', 0, c.id, slot[0], slot[1]);
     // module products, catégorie différenciée : pas de fraction d'employé (la variété fait vivre un employé entier)
-    f.rate = (productsActive && isDifferentiated(g)) || hours || _artisan(pr.type)
-        ? t.rate
-        : t.rate * Sim._minScale(batches / t.rate, 1);
+    f.rate = (productsActive && isDifferentiated(g)) || hours ? t.rate : t.rate * Sim._minScale(batches / t.rate, 1);
     f.wage = pr.wage;
     if (modules.jobs) {
       f.offer = marketOffer(t.skill);

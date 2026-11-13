@@ -836,12 +836,6 @@ class Params {
   // entretenu (−1 %/an) se rénove tous les ≈ 40 ans pour ≈ 24 % du prix du neuf. Choix de jeu (rapports/renovation.md).
   double renoTrigger = 0.6;
   double renoShare = 0.6;
-  // Artisans à temps partiel (renoArtisans, avec Modules.renovation et partTime) : les métiers, l'entrepreneur général et
-  // leurs fournisseurs gardent la productivité de leur type et ne paient que les heures travaillées (au moins
-  // Sim.minHours), au lieu de naître à l'« échelle minimale » (productivité réduite à la taille de la demande). Neuf
-  // petites entreprises pour une demande d'environ un employé à 240 citoyens : à l'échelle minimale, le module coûte
-  // ≈ 11 800 $ au départ, contre ≈ 4 000 $ à temps partiel et ≈ 4 900 $ sans le module (rapports/renovation.md).
-  bool renoArtisans = false;
 
   // ---- Entrepreneuriat des citoyens (Modules.entrepreneurship). Aucune de ces valeurs n'est réglée sur une cible : ce sont
   // des ordres de grandeur a priori, exposés pour être changés. Repère (non visé) : au Canada, environ 10 % d'entrées et 9 %

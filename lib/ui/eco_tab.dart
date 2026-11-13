@@ -54,7 +54,8 @@ class EconomyTab extends StatelessWidget {
             ]),
             for (final s in sectors) ...[
               header(sectorLabels[s]!),
-              for (final e in goods.entries.where((e) => e.value.sector == s))
+              // les biens en jeu (sans le module « renovation », ses biens n'existent pas dans la partie)
+              for (final e in goods.entries.where((e) => e.value.sector == s && sim.goodKeys.contains(e.key)))
                 TableRow(children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 3),
@@ -324,6 +325,7 @@ class _ModelTabState extends State<ModelTab> {
       _revivalSection(context, ctrl, upd),
       _pricingSection(context, ctrl, upd),
       _leaseSection(context, ctrl, upd),
+      _renovationSection(context, ctrl, upd),
       Section('Nouvelle partie', [
         Row(children: [
           Expanded(
@@ -914,6 +916,50 @@ Widget _leaseSection(BuildContext context, SimController ctrl, void Function(voi
       value: p.leases,
       onChanged: (v) => upd(() => p.leases = v),
     ),
+  ]);
+}
+
+/// Rénovation et métiers du bâtiment (Modules.renovation, MODELE.md § 6.6) : réglée au départ d'une partie ; le seuil et
+/// la part du coût se règlent en cours de partie.
+Widget _renovationSection(BuildContext context, SimController ctrl, void Function(void Function()) upd) {
+  final pal = Pal.of(context);
+  final sim = ctrl.sim;
+  final p = sim.params;
+  final done = sim.buildings.where((b) => b.done).toList();
+  final under = done.where((b) => b.cond < p.renoTrigger && b.renoLeft == 0).length;
+  final working = sim.buildings.where((b) => b.renoLeft > 0).length;
+  return Section('Rénovation', [
+    Text(
+        sim.renovationActive
+            ? 'Sous le seuil d’état, le propriétaire rénove son bâtiment jusqu’à l’état neuf : il achète des modules de '
+                'chantier à l’entrepreneur général, qui sous-traite aux charpentiers, électriciens et plombiers. Un '
+                'bailleur paie avec sa trésorerie et emprunte le manque ; un propriétaire-occupant paie avec son '
+                'épargne et peut emprunter sur sa maison. L’entretien courant passe aux métiers.'
+            : 'Module coupé dans cette partie : aucun bâtiment n’est jamais rénové, et l’entretien courant est fait par '
+                'les garages. Il s’active à l’écran de départ (« Rénovation et métiers du bâtiment », avec le marché '
+                'immobilier), actif par défaut à partir de ${fmtNum(renovationMinPopulation.toDouble(), 0)} citoyens.',
+        style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
+    if (sim.renovationActive) ...[
+      KV('Rénovations en cours / terminées', '$working / ${sim.bstats.renovated}'),
+      KV('Sous le seuil, en attente', '$under'),
+      KV('Dépenses de rénovation', money(sim.bstats.renoSpent)),
+      ParamSlider(
+          label: 'Seuil de rénovation (état du bâtiment)',
+          value: p.renoTrigger,
+          min: 0.3,
+          max: 0.9,
+          format: pct,
+          hint: 'Sous 30 %, un logement est inhabitable. Un bâtiment entretenu perd environ 1 % par an.',
+          onChanged: (v) => upd(() => p.renoTrigger = (v * 100).round() / 100)),
+      ParamSlider(
+          label: 'Coût d’une remise à neuf (part du neuf)',
+          value: p.renoShare,
+          min: 0.2,
+          max: 1,
+          format: pct,
+          hint: 'Part des modules de sa construction qu’il faut pour remettre à neuf un bâtiment en ruine.',
+          onChanged: (v) => upd(() => p.renoShare = (v * 100).round() / 100)),
+    ],
   ]);
 }
 

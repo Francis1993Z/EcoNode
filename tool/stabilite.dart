@@ -403,8 +403,6 @@ void applyParam(Params p, String k, String v) {
       p.renoTrigger = double.parse(v);
     case 'renoShare': // module renovation : part des modules du neuf que coûte une remise à neuf
       p.renoShare = double.parse(v);
-    case 'renoArtisans': // module renovation : artisans à temps partiel plutôt qu'à l'échelle minimale
-      p.renoArtisans = b();
     case 'reviewDays':
       p.reviewDays = int.parse(v);
     case 'reviewCutMax':

@@ -173,6 +173,14 @@ class _DiagnosticTabState extends State<DiagnosticTab> {
             dense: true,
             contentPadding: EdgeInsets.zero,
             title: Text(Modules.labels[k]!, style: const TextStyle(fontSize: 13)),
+            // la rénovation crée ses entreprises avec le scénario de départ : elle ne change qu'à la prochaine partie
+            subtitle: k == 'renovation'
+                ? Text(
+                    sim.modules.renovation == sim.renovationActive
+                        ? 'Réglé au départ d’une partie (suppose le marché immobilier).'
+                        : 'Pris en compte à la prochaine partie.',
+                    style: const TextStyle(fontSize: 11))
+                : null,
             value: sim.modules.get(k),
             onChanged: (v) {
               sim.modules.set(k, v);

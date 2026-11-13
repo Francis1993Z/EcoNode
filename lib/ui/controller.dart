@@ -9,6 +9,11 @@ import 'layout.dart';
 /// Calque « argent » : tous les flux monétaires, même si leur affichage est coupé.
 const String kMoneyLayer = r'$';
 
+/// Module « Rénovation et métiers du bâtiment » : actif par défaut à l'écran de départ à partir de cette population
+/// (décision de Francis, 2026-11-12). À 240 citoyens, ses neuf entreprises se partagent environ un employé de travail ;
+/// l'entrepreneur général disparaît dans 3 graines sur 4 et les rénovations s'arrêtent (rapports/renovation.md).
+const int renovationMinPopulation = 1000;
+
 /// Ce qui est sélectionné dans le graphe.
 class Selection {
   final String kind; // M | E | B | X | firm | citizen | building

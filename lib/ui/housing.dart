@@ -90,7 +90,8 @@ class HousingLog {
 /// Libellé et couleur de l'état d'un logement.
 ({String label, Color color}) buildingStatus(Pal pal, Building b) {
   if (!b.done) return (label: 'en construction', color: pal.ink3);
-  final dead = b.habitable ? '' : ' · inhabitable';
+  // module renovation : une rénovation en cours se voit partout où l'état est affiché
+  final dead = (b.habitable ? '' : ' · inhabitable') + (b.renoLeft > 0 ? ' · en rénovation' : '');
   if (b.listedDay != null) {
     return (label: b.ownerKind == 2 ? 'en vente (saisi)$dead' : 'en vente$dead', color: pal.accent);
   }
@@ -169,6 +170,16 @@ class BuildingView extends StatelessWidget {
         _Meter('État', b.cond, threshold: Building.minCond),
         KV('Habitable', b.habitable ? 'oui' : (b.done ? 'non (état sous ${pct(Building.minCond)})' : 'non (en chantier)'),
             color: b.habitable || !b.done ? null : pal.bad),
+        // module renovation : le seuil de rénovation et la rénovation en cours
+        if (sim.renovationActive && b.done)
+          KV(
+              'Rénovation',
+              b.renoLeft > 0
+                  ? 'en cours : ${b.renoLeft} module${b.renoLeft > 1 ? 's' : ''} à poser'
+                  : (b.cond < sim.params.renoTrigger
+                      ? 'à faire (état sous ${pct(sim.params.renoTrigger)})'
+                      : 'pas avant l’état ${pct(sim.params.renoTrigger)}'),
+              color: b.renoLeft > 0 ? pal.accent : null),
       ]),
       if (b.done)
         Section('Valeur', [
