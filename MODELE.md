@@ -86,6 +86,11 @@ On compte 33 biens :
 - dont 13 achetés par les ménages (`householdGoods`), et 6 services et biens d'équipement achetés par les entreprises
   hors recette (`businessServices`).
 
+S'y ajoutent le module de construction (`batiment`, module Bâtiments) et, avec le module Rénovation (§ 6.6), huit biens
+placés à la fin de la table : planches, briques, tuyaux, fils électriques, fusibles, et les heures de charpente,
+d'électricité et de plomberie (`renovationGoods`). Sans ce module, aucune boucle du moteur ne les voit
+(`Sim.goodKeys`).
+
 Ce que chaque bien apporte aux désirs, et le goût de chaque classe pour lui, sont dans `model.dart:uses`.
 
 ### Types d'entreprises (`model.dart:templates`, classe `Template`)
@@ -103,6 +108,10 @@ Ce que chaque bien apporte aux désirs, et le goût de chaque classe pour lui, s
 
 Il y a 32 types. Le scénario par défaut (`model.dart:defaultScenario`) prévoit une entreprise de chaque type. Le
 chantier forestier n'est pas créé : son plan de départ ne lui trouve aucune demande, car le bois n'a pas d'acheteur.
+Avec le module Bâtiments s'ajoute la Construction ; avec le module Rénovation, neuf types placés à la fin de la table
+(`renovationTypes` : scierie, briqueterie, tuyauterie, câblerie, fusibles, charpentier, électricien, plombier,
+entrepreneur général) la remplacent (`renovationScenario`, § 6.6). Sans ce module, ils ne sont jamais créés
+(`Sim.typeKeys`).
 
 ### Citoyen (`model.dart:Citizen`)
 
@@ -171,7 +180,8 @@ ristournes, refus. Identité de bilan : réserves + prêts = dépôts + fonds pr
     faillite ordonnée.
 - **Modules coupés par défaut :** bâtiments et hypothèques (`buildings`) ; rôles, contrats et négociation salariale
   (`jobs`, § 6.16), que l'interface active pour ses parties (`ui/controller.dart`) mais que le protocole et les tests
-  laissent coupé sauf mention.
+  laissent coupé sauf mention ; rénovation et métiers du bâtiment (`renovation`, § 6.6, suppose `buildings`, réglé au
+  départ d'une partie ; l'écran de départ l'active à partir de 1 000 citoyens).
 - **Filets** (`model.dart:Safeguards`), actifs par défaut dans le jeu : anti-famine, renflouement, plancher de logement,
   plafond de dérive, anti-crédit-fou. Ce sont des instruments de diagnostic : chaque déclenchement est compté et
   journalisé.
@@ -189,6 +199,7 @@ ristournes, refus. Identité de bilan : réserves + prêts = dépôts + fonds pr
 | 2 | Enveloppes des établissements publics | `_publicBudget` | I2 |
 | 3 | Production | `_produce` | toujours |
 | 4 | Paie : salaires, impôt, cotisations ; mise à pied si la paie est impossible. Module `jobs` : le salaire de chaque contrat | `_payWages`, `_payContracts` | toujours |
+| 4 bis | Bâtiments : usure et entretien (module `renovation` : entretien par les métiers, puis rénovations), service des hypothèques, marché des logements, chantiers | `buildings.dart:_buildingsDay` | module `buildings` |
 | 5 | Achats des entreprises (ordre `achats`) : intrants, puis services | `_buyInputs`, `_buyServices` | toujours |
 | 6 | Ménages (ordre `consommation`) : usure des désirs, manger, se loger, santé, ordinateur, études, loisirs, bonheur ; puis files des services publics | `_consume`, `_serveQueues` | files : I2 |
 | 7 | Filets anti-famine et plancher de logement | `_safetyNets` | filets actifs |
@@ -384,6 +395,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `ownersAtStart` | non | démarrage (§ 5) : propriétaires de départ, logement payé (module Bâtiments) | mesure § 5 |
 | `purchaseLoans` | non | crédit (§ 6.19) : le prêt d'un ordinateur sert à l'acheter (en stock, montant qui manque) | mesure § 6.19 |
 | `buildingTypes` | non | types de bâtiments (§ 6.6) : maisons, duplex et immeubles, avec leurs logements, leur coût, leur durée de chantier et leur valeur | mesure § 6.6 |
+| `renoTrigger`, `renoShare` | 0,6, 0,6 | module `renovation` (§ 6.6) : état sous lequel un propriétaire rénove ; part des modules du neuf que coûte une remise à neuf | choix de jeu ; à 0,6, un bâtiment entretenu se rénove tous les ≈ 40 ans pour ≈ 24 % du neuf |
 | `cheapestHouse` | non | types de bâtiments, variante de mesure (§ 6.6) : le ménage tente la maison la moins chère | mesure § 6.6 |
 | `leases` | non | baux (§ 6.6) : un locataire garde son logement tant qu'il paie ; le personnel du bailleur ne sert qu'aux nouveaux baux ; loyer = coût d'usage du logement | mesure § 6.6 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
@@ -779,6 +791,43 @@ de jeu, non calibrés.
   10 graines sur 10) et indice final 2,01. **Avec les Banques** (règle « la plus chère abordable », gardée ; sur le PC) :
   mêmes écarts (2 500 citoyens : chômage 5,9 → 4,6 %, indice final 1,73 → 2,25 ; 240 : 5,0 → 3,8 %, 1,67 → 2,31), aucune
   saisie, pas de spirale prix-crédit. Détails : `rapports/types-batiments.md`.
+
+**Rénovation et métiers du bâtiment (`Modules.renovation`, 2026-11-12, avec le module Bâtiments).** Coupé dans le
+moteur, réglé au départ d'une partie ; l'écran de départ l'active avec le marché immobilier à partir de 1 000 citoyens
+(`ui/controller.dart:renovationMinPopulation`, décision de Francis). Motivation : sans rénovation, le parc de départ
+tombe en ruine d'un bloc vers 65-70 ans (`rapports/derive36k.md`).
+- **Chaîne.** Huit biens (`renovationGoods`) et neuf types (`renovationTypes`) ajoutés à la fin des tables : scierie
+  (bois → planches), briqueterie (carburant, argile sur place → briques), tuyauterie, câblerie et fusibles (cuivre +
+  plastique), trois métiers qui vendent des heures (charpentier : planches ; électricien : fils et fusibles ; plombier :
+  tuyaux) et l'entrepreneur général (`entrepreneur`), qui remplace la Construction : il vend les modules de chantier
+  (`batiment`), pour le neuf comme pour la rénovation, avec des briques et des heures des trois métiers. Travail par
+  module ≈ 6 jours-personnes, comme la Construction. Une entreprise de chaque au départ (`renovationScenario`), quelle
+  que soit la population. Un intrant périssable (heure de sous-traitant) se commande un jour d'avance, pas cinq.
+- **Entretien courant.** Les `maintHoursPerDwelling` heures par logement et par jour s'achètent aux métiers
+  (`buildingCareShares` : charpente 40 %, plomberie 30 %, électricité 30 %) au lieu des garages ; l'entretien obtenu est
+  la moyenne pondérée des parts servies (`_care`).
+- **Rénovation** (`_renovations`). Un bâtiment terminé dont l'état passe sous `renoTrigger` (0,6) ouvre une rénovation
+  jusqu'à l'état neuf : ⌈(1 − état) × `renoShare` (0,6) × modules du bâtiment⌉ modules, posés à la cadence de chantier
+  du type ; chaque module ajoute 1 / (`renoShare` × modules) à l'état, le dernier le remet à neuf. Un bailleur paie
+  avec sa trésorerie au-delà de 3 jours de salaires et emprunte le manque sur l'hypothèque du bâtiment (au plus
+  `ltvFirm` × le coût du neuf) ; un propriétaire-occupant paie avec son épargne au-delà de 10 jours de besoins et
+  emprunte le manque sur sa maison (au plus `ltvHousehold` × le coût du neuf, versement et entretien sous 35 % de son
+  revenu, règle de fonds propres). On n'emprunte que pour des modules en stock, et la part qui n'a pas servi est
+  remboursée le jour même. Un bâtiment en liquidation attend son prochain propriétaire.
+- **Habitabilité.** Un propriétaire-occupant dont le logement passe sous l'état 0,3 loue ailleurs (bail) jusqu'à la
+  fin de la rénovation, puis rentre chez lui (`livesAtHome`) ; sans le module, il reste logé dans sa ruine. Un bailleur
+  ne compte plus ses ruines dans son parc quand il décide de construire (un logement en rénovation compte).
+- **Valeur.** La valeur d'un bâtiment (valeur courante, coût du neuf, plafonds des prêts, provision pour l'usure)
+  suit le prix de référence du module (prix d'équilibre au départ, indexé sur les salaires), pas le prix offert du
+  jour (`moduleValue`). La provision pour l'usure d'un bailleur compte une rénovation (× `renoShare`).
+- **Importations de secours** (`_renovationImport`, décision de Francis). Frontières fermées, l'entrepreneur général et
+  les métiers achètent à l'étranger, au prix d'import, la part de leurs matériaux que le marché d'ici n'a pas servie,
+  comme l'hôpital ; les heures des métiers et les modules restent d'ici.
+- **Parc de départ.** Son état est tiré entre `renoTrigger` et 1 (l'état d'équilibre d'un parc qu'on rénove à ce seuil),
+  avec le même tirage qu'avant (flux `logement`, sous-tirage 7).
+- **Plan de départ.** Les heures d'entretien du parc (≈ 1,06 logement par citoyen) entrent dans la demande de base des
+  métiers ; ces besoins ne sont jamais pris dans le panier mesuré des ménages.
+- **Mesures** : `rapports/renovation.md`.
 4. **Santé, ordinateur, études** : §§ 6.7 à 6.9.
 5. **Loisirs.**
    - **Budget du jour, à la Godley-Lavoie :** C = α₁ × max(0 ; revenu lissé − coût de survie) + α₂ × `adsBoost` ×
