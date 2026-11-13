@@ -119,10 +119,18 @@ void main() {
     run(s, 3);
     final c = s.citizens.firstWhere((c) => c.homeId != null && c.employer != null && s.mortgageOf(s.building(c.homeId!)!) == null);
     final b = s.building(c.homeId!)!;
-    // il ne garde que son coussin : la rénovation passe par un prêt
-    s.godMoney(Target('citizen', c.id), -(c.money - 10 * s.needCost));
     b.cond = 0.5;
-    s.step();
+    // chaque jour, il ne garde que son coussin : un module posé ne peut être payé que par un prêt (on n'emprunte que les
+    // jours où l'entrepreneur général a des modules en stock)
+    var placed = false;
+    for (var d = 0; d < 200 && !placed; d++) {
+      final extra = c.money - 10 * s.needCost;
+      if (extra > 0) s.godMoney(Target('citizen', c.id), -extra);
+      final before = b.renoLeft;
+      s.step();
+      placed = b.renoLeft > 0 && before > 0 ? b.renoLeft < before : b.cond > 0.5 && before > 0;
+    }
+    expect(placed, isTrue, reason: 'aucun module posé en 200 jours');
     final m = s.mortgageOf(b);
     expect(m, isNotNull, reason: 'pas de prêt de rénovation');
     expect(m!.principal, greaterThan(0));

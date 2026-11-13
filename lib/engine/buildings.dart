@@ -579,8 +579,12 @@ extension SimBuildings on Sim {
     if (f == null) return 0;
     final price = moduleCost();
     if (!(price > 0) || !price.isFinite) return 0;
+    q = math.min(q, _moduleStock().floor()); // on n'emprunte que pour des modules qu'on peut acheter aujourd'hui
+    if (q < 1) return 0;
     final reserve = 3 * f.wage * f.workers.length;
-    final short = quantize(q * price - math.max(0.0, f.money - reserve));
+    final own = math.max(0.0, f.money - reserve);
+    var loan = 0.0;
+    final short = quantize(q * price - own);
     if (short > 0) {
       final m = mortgageOf(b);
       if ((m?.principal ?? 0.0) + short <= p.ltvFirm * buildingCost(b) && _firmMayBorrow(f, short)) {
@@ -589,16 +593,42 @@ extension SimBuildings on Sim {
         } else {
           _draw(m, f, short);
         }
+        loan = short;
       }
     }
     final budget = f.money - reserve;
     if (budget <= 0) return 0;
     final r = buy(f, f.id.toString(), 'batiment', q.toDouble(), budget, true);
+    _repayUnused(b, f, loan, r.spent - own);
     if (r.qty < 1) return 0;
     b.basis += r.spent;
     f.reinvest = math.max(0.0, f.reinvest - r.spent);
     bstats.renoSpent += r.spent;
     return r.qty.round();
+  }
+
+  /// Modules de chantier en stock chez ceux qui en vendent.
+  double _moduleStock() {
+    var n = 0.0;
+    for (final f in sellersOf('batiment')) {
+      n += f.inv['batiment'] ?? 0;
+    }
+    return n;
+  }
+
+  /// La part d'un prêt de rénovation qui n'a pas servi aux achats du jour ([used], au-delà des fonds propres) est
+  /// remboursée aussitôt : un prêt ne finance que des modules achetés.
+  void _repayUnused(Building b, Account borrower, double loan, double used) {
+    if (loan <= 0) return;
+    final unused = quantize(loan - math.max(0.0, used));
+    final m = mortgageOf(b);
+    if (m == null || unused <= 0) return;
+    _repayMortgage(m, borrower, unused);
+    if (m.principal <= eps) {
+      _dropMortgage(m);
+    } else {
+      m.payment = quantize(_annuity(m.principal, m.rate / 365, m.termLeft));
+    }
   }
 
   /// Un propriétaire-occupant achète [q] modules de rénovation avec son épargne au-delà de 10 jours de besoins ; s'il lui
@@ -608,11 +638,19 @@ extension SimBuildings on Sim {
     if (c == null) return 0;
     final price = moduleCost();
     if (!(price > 0) || !price.isFinite) return 0;
+    q = math.min(q, _moduleStock().floor()); // on n'emprunte que pour des modules qu'on peut acheter aujourd'hui
+    if (q < 1) return 0;
     final cushion = 10 * needCost;
-    if (c.money - cushion < q * price) _renoLoan(c, b, quantize(q * price - math.max(0.0, c.money - cushion)));
+    final own = math.max(0.0, c.money - cushion);
+    var loan = 0.0;
+    if (own < q * price) {
+      final want = quantize(q * price - own);
+      if (_renoLoan(c, b, want)) loan = want;
+    }
     final budget = c.money - cushion;
     if (budget <= 0) return 0;
     final r = buy(c, 'M', 'batiment', q.toDouble(), budget, true);
+    _repayUnused(b, c, loan, r.spent - own);
     if (r.qty < 1) return 0;
     b.basis += r.spent;
     bstats.renoSpent += r.spent;

@@ -2662,7 +2662,9 @@ class Sim {
             _setStock(f, e.key, (f.inv[e.key] ?? 0) + r.qty);
             f.costs += r.spent;
             f.inputSpend += r.spent;
-            if (params.publicImports && !params.trade && r.qty < e.value - eps && publicService(f)) {
+            if (!params.trade &&
+                r.qty < e.value - eps &&
+                ((params.publicImports && publicService(f)) || _renovationImport(f, e.key))) {
               // importations de secours : le reste du besoin, que le marché d'ici n'a pas servi (le manque reste noté)
               final x = _publicImport(f, e.key, e.value - r.qty, math.min(share, f.money) - r.spent);
               _setStock(f, e.key, (f.inv[e.key] ?? 0) + x.$1);
@@ -2676,6 +2678,14 @@ class Sim {
     }
     _quoteCache = null;
   }
+
+  /// Module renovation : l'entrepreneur général et les métiers achètent à l'étranger, au prix d'import, la part de leurs
+  /// matériaux que le marché d'ici n'a pas servie, frontières fermées, comme l'hôpital (décision de Francis,
+  /// 2026-11-13). Sans elles, la briqueterie (un seul client, aux commandes irrégulières) meurt dans 10 graines sur 10 en
+  /// 3 000 jours à 1 000 et 2 500 citoyens, et l'entrepreneur général avec elle. Les heures des métiers et les modules
+  /// restent d'ici.
+  bool _renovationImport(Firm f, String g) =>
+      renovationActive && renovationTypes.contains(f.type) && renovationGoods.contains(g) && !goods[g]!.perish;
 
   /// Services aux entreprises : comptabilité, entretien, publicité, recherche et développement.
   void _buyServices(Firm f) {
