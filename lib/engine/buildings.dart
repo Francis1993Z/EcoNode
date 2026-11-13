@@ -102,8 +102,16 @@ extension SimBuildings on Sim {
   /// Prix d'un module de construction : le meilleur prix offert, à défaut le prix de départ.
   double moduleCost() => bestPrice('batiment');
 
+  /// Prix d'un module pour la valeur des bâtiments (valeur courante, coût du neuf, plafonds des prêts, provision pour
+  /// l'usure). Avec le module renovation, le prix de référence du module (son prix d'équilibre au départ, qui suit les
+  /// salaires) : une rareté passagère de modules, quand un fournisseur de l'entrepreneur général ferme, ne doit pas
+  /// réévaluer tout le parc, donc les loyers et les hypothèques. Mesuré avec le prix offert : module × 3,5, hypothèques
+  /// × 2,7 et indice des prix × 1,9 en 3 000 jours à 2 500 citoyens (rapports/renovation.md). Sans le module, le prix
+  /// offert, comme avant. Les achats de modules se font toujours au prix offert (moduleCost).
+  double moduleValue() => renovationActive ? referencePrice('batiment') : moduleCost();
+
   /// Coût de remplacement d'un logement neuf.
-  double replacementCost() => params.dwellingModules * moduleCost();
+  double replacementCost() => params.dwellingModules * moduleValue();
 
   /// Prix d'une heure d'entretien courant : une heure de réparation (garages) ; avec le module renovation, le panier des
   /// heures des métiers (buildingCareShares).
@@ -124,7 +132,7 @@ extension SimBuildings on Sim {
   double sizeOf(Building b) => b.type == null ? 1.0 : modulesOf(b) / params.dwellingModules;
 
   /// Coût de remplacement d'un bâtiment neuf (sans type : celui d'un logement standard).
-  double buildingCost(Building b) => modulesOf(b) * moduleCost();
+  double buildingCost(Building b) => modulesOf(b) * moduleValue();
 
   /// Valeur courante : coût de remplacement, rabattu selon l'état (un logement à l'état 0 vaut encore le quart : le
   /// terrain et les fondations), un peu plus cher quand les logements manquent (chaleur du marché, de −1 à +1 : ±15 %).
