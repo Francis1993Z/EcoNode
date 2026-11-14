@@ -962,6 +962,23 @@ Choix de jeu : c'est le débouché de la filière informatique.
 - **Ne passe pas à l'échelle** (mesuré, non corrigé). Une création par jour pour toute l'économie, le délai par type et
   le plafond de 3 producteurs sont des nombres absolus : à 13 240 habitants, il y a environ 7 naissances par an pour
   370 morts (journal, § 6, tâche 1).
+- **Démographie mesurée (2026-11-14, `rapports/demographie-entreprises.md`).** Réglages de l'interface, avec
+  l'entrepreneuriat : 12 graines × 10 ans, mesure seulement, sans changement du moteur.
+  - Naissances 4 à 5 % par an à 2 500 citoyens, contre 11 à 16 % aux États-Unis, en France et au Canada.
+  - Morts 10 à 15 % à 2 500 citoyens : le plan de départ (≈ 10 entreprises par type) se consolide en monopoles dans
+    les secteurs homogènes, sans entrée concurrente.
+  - À 240 citoyens : la moitié des entreprises nées meurent avant 6 mois, et celles du départ meurent à 2,4 % par an.
+  - Survie à 5 ans des entreprises nées : 51 à 56 % (États-Unis 51 %, France 69 %, Canada ≈ 68 %).
+  - 92 % des morts sont des trésoreries à sec ; il n'y a pas de fermeture volontaire.
+  - 14 % des entreprises sont rachetées chaque année par le filet de renflouement, dont 85 à 88 % des nées.
+  - Trois corrections sont proposées, aucune n'est codée (décision de Francis) : entrée concurrente sur marge,
+    fermeture volontaire, démarrage à la taille de l'équipe.
+- **Onglet « Entreprises » de l'interface (`lib/ui/entreprises_tab.dart`).** L'interface tient un journal quotidien
+  (`FirmLog`) et ne change rien au moteur. L'onglet montre :
+  - les taux de naissance et de mort sur l'année glissante, les rachats, les entreprises actives ;
+  - la survie à 1, 3 et 5 ans, l'âge moyen ;
+  - les causes de disparition et la concentration par secteur (HHI) ;
+  - des infobulles qui mettent les repères réels, avec leurs sources, à côté de la valeur de la simulation.
 
 ### 6.13 État et institutions publiques
 
@@ -1129,7 +1146,7 @@ la fondation devient une décision de citoyen. Il suppose le module `entry`.
   `entMinOwnShare` = 30 %) ; le reste est un prêt de la Caisse soumis aux règles I4 (paiements ≤ 35 % de la valeur ajoutée, fonds propres ≥ 11,5 %)
   appliquées par `_loanRefusal` ; tout passe par `transfer()` et `_lend()`. Le fondateur quitte son emploi, est le **premier employé** (jamais débauché)
   et le propriétaire (dividendes I1). À la fermeture : I5 inchangée, il perd sa mise, la Caisse radie le solde (pas de dette personnelle).
-- Valeurs : ordres de grandeur a priori, **non ajustées** sur le repère canadien (≈ 10 % d'entrées, 9 % de sorties par an). Limites : une seule
+- Valeurs : ordres de grandeur a priori, **non ajustées** sur les repères réels (Canada 2023 : 12,3 % d'entrées, 11,9 % de sorties par an ; mesure et autres pays au § 6.12). Limites : une seule
   fondation par citoyen à la fois, au plus une par type et par `entryCooldown` ; la qualité du produit viendra avec le module Produits (compteur de secteur).
 
 ### 6.18 Variétés de produits et marques (module `products`, `produits.dart`)
