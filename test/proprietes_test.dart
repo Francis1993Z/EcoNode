@@ -24,7 +24,7 @@ class Case {
 
   Case(this.n, int days) {
     _r = Mulberry32(hash32(20261011, n));
-    final p = Params()
+    final p = Params.historique()
       ..population = pick(40, 300)
       ..startWallet = between(1500, 5000)
       ..taxRate = between(0.05, 0.25)
@@ -39,7 +39,7 @@ class Case {
       ..bankCapitalPerCitizen = u() < 0.3 ? 0 : between(0, 200) // une Caisse sans capital bute sur son plancher
       ..dividendFromRetained = u() < 0.5
       ..trade = u() < 0.3;
-    final m = Modules();
+    final m = Modules.historique();
     for (final k in Modules.keys) {
       // les modules apparus après ces cas (Modules.lateKeys) restent coupés et ne consomment pas de tirage : les cas restent
       // les mêmes

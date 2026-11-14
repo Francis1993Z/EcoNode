@@ -18,9 +18,9 @@ void run(Sim s, int days) {
 }
 
 Sim make({int seed = 3, bool devChecks = true, void Function(Params)? tune}) {
-  final p = Params();
+  final p = Params.historique();
   tune?.call(p);
-  return Sim(seed: seed, params: p, modules: Modules()..buildings = true, devChecks: devChecks);
+  return Sim(seed: seed, params: p, modules: Modules.historique()..buildings = true, devChecks: devChecks);
 }
 
 /// Les liens entre bâtiments, propriétaires et hypothèques sont cohérents.
@@ -83,9 +83,9 @@ void checkParc(Sim s) {
 }
 
 void main() {
-  test('le module est coupé par défaut : ni bâtiment, ni hypothèque, ni entreprise de construction', () {
-    expect(Modules().buildings, isFalse);
-    final s = Sim(seed: 3, devChecks: true);
+  test('module coupé (anciens défauts) : ni bâtiment, ni hypothèque, ni entreprise de construction', () {
+    expect(Modules.historique().buildings, isFalse);
+    final s = Sim(seed: 3, devChecks: true, params: Params.historique(), modules: Modules.historique());
     run(s, 120);
     expect(s.buildings, isEmpty);
     expect(s.mortgages, isEmpty);

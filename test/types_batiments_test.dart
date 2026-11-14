@@ -15,12 +15,12 @@ void run(Sim s, int days) {
 }
 
 Sim make({int seed = 3, void Function(Params)? tune}) {
-  final p = Params()
+  final p = Params.historique()
     ..buildingTypes = true
     ..leases = true
     ..ownersAtStart = true;
   tune?.call(p);
-  return Sim(seed: seed, params: p, modules: Modules()..buildings = true, devChecks: true);
+  return Sim(seed: seed, params: p, modules: Modules.historique()..buildings = true, devChecks: true);
 }
 
 /// Les liens entre bâtiments, propriétaires, locataires et hypothèques sont cohérents ; les ménages n'ont que des maisons.
@@ -59,8 +59,8 @@ void checkTypes(Sim s) {
 
 void main() {
   test('coupés par défaut : chaque bâtiment est un logement standard', () {
-    expect(Params().buildingTypes, isFalse);
-    final s = Sim(seed: 3, modules: Modules()..buildings = true, devChecks: true);
+    expect(Params.historique().buildingTypes, isFalse);
+    final s = Sim(seed: 3, modules: Modules.historique()..buildings = true, devChecks: true, params: Params.historique());
     run(s, 30);
     expect(s.buildings, isNotEmpty);
     expect(s.buildings.every((b) => b.type == null && b.units == 1), isTrue);

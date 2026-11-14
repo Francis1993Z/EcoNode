@@ -3,6 +3,8 @@
 //   dart run tool/derive.dart graine population jours [--produits 0|1] [--batiments 0|1] [--banques 0|1]
 //        [--filets 0|1] [--renovation 0|1] [--sortie fichier] [--param nom=valeur,...]
 //
+// Modules : tous actifs par défaut, comme l'interface depuis le 14 novembre 2026 (--produits, --batiments, --banques,
+// --renovation 0 pour en couper un) ; commerce extérieur ouvert par défaut (--param trade=0 pour fermer).
 // --filets : filets de sécurité actifs (1, défaut) ou tous coupés (0).
 // --renovation : module « Rénovation et métiers du bâtiment » (suppose --batiments 1).
 // --sortie : les lignes vont dans ce fichier (ajoutées à la fin), écrites sur le disque à chaque relevé : une partie
@@ -26,7 +28,8 @@ String f2(double v) => v.toStringAsFixed(2);
 void main(List<String> a) {
   final seed = int.parse(a[0]), pop = int.parse(a[1]), days = int.parse(a[2]);
   final p = parametresInterface(pop);
-  var produits = true, batiments = false, banques = false, filets = true, renovation = false;
+  // défauts : ceux de l'interface depuis le 14 novembre 2026 (tous les modules actifs, commerce extérieur ouvert)
+  var produits = true, batiments = true, banques = true, filets = true, renovation = true;
   String? fichier;
   for (var i = 3; i < a.length; i++) {
     switch (a[i]) {

@@ -17,14 +17,14 @@ void run(Sim s, int days) {
 /// Une partie avec bâtiments, baux et propriétaires de départ. 1 000 citoyens : à 240, les neuf entreprises du module se
 /// partagent environ un employé de travail et la chaîne s'éteint vite (rapports/renovation.md).
 Sim make({int seed = 3, bool renovation = true, int population = 1000}) {
-  final p = Params()
+  final p = Params.historique()
     ..population = population
     ..leases = true
     ..ownersAtStart = true;
   return Sim(
       seed: seed,
       params: p,
-      modules: Modules()
+      modules: Modules.historique()
         ..buildings = true
         ..renovation = renovation,
       devChecks: true);
@@ -45,7 +45,7 @@ void main() {
   });
 
   test('sans bâtiments, le module ne joue pas', () {
-    final s = Sim(seed: 1, modules: Modules()..renovation = true);
+    final s = Sim(seed: 1, modules: Modules.historique()..renovation = true, params: Params.historique());
     expect(s.renovationActive, isFalse);
     expect(s.goodKeys.where(renovationGoods.contains), isEmpty);
   });

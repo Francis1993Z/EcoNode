@@ -9,11 +9,6 @@ import 'layout.dart';
 /// Calque « argent » : tous les flux monétaires, même si leur affichage est coupé.
 const String kMoneyLayer = r'$';
 
-/// Module « Rénovation et métiers du bâtiment » : actif par défaut à l'écran de départ à partir de cette population
-/// (décision de Francis, 2026-11-12). À 240 citoyens, ses neuf entreprises se partagent environ un employé de travail ;
-/// l'entrepreneur général disparaît dans 3 graines sur 4 et les rénovations s'arrêtent (rapports/renovation.md).
-const int renovationMinPopulation = 1000;
-
 /// Ce qui est sélectionné dans le graphe.
 class Selection {
   final String kind; // M | E | B | X | firm | citizen | building
@@ -77,10 +72,8 @@ class SimController extends ChangeNotifier {
   /// Temps de calcul accordé à la simulation par image, pour que l'interface reste fluide.
   static const int _budgetUs = 10000;
 
-  /// L'interface lance ses parties avec les rôles, contrats et négociation salariale, l'entrepreneuriat des citoyens et les
-  /// variétés de produits (modules jobs, entrepreneurship et products, coupés par défaut dans le moteur et le protocole).
-  /// Le crédit aux citoyens et les banques (module banking) restent coupés : à activer à l'écran de départ ou dans l'onglet
-  /// Diagnostic.
+  /// Tous les modules sont actifs par défaut, et le commerce extérieur aussi (Params.trade), dans le moteur comme dans
+  /// l'interface (demande de Francis, 14 novembre 2026) ; chacun se coupe à l'écran de départ ou dans l'onglet Diagnostic.
   /// L'interface active aussi la transmission du taux directeur (Params.policyPassThrough) : aux valeurs par défaut elle ne
   /// change rien (3 % + 3 % = 6 %), et le taux directeur de la banque centrale agit dès qu'on le déplace.
   SimController({int seed = 42})
@@ -88,9 +81,9 @@ class SimController extends ChangeNotifier {
             seed: seed,
             params: Params()
               ..policyPassThrough = true
-              ..tradeWaves = true // douane : prix mondiaux en vagues (frontières fermées : importations de secours)
-              ..floatingFx = true // douane : taux de change flottant (idem)
-              ..foreignDemand = true // douane : commandes de l'étranger (idem)
+              ..tradeWaves = true // douane : prix mondiaux en vagues
+              ..floatingFx = true // douane : taux de change flottant
+              ..foreignDemand = true // douane : commandes de l'étranger
               ..revival = true // renaissance des filières éteintes (MODELE.md § 6.22)
               ..revivalPlannedDemand = true // demande dérivée comptée au plan de l'aval : moins de relances vouées à l'échec
               ..excessCashReturn = true // excédent de trésorerie reversé aux propriétaires (dérive N16, rapports/anomalies)
@@ -114,10 +107,7 @@ class SimController extends ChangeNotifier {
               ..planFreshSolve = true // plan de départ : la Machinerie et ses fournisseurs ne disparaissent plus (N18)
               ..ownersAtStart = true
               ..reservePerCitizen = 2000, // banques : dotation réaliste (voir startParams)
-            modules: Modules()
-              ..jobs = true
-              ..entrepreneurship = true
-              ..products = true) {
+            modules: Modules()) {
     autoLayout(sim);
   }
 

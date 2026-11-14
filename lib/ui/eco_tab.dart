@@ -937,7 +937,7 @@ Widget _renovationSection(BuildContext context, SimController ctrl, void Functio
                 'épargne et peut emprunter sur sa maison. L’entretien courant passe aux métiers.'
             : 'Module coupé dans cette partie : aucun bâtiment n’est jamais rénové, et l’entretien courant est fait par '
                 'les garages. Il s’active à l’écran de départ (« Rénovation et métiers du bâtiment », avec le marché '
-                'immobilier), actif par défaut à partir de ${fmtNum(renovationMinPopulation.toDouble(), 0)} citoyens.',
+                'immobilier), actif par défaut.',
         style: TextStyle(color: pal.ink3, fontSize: 11.5, height: 1.35)),
     if (sim.renovationActive) ...[
       KV('Rénovations en cours / terminées', '$working / ${sim.bstats.renovated}'),

@@ -1171,7 +1171,12 @@ extension SimSnapshot on Sim {
     devChecks = j['devChecks'] as bool;
     sansHasard = (j['sansHasard'] as bool?) ?? false;
     params = _paramsFrom(j['params'] as Map);
+    // un module apparu après la référence n'est écrit que s'il est actif (Modules.toJson) : absent, il était coupé, même
+    // depuis que tous les modules sont actifs par défaut
     modules = Modules();
+    for (final k in Modules.lateKeys) {
+      modules.set(k, false);
+    }
     for (final e in (j['modules'] as Map).entries) {
       modules.set(e.key as String, e.value as bool);
     }

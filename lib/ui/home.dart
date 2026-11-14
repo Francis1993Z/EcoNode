@@ -46,10 +46,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     var founders = ctrl.sim.modules.entrepreneurship;
     var varieties = ctrl.sim.modules.products;
     var banking = ctrl.sim.modules.banking;
-    // rénovation et métiers du bâtiment : actif par défaut à partir de 1 000 citoyens, tant que le joueur n'y touche pas
     var renovation = ctrl.sim.modules.renovation;
-    var renovationSet = false;
-    bool renoOn() => renovationSet ? renovation : pop >= renovationMinPopulation;
     final seedCtl = TextEditingController(text: '42');
     final go = await showDialog<bool>(
       context: context,
@@ -85,21 +82,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               SwitchListTile(
                 contentPadding: const EdgeInsets.only(left: 16),
-                value: housing && renoOn(),
-                onChanged: housing
-                    ? (v) => set(() {
-                          renovation = v;
-                          renovationSet = true;
-                        })
-                    : null,
+                value: housing && renovation,
+                onChanged: housing ? (v) => set(() => renovation = v) : null,
                 title: const Text('Rénovation et métiers du bâtiment',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                subtitle: Text(
+                subtitle: const Text(
                     'Scierie, briqueterie, tuyaux, câbles et fusibles ; charpentiers, électriciens, plombiers et un '
                     'entrepreneur général, qui remplace la Construction. Les propriétaires rénovent leurs bâtiments usés '
-                    'et l’entretien passe aux métiers. Actif par défaut à partir de ${fmtNum(renovationMinPopulation.toDouble(), 0)} '
-                    'citoyens : en dessous, ces neuf petites entreprises ne trouvent pas assez de travail pour durer.',
-                    style: const TextStyle(fontSize: 12)),
+                    'et l’entretien passe aux métiers. Sous 1 000 citoyens environ, l’entrepreneur général et la '
+                    'briqueterie trouvent rarement assez de travail pour durer.',
+                    style: TextStyle(fontSize: 12)),
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -174,7 +166,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ctrl.sim.modules.entrepreneurship = founders;
       ctrl.sim.modules.products = varieties;
       ctrl.sim.modules.banking = banking;
-      ctrl.sim.modules.renovation = housing && renoOn();
+      ctrl.sim.modules.renovation = housing && renovation;
       ctrl.newGame(seed, params: freshParams(ctrl.startParams, pop.round()));
     }
     seedCtl.dispose();

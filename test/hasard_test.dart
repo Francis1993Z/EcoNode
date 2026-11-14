@@ -18,7 +18,7 @@ void main() {
     expect(hash32(0xFFFFFFFF, 0x7FFFFFFF), 4141235960);
     expect(hash32(123456789, 987654321), 890124905);
     expect(hash32(0x80000000, 0x80000001), 3897674484);
-    final s = Sim(seed: 42);
+    final s = Sim(seed: 42, params: Params.historique(), modules: Modules.historique());
     expect(s.draw(Flux.maladie, 17), 0.26128904800862074);
     expect(s.draw(Flux.maladie, 100001, 3), 0.947804483352229);
     expect(s.draw(Flux.depart, 17), 0.7659328319132328);
@@ -28,7 +28,7 @@ void main() {
   });
 
   test('partie de 150 jours : même empreinte sur la VM et sur le web', () {
-    final s = Sim(seed: 42);
+    final s = Sim(seed: 42, params: Params.historique(), modules: Modules.historique());
     for (var i = 0; i < 150; i++) {
       s.step();
     }
@@ -47,7 +47,7 @@ void main() {
   });
 
   test('flux indépendants : moyenne, variance et corrélations de 100 000 tirages', () {
-    final s = Sim(seed: 3);
+    final s = Sim(seed: 3, params: Params.historique(), modules: Modules.historique());
     const n = 100000;
     List<double> draws(Flux f, [int shift = 0]) => [for (var i = 1; i <= n; i++) s.draw(f, i + shift)];
     double mean(List<double> x) => x.fold(0.0, (a, b) => a + b) / x.length;
@@ -76,7 +76,7 @@ void main() {
   });
 
   test('ordre du jour : retirer un agent ne change pas l’ordre relatif des autres', () {
-    final s = Sim(seed: 9);
+    final s = Sim(seed: 9, params: Params.historique(), modules: Modules.historique());
     int cmp(int a, int b) {
       final ka = s.orderKey(Flux.consommation, a), kb = s.orderKey(Flux.consommation, b);
       return ka != kb ? ka.compareTo(kb) : a.compareTo(b);
@@ -89,7 +89,7 @@ void main() {
   });
 
   test('les tirages d’un agent ne dépendent pas des autres agents', () {
-    final a = Sim(seed: 5), b = Sim(seed: 5, params: Params()..population = 200);
+    final a = Sim(seed: 5, params: Params.historique(), modules: Modules.historique()), b = Sim(seed: 5, params: Params.historique()..population = 200, modules: Modules.historique());
     for (final f in Flux.values) {
       expect(b.draw(f, 17), a.draw(f, 17), reason: f.name);
     }

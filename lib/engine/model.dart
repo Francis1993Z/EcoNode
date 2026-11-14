@@ -617,6 +617,14 @@ final Map<String, String> producerOf = {
 
 /// Paramètres de la partie. Tout paramètre ajouté doit l'être aussi dans les instantanés (snapshot.dart).
 class Params {
+  /// Réglages par défaut : le commerce extérieur est actif depuis le 14 novembre 2026.
+  Params();
+
+  /// Les réglages par défaut d'avant le 14 novembre 2026 : commerce extérieur coupé (voir Modules.historique).
+  Params.historique() {
+    trade = false;
+  }
+
   int population = 240;
   double startWallet = 3000;
   double startWage = 150;
@@ -629,7 +637,10 @@ class Params {
   double mpcIncome = 0.6;
   double wealthTargetDays = 20;
   double get propensity => (1 - mpcIncome) / wealthTargetDays;
-  bool trade = false;
+  // Commerce extérieur (frontières ouvertes) : importations au prix mondial × importMarkup, exportations des surplus et,
+  // avec foreignDemand, commandes de l'étranger. Actif par défaut depuis le 14 novembre 2026 (demande de Francis) ;
+  // Params.historique le coupe, comme avant.
+  bool trade = true;
   double importMarkup = 1.3;
   double exportDiscount = 0.7;
   double ubi = 0;
@@ -1143,32 +1154,46 @@ class Modules {
   // Caisse encaissait la perte. Aucun paramètre.
   bool bankruptcy = true;
   // Bâtiments et hypothèques : le parc de logements est fait de bâtiments qu'on construit, qu'on loue, qu'on achète à
-  // crédit (hypothèque de la Caisse), qu'on revend et qui s'usent. Coupé par défaut : le parc suit alors la capacité fixée
-  // au départ (comportement historique).
-  bool buildings = false;
+  // crédit (hypothèque de la Caisse), qu'on revend et qui s'usent. Actif par défaut depuis le 14 novembre 2026 (voir
+  // Modules.historique) ; coupé, le parc suit la capacité fixée au départ (comportement historique).
+  bool buildings = true;
   // Rôles, contrats individuels et négociation salariale : chaque employé a un rôle de l'organigramme de son entreprise,
   // un salaire négocié à l'embauche (salaire de réserve contre plafond de l'employeur), révisé à chaque anniversaire et
-  // relevé par une contre-offre quand un concurrent veut le débaucher ; promotions internes. Coupé par défaut : un seul
-  // salaire par entreprise (comportement historique). L'interface lance ses parties avec le module actif.
-  bool jobs = false;
+  // relevé par une contre-offre quand un concurrent veut le débaucher ; promotions internes. Actif par défaut ; coupé, un seul
+  // salaire par entreprise (comportement historique).
+  bool jobs = true;
   // Entrepreneuriat des citoyens : des citoyens ambitieux et peu averses au risque fondent des entreprises avec leur épargne
-  // et un prêt de la Caisse, au lieu de créations mécaniques de clones. Coupé par défaut. Suppose « Entrée et sortie
+  // et un prêt de la Caisse, au lieu de créations mécaniques de clones. Actif par défaut. Suppose « Entrée et sortie
   // d'entreprises » (les fermetures) : seule la fondation change.
-  bool entrepreneurship = false;
+  bool entrepreneurship = true;
   // Variétés de produits et marques : chaque entreprise d'un bien de consommation ou d'équipement vend sa variété (nom,
-  // qualité, goût des ménages, notoriété) au lieu d'un clone. Coupé par défaut. Les variétés naissent et meurent avec les
+  // qualité, goût des ménages, notoriété) au lieu d'un clone. Actif par défaut. Les variétés naissent et meurent avec les
   // entreprises : leur nombre n'est jamais fixé d'avance.
-  bool products = false;
+  bool products = true;
   // Crédit aux citoyens (prêt personnel, carte de crédit, cote, faillite personnelle) et, à partir de deux banques,
-  // concurrence bancaire (réserves, marché interbancaire, fondations et faillites de banques). Coupé par défaut.
-  bool banking = false;
+  // concurrence bancaire (réserves, marché interbancaire, fondations et faillites de banques). Actif par défaut.
+  bool banking = true;
   // Rénovation et métiers du bâtiment (suppose « buildings » ; réglé au départ d'une partie) : une chaîne de matériaux
   // (scierie, briqueterie, tuyauterie, câblerie, fusibles), trois métiers (charpentier, électricien, plombier) et un
   // entrepreneur général qui remplace la Construction. Les propriétaires rénovent un bâtiment usé en achetant des modules
-  // de chantier, et l'entretien courant passe aux métiers. Coupé par défaut (MODELE.md § 6.6).
-  bool renovation = false;
+  // de chantier, et l'entretien courant passe aux métiers. Actif par défaut (MODELE.md § 6.6).
+  bool renovation = true;
 
+  /// Réglages par défaut : depuis le 14 novembre 2026, tous les modules sont actifs (demande de Francis : tous les
+  /// modules actifs par défaut, dans l'interface et sans elle).
   Modules();
+
+  /// Les réglages par défaut d'avant le 14 novembre 2026 : bâtiments, rôles, entrepreneuriat, produits, banques et
+  /// rénovation coupés. La batterie de parité et la référence du moteur (tool/reference.sh) les rejouent, avec le
+  /// commerce extérieur coupé (Params.historique) : l'empreinte reste comparable d'une révision à l'autre.
+  Modules.historique() {
+    buildings = false;
+    jobs = false;
+    entrepreneurship = false;
+    products = false;
+    banking = false;
+    renovation = false;
+  }
 
   /// Tous les modules coupés : chaînes de production, emploi, nourriture, logement, loisirs.
   Modules.none() {

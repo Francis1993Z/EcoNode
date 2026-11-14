@@ -62,7 +62,7 @@ void main() {
   });
 
   testWidgets('module coupé : la liste montre le salaire unique et propose d’activer le module', (tester) async {
-    final ctrl = SimController(seed: 7)..sim = Sim(seed: 7);
+    final ctrl = SimController(seed: 7)..sim = Sim(seed: 7, params: Params.historique(), modules: Modules.historique());
     for (var d = 0; d < 30; d++) {
       ctrl.sim.step();
     }

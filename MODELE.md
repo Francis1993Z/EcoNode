@@ -178,10 +178,15 @@ ristournes, refus. Identité de bilan : réserves + prêts = dépôts + fonds pr
     éducation publique, entrée et sortie d'entreprises ;
   - institutions I1 à I5 : test de solvabilité, enveloppe des services publics, assurance-emploi, règles prudentielles,
     faillite ordonnée.
-- **Modules coupés par défaut :** bâtiments et hypothèques (`buildings`) ; rôles, contrats et négociation salariale
-  (`jobs`, § 6.16), que l'interface active pour ses parties (`ui/controller.dart`) mais que le protocole et les tests
-  laissent coupé sauf mention ; rénovation et métiers du bâtiment (`renovation`, § 6.6, suppose `buildings`, réglé au
-  départ d'une partie ; l'écran de départ l'active à partir de 1 000 citoyens).
+- **Modules ajoutés depuis, actifs par défaut depuis le 14 novembre 2026** (demande de Francis : tous les modules
+  actifs par défaut, dans l'interface et sans elle) : bâtiments et hypothèques (`buildings`) ; rôles, contrats et
+  négociation salariale (`jobs`, § 6.16) ; entrepreneuriat des citoyens (`entrepreneurship`, § 6.17) ; variétés de
+  produits (`products`, § 6.18) ; crédit aux citoyens et banques (`banking`, § 6.19) ; rénovation et métiers du
+  bâtiment (`renovation`, § 6.6, suppose `buildings`, réglé au départ d'une partie, à toutes les tailles). Le commerce
+  extérieur (`Params.trade`) est ouvert par défaut depuis la même date.
+- **Anciens défauts** (`Modules.historique`, `Params.historique`) : ces six modules et le commerce extérieur coupés. La
+  batterie de parité (`tool/parite_plateformes.sh`, option `--historique` de `partie` et `stabilite`) et la référence du
+  moteur (`tool/reference.sh`) les rejouent : l'empreinte reste comparable d'une révision à l'autre.
 - **Filets** (`model.dart:Safeguards`), actifs par défaut dans le jeu : anti-famine, renflouement, plancher de logement,
   plafond de dérive, anti-crédit-fou. Ce sont des instruments de diagnostic : chaque déclenchement est compté et
   journalisé.
@@ -384,7 +389,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `bufferDays` | 12 | coussin d'épargne, en jours de survie | choix de jeu |
 | `mpcIncome` | 0,6 | propension à consommer le revenu discrétionnaire (α₁) | modèle SIM de Godley et Lavoie |
 | `wealthTargetDays` | 20 | richesse visée T, en jours de revenu discrétionnaire ; α₂ = (1 − α₁)/T | calibration interne : reproduit la richesse de départ (2 750 $ ≈ 21 jours) |
-| `trade`, `importMarkup`, `exportDiscount` | non, 1,3, 0,7 | commerce extérieur : import au prix mondial × 1,3, export × 0,7 | choix de jeu |
+| `trade`, `importMarkup`, `exportDiscount` | oui (depuis le 14 novembre 2026 ; non dans `Params.historique`), 1,3, 0,7 | commerce extérieur : import au prix mondial × 1,3, export × 0,7 | choix de jeu |
 | `tradeWaves`, `tradeWaveAmp`, `tradeWavePeriod`, `tradeNoise`, `tariff` | non, 0,3, 365 j, 0,02, 0 | douane (§ 6.21) : prix mondiaux en vagues, droit sur les importations | choix de jeu |
 | `floatingFx`, `fxSpeed` | non, 0,05 | douane (§ 6.21) : taux de change flottant et sa vitesse d'ajustement par jour | mesure § 6.21 |
 | `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
@@ -792,9 +797,9 @@ de jeu, non calibrés.
   mêmes écarts (2 500 citoyens : chômage 5,9 → 4,6 %, indice final 1,73 → 2,25 ; 240 : 5,0 → 3,8 %, 1,67 → 2,31), aucune
   saisie, pas de spirale prix-crédit. Détails : `rapports/types-batiments.md`.
 
-**Rénovation et métiers du bâtiment (`Modules.renovation`, 2026-11-12, avec le module Bâtiments).** Coupé dans le
-moteur, réglé au départ d'une partie ; l'écran de départ l'active avec le marché immobilier à partir de 1 000 citoyens
-(`ui/controller.dart:renovationMinPopulation`, décision de Francis). Motivation : sans rénovation, le parc de départ
+**Rénovation et métiers du bâtiment (`Modules.renovation`, 2026-11-12, avec le module Bâtiments).** Réglé au départ
+d'une partie ; actif par défaut depuis le 14 novembre 2026, dans le moteur et l'interface, à toutes les tailles (décision
+de Francis ; sous 1 000 citoyens environ, l'entrepreneur général et la briqueterie meurent souvent faute de travail). Motivation : sans rénovation, le parc de départ
 tombe en ruine d'un bloc vers 65-70 ans (`rapports/derive36k.md`).
 - **Chaîne.** Huit biens (`renovationGoods`) et neuf types (`renovationTypes`) ajoutés à la fin des tables : scierie
   (bois → planches), briqueterie (carburant, argile sur place → briques), tuyauterie, câblerie et fusibles (cuivre +
@@ -1095,8 +1100,8 @@ Les résultats de ces variantes sont au journal (tâche 4). Les règles prudenti
 
 ### 6.16 Rôles, contrats et négociation salariale (module `jobs`, `jobs.dart`)
 
-Coupé par défaut dans le moteur (empreinte de parité identique au bit près quand il est coupé) ; l'interface l'active
-pour ses parties. Mesures et choix : [`rapports/emplois-negociation.md`](rapports/emplois-negociation.md).
+Actif par défaut depuis le 14 novembre 2026 (coupé dans `Modules.historique`, que rejoue la référence du moteur).
+Mesures et choix : [`rapports/emplois-negociation.md`](rapports/emplois-negociation.md).
 
 - **Organigrammes** (`model.dart:roles`). Chaque type d'entreprise a 3 à 5 rôles. Un rôle a une qualification minimale
   (0 à 3 ; sa partie entière, plafonnée à 2, donne sa classe), une prime à l'intérieur de sa classe, une part visée de
@@ -1173,7 +1178,7 @@ avec Produits, 8,4 → 6,6 % (7 sur 10 ; pire graine 13,8 → 10,3 %), indice +0
 
 ### 6.17 Entrepreneuriat des citoyens (module `entrepreneurship`, `entrepreneuriat.dart`)
 
-Coupé par défaut (le moteur, le protocole et `reference.sh` ne changent pas ; l'interface le lance actif). Avec le module,
+Actif par défaut depuis le 14 novembre 2026 (coupé dans `Modules.historique`, que rejoue la référence du moteur). Avec le module,
 `_entryExit` ne crée plus de « clone » mécanique (`_found`) : les fermetures restent celles de l'inactivité (I5 inchangée),
 la fondation devient une décision de citoyen. Il suppose le module `entry`.
 - **Candidat** : pas déjà propriétaire, veut posséder (trait `wantsToOwn` avec les bâtiments, sinon même tirage de part `ownerShare`),
@@ -1194,7 +1199,7 @@ la fondation devient une décision de citoyen. Il suppose le module `entry`.
 
 ### 6.18 Variétés de produits et marques (module `products`, `produits.dart`)
 
-Coupé par défaut (l'interface le lance actif). Une **catégorie** est un bien ; une **variété**, le produit d'une entreprise (une par
+Actif par défaut depuis le 14 novembre 2026 (coupé dans `Modules.historique`). Une **catégorie** est un bien ; une **variété**, le produit d'une entreprise (une par
 entreprise) dans les catégories différenciées : consommation (`consumerVarieties` : pain, viande, repas, télé, loisirs, hôtel, voyages,
 bijoux, ordinateurs) et équipement (`machines`). Les matières premières et biens intermédiaires ne changent pas. Aucune catégorie ajoutée,
 aucune variété créée d'avance : une entreprise lance la sienne à sa création (ou à l'activation), l'abandonne à sa fermeture.
@@ -1225,7 +1230,7 @@ aucune variété créée d'avance : une entreprise lance la sienne à sa créati
 
 ### 6.19 Crédit aux citoyens et banques (module `banking`, `banques.dart`)
 
-Coupé par défaut (l'interface le lance actif). **Crédit aux particuliers** : carte de crédit quand l'argent ne couvre pas les besoins
+Actif par défaut depuis le 14 novembre 2026 (coupé dans `Modules.historique`). **Crédit aux particuliers** : carte de crédit quand l'argent ne couvre pas les besoins
 du jour (limite `cardLimitDays` jours de revenu selon la cote, paiement minimum `cardMinPct` par mois, taux `cardRate` + marge de la
 banque + prime de cote), prêt personnel à mensualités constantes (`loanTermMonths`) pour un creux de chômage ou un achat important ;
 remboursement de la carte quand le revenu arrive. Cote 300–900 (retards récents, dette / revenu, emploi, faillite) ; service de la

@@ -8,6 +8,9 @@
 //   --sauf bailout,famine    filets coupés (les autres restent actifs)
 //   --modules credit=0,...   coupe (0) ou active (1) des modules
 //   --noyau                  coupe tous les modules ajoutés au modèle de base (les institutions restent actives)
+//   --historique             réglages par défaut d'avant le 14 novembre 2026 : Modules.historique() et commerce
+//                            extérieur coupé (Params.historique) ; pour la batterie de parité et la référence du moteur.
+//                            À placer avant --modules et --param, qui s'appliquent par-dessus
 //   --param nom=valeur       change un paramètre (comme tool/stabilite.dart)
 //   --population 1000        taille de la population (comme --param population=1000)
 //   --sans-hasard            tous les tirages valent 0,5 et les ordres du jour suivent les identifiants (cas extrême de
@@ -42,6 +45,7 @@ class _Opts {
   bool nets = true;
   Set<String> sauf = {};
   Modules modules = Modules();
+  bool historique = false; // Params.historique au lieu de Params()
   Map<String, String> params = {};
   bool noRandom = false;
   String? trace;
@@ -87,6 +91,10 @@ class _Opts {
           keep(v);
         case '--noyau':
           modules = Modules.noyau();
+          passThrough.add(a);
+        case '--historique':
+          modules = Modules.historique();
+          historique = true;
           passThrough.add(a);
         case '--modules':
           final v = next();
@@ -138,7 +146,7 @@ class _Opts {
   }
 
   Sim newSim() {
-    final p = Params();
+    final p = historique ? Params.historique() : Params();
     for (final e in params.entries) {
       applyParam(p, e.key, e.value);
     }

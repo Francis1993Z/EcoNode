@@ -16,6 +16,9 @@
 //   --shock-nets both        chocs sans filets (off), avec filets (on) ou les deux (both)
 //   --modules credit=0,...   coupe (0) ou active (1) des modules
 //   --noyau                  coupe tous les modules ajoutés au modèle de base (les institutions restent actives)
+//   --historique             réglages par défaut d'avant le 14 novembre 2026 : Modules.historique() et commerce
+//                            extérieur coupé (Params.historique) ; pour la batterie de parité et la référence du moteur.
+//                            À placer avant --modules et --param, qui s'appliquent par-dessus
 //   --param nom=valeur       change un paramètre (variantes mesurées ; voir applyParam)
 //   --population 1000        taille de la population (comme --param population=1000)
 //   --niveau 0|1|2           niveau du protocole (remplace graines, durée, étapes et population) :
@@ -60,10 +63,11 @@ class Config {
   final String label;
   Modules modules;
   final Map<String, String> params;
-  Config(this.label, this.modules, this.params);
+  final bool historique; // Params.historique au lieu de Params() (option --historique)
+  Config(this.label, this.modules, this.params, [this.historique = false]);
 
   Params newParams() {
-    final p = Params();
+    final p = historique ? Params.historique() : Params();
     for (final e in params.entries) {
       applyParam(p, e.key, e.value);
     }
@@ -81,7 +85,7 @@ class Config {
   ///   <module>=0|1            un module (Modules.keys)
   ///   param:<nom>=<valeur>    un paramètre (applyParam)
   Config apply(String spec) {
-    final c = Config(spec, modules.copy(), Map.of(params));
+    final c = Config(spec, modules.copy(), Map.of(params), historique);
     if (spec == 'ref') return c;
     for (final t in spec.split(',')) {
       if (t == 'noyau') {
@@ -170,6 +174,8 @@ class Options {
           shockNets = v == 'both' ? {'off', 'on'} : {v};
         case '--noyau':
           config.modules = Modules.noyau();
+        case '--historique':
+          config = Config(config.label, Modules.historique(), config.params, true);
         case '--sauf':
           final v = next();
           if (v == 'chacun') {
