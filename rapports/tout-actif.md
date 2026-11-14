@@ -51,10 +51,62 @@ Moyennes des 10 graines sur les jours 1 001-3 000 :
 - **Entrepreneur général actif au jour 3 000** : 0 et 1 sur 10 à 240 (C, B), 6 et 7 sur 10 à 1 000, 10 et 9 sur 10 à
   2 500, comme attendu sans le seuil.
 
-## 3. À décider
+## 3. Diagnostic : qui perd face aux importations, et pourquoi
 
-Les nouveaux défauts doublent ou triplent le chômage de l'ancienne partie par défaut, et c'est le commerce extérieur qui
-en est la cause : les modules seuls l'améliorent. Le commerce a été réglé comme un « choix de jeu » (import au prix mondial
-× 1,3, export × 0,7) et n'a jamais été calibré pour une partie ordinaire. Avant de fusionner, il faudrait soit garder les
-frontières fermées par défaut, soit comprendre pourquoi l'ouverture détruit autant d'emplois (quelles filières perdent
-face à l'import) et le corriger.
+Francis garde les frontières ouvertes par défaut (14 novembre) et demande le diagnostic. Sonde `tool/commerce.dart` :
+mêmes réglages que B et C, 4 graines à 240 et 1 000 citoyens, 2 à 2 500, 3 000 jours, frontières ouvertes et fermées ;
+moyennes des jours 1 001-3 000. Sorties et agrégation : `rapports/donnees/tout-actif/commerce/` (`agg_c.txt`).
+
+**Ce qui fixe le prix à l'import.** Prix mondial × 1,3 (`importMarkup`) × facteur des vagues (0,7 à 1,3) × taux de change
+(× droit de douane, nul). Le prix mondial est celui du plan de départ et ne bouge jamais. L'export est payé prix mondial ×
+0,7 × vagues × change. L'importation est une offre sans limite de quantité, à côté des vendeurs d'ici.
+
+**1. Les prix relatifs d'ici s'éloignent des prix mondiaux, même frontières fermées.** Avec tous les modules, la monnaie du
+crédit et des hypothèques fait monter les salaires et les prix (indice × 2 à 3), mais pas partout pareil : les biens faits
+surtout de travail montent, ceux que les machines et la technologie rendent moins chers baissent. Prix d'ici rapporté au
+prix mondial, frontières fermées :
+
+| | Repas | Pain | Viande | Poisson | Céréales | Or | Bijoux | Pétrole | Carburant | Machines |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 000 citoyens | 2,73 | 2,91 | 2,53 | 2,47 | 2,75 | 0,46 | 0,56 | 1,15 | 1,13 | 1,25 |
+| 2 500 citoyens | 2,45 | 2,44 | 2,19 | 2,09 | 2,28 | 0,27 | 0,41 | 0,56 | 0,77 | 0,98 |
+
+Le pain coûte ici 6 à 9 fois plus que l'or, comparé au reste du monde. Dans la réalité, les mêmes gains de productivité se
+font ailleurs aussi et les prix mondiaux suivent ; ici, ils restent ceux du jour 0.
+
+**2. À 1 000 et 2 500 citoyens : un « syndrome hollandais ».** Frontières ouvertes, l'or, les bijoux, le pétrole et le
+carburant, très bon marché ici, s'exportent en masse (à 2 500 : bijoux 45 000 $/j, carburant 43 000, pétrole 40 000, or
+31 000 ; à 1 000 : bijoux 64 000, or 46 000). Ces recettes gardent le taux de change bas (0,7 à 1,6 en moyenne selon la
+graine) alors qu'il faudrait environ 2,5 pour compenser l'écart de prix de la nourriture : elle s'importe :
+
+| Bien (1 000 citoyens) | Part importée | Production par jour, ouvert (fermé) | Emplois, ouvert (fermé) |
+|---|---|---|---|
+| Repas | 97 % | 80 (999) | 8 (84) |
+| Pain | 96 % | 37 (831) | 2 (20) |
+| Viande | 99 % | 4 (281) | 0,5 (16) |
+| Poisson | 100 % | 2,5 (100) | 0,6 (10) |
+| Céréales | 88 % | 0,8 (83) | 0,2 (10) |
+| Bétail | 81 % | 0,1 (5) | 0,2 (10) |
+
+Environ 140 emplois de la filière alimentaire disparaissent à 1 000 citoyens (14 % des travailleurs) ; les secteurs qui
+exportent n'en créent qu'une soixantaine (bijoux + 70, or + 16, pétrole et carburant − 14). À 2 500, même chose pour le
+pain (94 % importé), la viande, le poisson et les céréales (100 %, 95 %), et la moitié des repas. Les fermetures suivent :
+restaurants 34 contre 9, boulangeries 29 contre 5, boucheries 27 contre 7, pêche 33 contre 16 (2 graines). Les repas du
+restaurant, qu'on ne peut pas importer dans la réalité, sont le premier poste d'importation (86 000 $/j à 1 000 et à
+2 500 citoyens).
+
+**3. À 240 citoyens : l'inverse.** Le taux de change monte (3 à 7,5 ; la monnaie d'ici se déprécie) mais pas assez vite
+pour l'inflation (indice ≈ 3,5) : machines, ordinateurs, électronique, acier, fils, fusibles et tuyaux viennent à 100 % de
+l'étranger, leurs petites entreprises ferment, et la viande est importée à moitié.
+
+## 4. Corrections possibles (à décider par Francis)
+
+1. **Prix mondiaux qui vivent** : chaque prix mondial suit lentement le coût normal du bien ici (le reste du monde a les
+   mêmes techniques), vagues en plus. La cause est traitée à la racine ; le commerce ne vient plus que des vagues, du
+   change et des écarts de coût du moment.
+2. **Services non échangeables** : les repas du restaurant (et peut-être le pain frais) ne s'importent ni ne s'exportent,
+   comme l'hôtel ou les loisirs.
+3. **Préférence pour ce qui est fait ici** : une importation n'est choisie que si elle est moins chère d'une marge (transport,
+   fraîcheur, habitudes), par exemple 20 %.
+4. **Change ancré sur les prix** : le taux de change suit aussi l'écart entre l'indice des prix d'ici et celui du monde,
+   pas seulement le solde des échanges (traite surtout le cas des 240 citoyens).
