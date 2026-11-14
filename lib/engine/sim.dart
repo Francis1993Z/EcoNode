@@ -3582,15 +3582,27 @@ class Sim {
     }
   }
 
+  /// Lots par jour d'un projet de création qui répond à [want] unités par jour non servies avec une équipe de [team]. Module
+  /// renovation, entreprises de la chaîne : au plus ce que l'équipe produit, car la demande non servie d'une chaîne
+  /// éteinte s'accumule (chaque rénovation en attente redemande ses modules chaque jour) ; sans plafond, le capital exigé
+  /// (cinq jours d'intrants pour toute cette demande) dépassait plusieurs centaines de milliers de dollars et aucun
+  /// entrepreneur général n'était plus fondé (mesuré : 6 graines sur 10 à 1 000 citoyens, jusqu'à 138 rénovations en
+  /// attente au jour 3 000). Sans le module, toute la demande, comme avant.
+  double projectBatches(String ty, double want, int team) {
+    final t = templates[ty]!;
+    final b = want / t.outputs[t.outputs.keys.first]!;
+    return renovationActive && renovationTypes.contains(ty) ? math.min(b, team * t.rate) : b;
+  }
+
   /// Un citoyen fonde une entreprise de ce type avec son épargne (10 jours de salaires, 5 jours d'intrants).
   /// Rend null si l'entreprise est créée, sinon la cause du refus : main_oeuvre, viabilite ou capital.
   String? _found(String ty, double want, String why) {
     final p = params;
     final t = templates[ty]!;
     final g = t.outputs.keys.first;
-    final batches = want / t.outputs[g]!;
-    final w = batches / t.rate; // employés nécessaires à productivité nominale
+    final w = want / t.outputs[g]! / t.rate; // employés nécessaires à productivité nominale
     final team = w.ceil().clamp(1, 3).toInt();
+    final batches = projectBatches(ty, want, team);
     // module jobs : coût moyen d'un employé de l'organigramme, au salaire affiché du marché
     final wage = modules.jobs ? marketOffer(t.skill) * avgRoleRel(ty) : marketWage(t.skill);
     var inputCost = 0.0;
