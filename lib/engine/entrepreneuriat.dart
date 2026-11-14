@@ -175,7 +175,7 @@ extension SimEntrepreneurship on Sim {
       }
       var revenue0 = 0.0;
       for (final e in t.outputs.entries) {
-        revenue0 += batches * e.value * math.min(bestPrice(e.key), 2 * worldPrice[e.key]!);
+        revenue0 += batches * e.value * projectPrice(ty, e.key);
       }
       // Params.revivalHours : une relance à temps partiel ne paie que les heures nécessaires
       final labour = p.revival ? entryLabour(g, w, team, wage) : team * wage;

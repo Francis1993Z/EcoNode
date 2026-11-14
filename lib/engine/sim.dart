@@ -3582,6 +3582,19 @@ class Sim {
     }
   }
 
+  /// Prix de vente qu'un projet de création attend pour [g] : le meilleur prix offert, au plus deux fois le prix de départ.
+  /// Module renovation, entreprises de la chaîne, quand plus personne ne vend le bien : le prix de départ indexé sur les
+  /// salaires (au plus deux fois), car le meilleur prix retombe alors sur le prix de départ, que l'inflation a dépassé
+  /// depuis (mesuré à 1 000 citoyens : au jour 800, un entrepreneur général n'était plus jamais viable, recette 6 120 $/j
+  /// contre 950 $ de travail et 5 300 $ d'intrants, et 26 rénovations attendaient). Sans le module, comme avant.
+  double projectPrice(String ty, String g) {
+    if (renovationActive && renovationTypes.contains(ty) && !hasActiveProducer(g)) {
+      final ref = referencePrice(g);
+      return math.min(math.max(bestPrice(g), ref), 2 * ref);
+    }
+    return math.min(bestPrice(g), 2 * worldPrice[g]!);
+  }
+
   /// Lots par jour d'un projet de création qui répond à [want] unités par jour non servies avec une équipe de [team]. Module
   /// renovation, entreprises de la chaîne : au plus ce que l'équipe produit, car la demande non servie d'une chaîne
   /// éteinte s'accumule (chaque rénovation en attente redemande ses modules chaque jour) ; sans plafond, le capital exigé
@@ -3616,7 +3629,7 @@ class Sim {
     // l'équipe et ses intrants ; un marché trop petit pour un employé reste sans producteur
     var revenue0 = 0.0;
     for (final e in t.outputs.entries) {
-      revenue0 += batches * e.value * math.min(bestPrice(e.key), 2 * worldPrice[e.key]!);
+      revenue0 += batches * e.value * projectPrice(ty, e.key);
     }
     final hours = revivesByHours(g); // Params.revivalHours : relance à temps partiel
     final labour = hours ? entryLabour(g, w, team, wage) : team * wage;

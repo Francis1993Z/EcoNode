@@ -57,7 +57,7 @@ void main(List<String> a) {
     }
     var revenue0 = 0.0;
     for (final e in t.outputs.entries) {
-      revenue0 += batches * e.value * math.min(s.bestPrice(e.key), 2 * s.worldPrice[e.key]!);
+      revenue0 += batches * e.value * s.projectPrice(ty, e.key);
     }
     final labour = p.revival ? s.entryLabour(g, w, team, wage) : team * wage;
     final viable = revenue0 >= 1.1 * (labour + inputCost);
