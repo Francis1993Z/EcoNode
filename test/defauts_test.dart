@@ -39,6 +39,34 @@ void main() {
     expect(s.ledgerImports + s.ledgerExports, greaterThan(0));
   });
 
+  test('corrections du commerce extérieur : pas de repas importé, prix mondiaux qui bougent, comptes justes', () {
+    final p = Params()
+      ..worldPriceDrift = true
+      ..localMeals = true
+      ..homePreference = true
+      ..tradeWaves = true
+      ..floatingFx = true
+      ..foreignDemand = true;
+    final s = Sim(seed: 3, params: p, devChecks: true); // lève une exception au premier écart
+    expect(s.tradable('repas'), isFalse);
+    expect(s.tradable('pain'), isTrue);
+    expect(s.importBias, closeTo(1.2, 1e-12));
+    var repas = 0.0;
+    for (var d = 0; d < 300; d++) {
+      s.step();
+      for (final e in s.flows.values) {
+        if ((e.from == 'X' || e.to == 'X') && e.good == 'repas') repas += e.qty;
+      }
+    }
+    expect(repas, 0);
+    expect(s.worldDrift, isNotEmpty);
+    expect(s.worldDrift.values.any((v) => (v - 1).abs() > 0.01), isTrue);
+    // l'état des corrections passe par l'instantané
+    final r = simFromSnapshot((jsonDecode(jsonEncode(s.toSnapshot())) as Map).cast<String, dynamic>());
+    expect(r.worldDrift, s.worldDrift);
+    expect(r.params.homePreference && r.params.localMeals && r.params.worldPriceDrift, isTrue);
+  });
+
   test('un instantané des anciens défauts se relit avec ses modules récents coupés', () {
     final s = Sim(seed: 2, params: Params.historique(), modules: Modules.historique());
     for (var d = 0; d < 20; d++) {

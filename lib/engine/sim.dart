@@ -162,8 +162,9 @@ class _BestOffers {
   late final List<double> sortedPrices = [for (final f in byPrice) f.price[good]!]; // les prix ne changent pas ici
   final double imported; // prix d'importation, ou l'infini
   final double fallback; // plus bas prix affiché, sinon le prix mondial
+  final double bias; // Params.homePreference : l'importation n'est prise que si imported × bias est plus bas
   int _next = 0; // premier vendeur qui peut encore avoir une unité en stock
-  _BestOffers._(this.good, this.sellers, this.byPrice, this.imported, this.fallback);
+  _BestOffers._(this.good, this.sellers, this.byPrice, this.imported, this.fallback, this.bias);
 
   /// Attrait de chaque vendeur pour un ménage (la notoriété ne change pas pendant la consommation).
   List<double> householdPulls(Sim s) => _pulls ??= [for (final f in sellers) 1 / (1 + s.brandPull(f))];
@@ -173,9 +174,9 @@ class _BestOffers {
     final list = List<Firm>.of(sellers)..sort((a, b) => a.price[good]!.compareTo(b.price[good]!));
     final p = s.params;
     final g = goods[good]!;
-    final imported = p.trade && !g.perish && g.tradable ? s.importPrice(good) : double.infinity;
+    final imported = p.trade && !g.perish && s.tradable(good) ? s.importPrice(good) : double.infinity;
     final fallback = list.isEmpty ? s.worldPrice[good]! : list.first.price[good]!;
-    return _BestOffers._(good, sellers, list, imported, fallback);
+    return _BestOffers._(good, sellers, list, imported, fallback, s.importBias);
   }
 
   List<int>? _priceIdx;
@@ -191,7 +192,8 @@ class _BestOffers {
       _next++;
     }
     final best = _next < byPrice.length ? sortedPrices[_next] : double.infinity;
-    return math.min(best, imported);
+    if (bias == 1) return math.min(best, imported);
+    return imported * bias < best ? imported : best;
   }
 
   double bestPrice() {
@@ -248,9 +250,9 @@ class _AllOffers {
       offers.add(_Offer(f, f.price[good]!, s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, f.id)), 1 / (1 + s.brandPull(f))));
     }
     final p = s.params;
-    if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
-      offers.add(
-          _Offer(null, s.importPrice(good), s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), 1));
+    if (p.trade && !goods[good]!.perish && s.tradable(good)) {
+      offers.add(_Offer(
+          null, s.importPrice(good), s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), s.importBias));
     }
     keys = [for (final o in offers) o.p * (1 + 0.03 * o.r) * o.pull];
     used = List<bool>.filled(offers.length, false);
@@ -283,9 +285,9 @@ class _AllOffers {
       }
     }
     final p = s.params;
-    if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
-      offers.add(
-          _Offer(null, s.importPrice(good), s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), 1));
+    if (p.trade && !goods[good]!.perish && s.tradable(good)) {
+      offers.add(_Offer(
+          null, s.importPrice(good), s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), s.importBias));
     }
     keys = [for (final o in offers) o.p * (1 + 0.03 * o.r) * o.pull];
     used = List<bool>.filled(offers.length, false);
@@ -327,6 +329,8 @@ class _LazyOffers {
   int _front = 0;
   bool _import;
   final double _importPrice;
+  final double _bias; // Params.homePreference (1 sinon)
+  final double _importKey; // plus petite clé possible de l'offre d'importation
   // tas binaire des offres examinées : clé, place ; offers[i] est l'offre
   final List<double> _keys = [];
   final List<int> _place = [];
@@ -334,9 +338,13 @@ class _LazyOffers {
 
   _LazyOffers(this.s, this.bo, this.buyer, this.good, this.base)
       : idx = bo.priceIdx,
-        _import = s.params.trade && !goods[good]!.perish && goods[good]!.tradable,
-        _importPrice = s.params.trade && !goods[good]!.perish && goods[good]!.tradable
+        _import = s.params.trade && !goods[good]!.perish && s.tradable(good),
+        _importPrice = s.params.trade && !goods[good]!.perish && s.tradable(good)
             ? s.importPrice(good)
+            : double.infinity,
+        _bias = s.importBias,
+        _importKey = s.params.trade && !goods[good]!.perish && s.tradable(good)
+            ? s.importPrice(good) * s.importBias
             : double.infinity;
 
   bool _less(int a, int b) => _keys[a] < _keys[b] || (_keys[a] == _keys[b] && _place[a] < _place[b]);
@@ -389,13 +397,13 @@ class _LazyOffers {
     for (;;) {
       // plus petit prix parmi les vendeurs pas encore examinés (leur clé ne peut pas être plus basse)
       final nextSeller = _front < bo.byPrice.length ? bo.sortedPrices[_front] : double.infinity;
-      final lb = _import && _importPrice < nextSeller ? _importPrice : nextSeller;
+      final lb = _import && _importKey < nextSeller ? _importKey : nextSeller;
       if (_keys.isNotEmpty && (lb == double.infinity || _keys[0] < lb)) return _pop();
       if (lb == double.infinity) return null;
-      if (_import && _importPrice <= nextSeller) {
+      if (_import && _importKey <= nextSeller) {
         _import = false;
         final r = s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0));
-        final o = _Offer(null, _importPrice, r, 1);
+        final o = _Offer(null, _importPrice, r, _bias);
         _push(o.p * (1 + 0.03 * o.r) * o.pull, 1 << 30, o);
         continue;
       }
@@ -589,6 +597,12 @@ class Sim {
   double fxRate = 1, fxImportsEma = 0, fxExportsEma = 0;
   /// Commandes quotidiennes de l'étranger (Params.foreignDemand), en unités, par « identifiant d'entreprise:bien ».
   final Map<String, double> foreignOrders = {};
+  /// Prix mondiaux qui vivent (Params.worldPriceDrift) : multiplicateur du prix mondial de départ dans les prix d'import et
+  /// d'export, par bien (1 au départ) ; vide tant que la correction n'a pas servi.
+  final Map<String, double> worldDrift = {};
+  /// Relevés du jour pour worldDrift (Params.worldPriceDrift), refaits par _decide : somme des coûts normaux pondérés par
+  /// la production lissée des vendeurs actifs, et somme des poids, par bien.
+  final Map<String, double> _normalCostSum = {}, _normalCostW = {};
   /// Importations de secours des établissements publics (Params.publicImports), en dollars, depuis le début.
   double ledgerPublicImports = 0;
   /// Dette publique envers la Caisse (Params.stateBorrowing) et ses totaux : emprunté, intérêts payés ou capitalisés,
@@ -799,6 +813,7 @@ class Sim {
     fxImportsEma = 0;
     fxExportsEma = 0;
     foreignOrders.clear();
+    worldDrift.clear();
     ledgerPublicImports = 0;
     stateDebt = stateBorrowed = stateInterest = stateRepaid = stateInterestToday = 0;
     cpiValueEma.clear();
@@ -1702,8 +1717,13 @@ class Sim {
       }
     }
     if (verifyFastPaths && best != _quoteScan(good)) throw StateError('Meilleur prix (tableaux) différent au jour $day ($good)');
-    if (params.trade && !goods[good]!.perish && goods[good]!.tradable) {
-      best = math.min(best, importPrice(good));
+    if (params.trade && !goods[good]!.perish && tradable(good)) {
+      final ip = importPrice(good), bias = importBias;
+      if (bias == 1) {
+        best = math.min(best, ip);
+      } else if (ip * bias < best) {
+        best = ip;
+      }
     }
     return best;
   }
@@ -2010,6 +2030,7 @@ class Sim {
     _capital();
     _quoteCache = null;
     _decide();
+    if (p.worldPriceDrift) _driftWorldPrices(); // prix mondiaux qui vivent, sur les coûts relevés par _decide
     _finance();
     for (final g in goodKeys) {
       unmetEma[g] = 0.9 * (unmetEma[g] ?? 0) + 0.1 * (unmet[g] ?? 0);
@@ -3228,7 +3249,7 @@ class Sim {
     if (params.foreignDemand) _foreignOrders(); // commandes de l'étranger d'abord, puis surplus de stock
     for (final f in firms) {
       for (final g in f.outputs.keys) {
-        if (goods[g]!.perish || !goods[g]!.tradable) continue;
+        if (goods[g]!.perish || !tradable(g)) continue;
         final excess = (f.inv[g] ?? 0) - 8 * math.max(f.demandEma[g] ?? 0, 0.5);
         if (excess <= eps) continue;
         final value = transfer(null, f, excess * exportPrice(g));
@@ -3781,6 +3802,10 @@ class Sim {
     final tw = wn[0] + wn[1] + wn[2];
     avgWage = tw > 0 ? (wsum[0] + wsum[1] + wsum[2]) / tw : p.startWage;
     final baseMk = p.markup - 1;
+    if (p.worldPriceDrift) {
+      _normalCostSum.clear();
+      _normalCostW.clear();
+    }
 
     for (final f in firms) {
       f.revenueEma = 0.9 * f.revenueEma + 0.1 * f.revenue;
@@ -3790,6 +3815,17 @@ class Sim {
       // prix au coût normal (A7) : la fixation du prix ignore la sous-utilisation de l'équipe ; le coût réel reste en cache
       final pricing = params.normalUtil > 0 ? unitCost(f, normal: true) : null;
       f.unitCostCache = cost;
+      if (p.worldPriceDrift && f.workers.isNotEmpty && !publicService(f)) {
+        // prix mondiaux qui vivent : coût normal de chaque extrant, pondéré par la production lissée
+        final nc = pricing ?? cost;
+        for (final e in f.outputs.entries) {
+          final c = nc[e.key];
+          if (c == null || !c.isFinite || c <= 0) continue;
+          final w = math.max(f.outputEma, 0.01) * e.value;
+          _normalCostSum[e.key] = (_normalCostSum[e.key] ?? 0) + c * w;
+          _normalCostW[e.key] = (_normalCostW[e.key] ?? 0) + w;
+        }
+      }
       for (final g in f.outputs.keys) {
         final um = f.unmetShare[g] ?? 0;
         f.unmetShare[g] = 0;

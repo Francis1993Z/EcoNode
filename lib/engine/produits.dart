@@ -327,10 +327,12 @@ extension SimProducts on Sim {
     }
     if (offers.isEmpty) return null;
     final p = params;
-    if (p.trade && !goods[g]!.perish && goods[g]!.tradable) {
+    if (p.trade && !goods[g]!.perish && tradable(g)) {
       final price = importPrice(g);
       offers.add(_Offer(null, price, 0.5, 1));
-      keys.add(-(p.prodQualityWeight * (uses[g]?.taste[c.level] ?? 1.0) - priceSensitivity(c) * price / worldPrice[g]!));
+      // Params.homePreference : l'importation est jugée comme si elle coûtait importBias fois son prix
+      keys.add(-(p.prodQualityWeight * (uses[g]?.taste[c.level] ?? 1.0) -
+          priceSensitivity(c) * price * importBias / worldPrice[g]!));
     }
     return _AllOffers.fromOffers(offers, keys);
   }

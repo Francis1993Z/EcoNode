@@ -1273,7 +1273,7 @@ class _WorldView extends StatelessWidget {
 
     final traded = [
       for (final e in goods.entries)
-        if (e.value.tradable && !e.value.perish && sim.goodKeys.contains(e.key)) e,
+        if (sim.tradable(e.key) && !e.value.perish && sim.goodKeys.contains(e.key)) e,
     ];
     TextStyle head() => TextStyle(color: pal.ink3, fontSize: 11);
     return ListView(padding: const EdgeInsets.all(12), children: [
@@ -1331,6 +1331,56 @@ class _WorldView extends StatelessWidget {
             max: 1,
             format: pct,
             onChanged: (v) => upd(() => p.exportDiscount = v)),
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Préférence pour ce qui est fait ici', style: TextStyle(fontSize: 13)),
+          subtitle: const Text(
+              'Un acheteur ne prend une importation que si elle est moins chère qu’ici d’au moins la marge ci-dessous '
+              '(transport, fraîcheur, habitudes). Il paie le prix d’import.',
+              style: TextStyle(fontSize: 11)),
+          value: p.homePreference,
+          onChanged: (v) => upd(() => p.homePreference = v),
+        ),
+        if (p.homePreference)
+          ParamSlider(
+              label: 'Marge de préférence',
+              value: p.homeMargin,
+              min: 0,
+              max: 1,
+              format: pct,
+              onChanged: (v) => upd(() => p.homeMargin = (v * 100).round() / 100)),
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Repas du restaurant non échangeables', style: TextStyle(fontSize: 13)),
+          subtitle: const Text('Comme l’hôtel ou les loisirs : un repas ne s’importe ni ne s’exporte.',
+              style: TextStyle(fontSize: 11)),
+          value: p.localMeals,
+          onChanged: (v) => upd(() => p.localMeals = v),
+        ),
+      ]),
+      Section('Prix mondiaux qui vivent', [
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Les prix mondiaux suivent les coûts', style: TextStyle(fontSize: 13)),
+          subtitle: const Text(
+              'Le prix d’import et d’export de chaque bien suit lentement son prix normal ici : le reste du monde a les '
+              'mêmes techniques. Coupé : les prix mondiaux restent ceux du départ, pendant que les prix d’ici dérivent.',
+              style: TextStyle(fontSize: 11)),
+          value: p.worldPriceDrift,
+          onChanged: (v) => upd(() => p.worldPriceDrift = v),
+        ),
+        if (p.worldPriceDrift)
+          ParamSlider(
+              label: 'Délai d’ajustement',
+              value: p.worldPriceDays,
+              min: 30,
+              max: 3000,
+              format: (v) => '${v.round()} j',
+              hint: 'Chaque jour, le prix mondial fait 1 / délai du chemin vers le prix normal d’ici.',
+              onChanged: (v) => upd(() => p.worldPriceDays = v.roundToDouble())),
       ]),
       Section('Prix mondiaux en vagues', [
         SwitchListTile(

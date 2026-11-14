@@ -203,6 +203,11 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.fdStart != d.fdStart) 'fdStart': _d(p.fdStart),
     if (p.fdMaxCap != d.fdMaxCap) 'fdMaxCap': _d(p.fdMaxCap),
     if (p.publicImports != d.publicImports) 'publicImports': p.publicImports,
+    if (p.worldPriceDrift != d.worldPriceDrift) 'worldPriceDrift': p.worldPriceDrift,
+    if (p.worldPriceDays != d.worldPriceDays) 'worldPriceDays': _d(p.worldPriceDays),
+    if (p.localMeals != d.localMeals) 'localMeals': p.localMeals,
+    if (p.homePreference != d.homePreference) 'homePreference': p.homePreference,
+    if (p.homeMargin != d.homeMargin) 'homeMargin': _d(p.homeMargin),
     if (p.stateBorrowing != d.stateBorrowing) 'stateBorrowing': p.stateBorrowing,
     if (p.stateDebtMaxGdp != d.stateDebtMaxGdp) 'stateDebtMaxGdp': _d(p.stateDebtMaxGdp),
     if (p.stateRepayRate != d.stateRepayRate) 'stateRepayRate': _d(p.stateRepayRate),
@@ -399,6 +404,11 @@ Params _paramsFrom(Map j) => Params()
   ..revivalFullCost = (j['revivalFullCost'] as bool?) ?? false
   ..revivalPlannedDemand = (j['revivalPlannedDemand'] as bool?) ?? false
   ..publicImports = (j['publicImports'] as bool?) ?? false
+  ..worldPriceDrift = (j['worldPriceDrift'] as bool?) ?? false
+  ..worldPriceDays = _rdOr(j['worldPriceDays'], 365)
+  ..localMeals = (j['localMeals'] as bool?) ?? false
+  ..homePreference = (j['homePreference'] as bool?) ?? false
+  ..homeMargin = _rdOr(j['homeMargin'], 0.2)
   ..stateBorrowing = (j['stateBorrowing'] as bool?) ?? false
   ..stateDebtMaxGdp = _rdOr(j['stateDebtMaxGdp'], 0.6)
   ..stateRepayRate = _rdOr(j['stateRepayRate'], 0.02)
@@ -1053,6 +1063,7 @@ extension SimSnapshot on Sim {
         if (ledgerTariffs != 0) 'ledgerTariffs': _d(ledgerTariffs),
         if (fxRate != 1 || fxImportsEma != 0 || fxExportsEma != 0) 'fx': [_d(fxRate), _d(fxImportsEma), _d(fxExportsEma)],
         if (foreignOrders.isNotEmpty) 'foreignOrders': _dm(foreignOrders),
+        if (worldDrift.isNotEmpty) 'worldDrift': _dm(worldDrift),
         if (ledgerPublicImports != 0) 'ledgerPublicImports': _d(ledgerPublicImports),
         if (cpiQtyEma.isNotEmpty) 'cpiSmooth': [_dm(cpiValueEma), _dm(cpiQtyEma)],
         if (stateBorrowed != 0)
@@ -1145,6 +1156,7 @@ extension SimSnapshot on Sim {
           _dm(foreignOrders)
         ])),
       if (importEma.isNotEmpty) 'renaissance': _fnv(j(_dm(importEma))),
+      if (worldDrift.isNotEmpty) 'prix_mondiaux': _fnv(j(_dm(worldDrift))),
       if (ledgerPublicImports != 0) 'secours': _fnv(j([_d(ledgerPublicImports)])),
       if (cpiQtyEma.isNotEmpty) 'indice_lisse': _fnv(j([_dm(cpiValueEma), _dm(cpiQtyEma)])),
       if (stateBorrowed != 0)
@@ -1227,6 +1239,9 @@ extension SimSnapshot on Sim {
     foreignOrders
       ..clear()
       ..addAll(j['foreignOrders'] == null ? const {} : _rdm(j['foreignOrders']));
+    worldDrift
+      ..clear()
+      ..addAll(j['worldDrift'] == null ? const {} : _rdm(j['worldDrift']));
     ledgerPublicImports = _rdOr(j['ledgerPublicImports'], 0);
     final cs = j['cpiSmooth'] as List?;
     cpiValueEma

@@ -390,6 +390,9 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `mpcIncome` | 0,6 | propension à consommer le revenu discrétionnaire (α₁) | modèle SIM de Godley et Lavoie |
 | `wealthTargetDays` | 20 | richesse visée T, en jours de revenu discrétionnaire ; α₂ = (1 − α₁)/T | calibration interne : reproduit la richesse de départ (2 750 $ ≈ 21 jours) |
 | `trade`, `importMarkup`, `exportDiscount` | oui (depuis le 14 novembre 2026 ; non dans `Params.historique`), 1,3, 0,7 | commerce extérieur : import au prix mondial × 1,3, export × 0,7 | choix de jeu |
+| `worldPriceDrift`, `worldPriceDays` | non (interface : oui), 365 | prix mondiaux qui suivent le prix normal d'ici (§ 6.21) | décision de Francis, 2026-11-14 |
+| `localMeals` | non (interface : oui) | repas du restaurant non échangeables (§ 6.21) | idem |
+| `homePreference`, `homeMargin` | non (interface : oui), 0,2 | une importation n'est prise que 20 % moins chère qu'ici (§ 6.21) | idem |
 | `tradeWaves`, `tradeWaveAmp`, `tradeWavePeriod`, `tradeNoise`, `tariff` | non, 0,3, 365 j, 0,02, 0 | douane (§ 6.21) : prix mondiaux en vagues, droit sur les importations | choix de jeu |
 | `floatingFx`, `fxSpeed` | non, 0,05 | douane (§ 6.21) : taux de change flottant et sa vitesse d'ajustement par jour | mesure § 6.21 |
 | `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
@@ -1339,6 +1342,25 @@ lié à la demande d'ici, une entreprise de transformation (restaurant : intrant
 Mesure (240 citoyens, 5 graines, chômage moyen des jours 1000 à 1500) : frontières fermées 23 %, change seul 38 %,
 change + demande étrangère 30 % (15 à 20 % dans 4 graines ; la cinquième s'effondre vers le jour 900 : des filières
 d'intrants disparaissent, les intrants importés rendent l'export non rentable, et le taux au plafond n'y peut rien).
+
+**Corrections du commerce extérieur (2026-11-14, choisies par Francis ; coupées dans le moteur, actives dans
+l'interface).** Diagnostic (`rapports/tout-actif.md` § 3, sonde `tool/commerce.dart`) : les prix mondiaux restaient ceux
+du plan de départ pendant que les prix relatifs d'ici dérivent avec le crédit et la productivité (nourriture à 2 ou 3 fois
+le prix mondial, or et bijoux à 0,3-0,6 fois, même frontières fermées). Frontières ouvertes, l'or, les bijoux, le pétrole
+et le carburant s'exportaient en masse, le change restait bas et toute la filière alimentaire était importée (≈ 140
+emplois perdus sur 1 000 citoyens) ; les repas du restaurant étaient le premier poste d'importation.
+- **Prix mondiaux qui vivent** (`worldPriceDrift`, `worldPriceDays` = 365) : `Sim.worldDrift[g]` (1 au départ) multiplie
+  le prix mondial dans `importPrice` et `exportPrice`. Après `_decide`, `_driftWorldPrices` le rapproche chaque jour de
+  1 / `worldPriceDays` de (prix normal ici / prix mondial de départ), borné à [0,1 ; 20] ; le prix normal est le coût au
+  taux d'utilisation normal (`unitCost(normal: true)`, sinon le coût du jour) des vendeurs actifs, pondéré par leur
+  production lissée, × `markup`. Un bien sans vendeur actif garde son facteur. `worldPrice` lui-même ne change pas : il
+  reste la référence des choix des ménages, du partage des coproduits et de la valeur des bâtiments. Instantané :
+  `worldDrift` (écrit s'il n'est pas vide).
+- **Repas non échangeables** (`localMeals`) : `Sim.tradable` exclut `repas`, partout où l'on importe ou exporte.
+- **Préférence pour ce qui est fait ici** (`homePreference`, `homeMargin` = 0,2) : la clé de l'offre d'importation est
+  multipliée par `importBias` = 1 + `homeMargin` (`_AllOffers`, `_LazyOffers`, `_BestOffers.quote`, `bestPrice`, choix
+  d'une variété, viabilité d'une relance) ; l'acheteur paie toujours le prix d'import.
+Mesure : `rapports/tout-actif.md` § 5.
 
 Importations de secours (`publicImports`, coupées par défaut dans le moteur, actives dans l'interface) : frontières
 fermées, un établissement public (hôpital ; l'école n'a pas d'intrant) achète d'abord ses intrants sur le marché d'ici,

@@ -84,6 +84,9 @@ class SimController extends ChangeNotifier {
               ..tradeWaves = true // douane : prix mondiaux en vagues
               ..floatingFx = true // douane : taux de change flottant
               ..foreignDemand = true // douane : commandes de l'étranger
+              ..worldPriceDrift = true // douane : prix mondiaux qui suivent les coûts d'ici (rapports/tout-actif.md)
+              ..localMeals = true // douane : repas du restaurant non échangeables
+              ..homePreference = true // douane : préférence de 20 % pour ce qui est fait ici
               ..revival = true // renaissance des filières éteintes (MODELE.md § 6.22)
               ..revivalPlannedDemand = true // demande dérivée comptée au plan de l'aval : moins de relances vouées à l'échec
               ..excessCashReturn = true // excédent de trésorerie reversé aux propriétaires (dérive N16, rapports/anomalies)
@@ -243,6 +246,9 @@ class SimController extends ChangeNotifier {
           ..tradeWaves = true
           ..floatingFx = true
           ..foreignDemand = true
+          ..worldPriceDrift = true // commerce extérieur : voir le constructeur
+          ..localMeals = true
+          ..homePreference = true
           ..revival = true // renaissance des filières : voir le constructeur
           ..revivalPlannedDemand = true
           ..excessCashReturn = true

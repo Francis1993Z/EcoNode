@@ -344,6 +344,16 @@ void applyParam(Params p, String k, String v) {
       p.stateRepayRate = double.parse(v);
     case 'publicImports': // importations de secours des établissements publics (frontières fermées)
       p.publicImports = b();
+    case 'worldPriceDrift': // commerce : prix mondiaux qui suivent le prix normal d'ici
+      p.worldPriceDrift = b();
+    case 'worldPriceDays':
+      p.worldPriceDays = double.parse(v);
+    case 'localMeals': // commerce : repas du restaurant non échangeables
+      p.localMeals = b();
+    case 'homePreference': // commerce : préférence pour ce qui est fait ici (marge homeMargin)
+      p.homePreference = b();
+    case 'homeMargin':
+      p.homeMargin = double.parse(v);
     case 'foreignDemand': // douane : demande étrangère active (carnet de commandes)
       p.foreignDemand = b();
     case 'fdGrowth':

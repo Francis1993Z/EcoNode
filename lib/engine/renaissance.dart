@@ -82,9 +82,10 @@ extension SimRevival on Sim {
     }
     for (final e in t.outputs.entries) {
       final g = goods[e.key]!;
-      if (g.perish || !g.tradable) continue;
+      if (g.perish || !tradable(e.key)) continue;
       final share = tot > 0 ? e.value * worldPrice[e.key]! / tot : 1 / t.outputs.length;
-      if (perBatch * share / e.value * p.markup > importPrice(e.key)) return 'prix_import';
+      // Params.homePreference : une relance tient tant qu'elle ne dépasse pas l'import de plus de la marge
+      if (perBatch * share / e.value * p.markup > importPrice(e.key) * importBias) return 'prix_import';
     }
     return null;
   }

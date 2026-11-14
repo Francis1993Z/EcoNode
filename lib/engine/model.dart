@@ -993,6 +993,22 @@ class Params {
   // à 240 citoyens, la mort des petites filières (cuivre, pétrole) arrête l'électronique et le plastique, puis l'hôpital,
   // et la santé s'effondre (anomalie A1). Frontières ouvertes, l'importation ordinaire suffit.
   bool publicImports = false;
+  // Commerce extérieur (2026-11-14, rapports/tout-actif.md § 3) : trois corrections choisies par Francis, coupées dans le
+  // moteur, actives dans l'interface. Sans elles, frontières ouvertes, les prix mondiaux restent ceux du plan de départ
+  // pendant que les prix relatifs d'ici dérivent (nourriture × 2 à 3, or × 0,3) : l'or et les bijoux s'exportent, le change
+  // reste bas et toute la filière alimentaire est importée.
+  // 1. Prix mondiaux qui vivent (worldPriceDrift) : le prix d'import et d'export d'un bien échangeable suit lentement son
+  //    prix normal ici (coût au taux d'utilisation normal des vendeurs actifs, pondéré par leur production lissée, × markup)
+  //    au rythme de 1 / worldPriceDays par jour : le reste du monde a les mêmes techniques. Sim.worldPrice ne change pas
+  //    (prix de référence des choix des ménages, des coproduits, de la valeur des bâtiments) : seul Sim.worldDrift bouge.
+  bool worldPriceDrift = false;
+  double worldPriceDays = 365;
+  // 2. Repas non échangeables (localMeals) : les repas du restaurant ne s'importent ni ne s'exportent, comme l'hôtel.
+  bool localMeals = false;
+  // 3. Préférence pour ce qui est fait ici (homePreference) : un acheteur ne prend une importation que si elle est moins
+  //    chère qu'une offre d'ici d'au moins homeMargin (transport, fraîcheur, habitudes) ; il paie le prix d'import.
+  bool homePreference = false;
+  double homeMargin = 0.2;
   // Dette publique (stateBorrowing, 2026-10-30) : quand le trésor, au-dessus de son plancher, ne suffit pas aux
   // enveloppes des établissements publics, l'État emprunte la différence à la Caisse (création de monnaie, comme un prêt
   // à une entreprise), jusqu'à stateDebtMaxGdp du PIB annuel (60 % : repère de Maastricht). Il paie chaque jour les
