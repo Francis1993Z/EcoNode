@@ -110,3 +110,35 @@ l'étranger, leurs petites entreprises ferment, et la viande est importée à mo
    fraîcheur, habitudes), par exemple 20 %.
 4. **Change ancré sur les prix** : le taux de change suit aussi l'écart entre l'indice des prix d'ici et celui du monde,
    pas seulement le solde des échanges (traite surtout le cas des 240 citoyens).
+
+## 5. Mesure des corrections 1 à 3
+
+Francis a choisi les corrections 1, 2 et 3 (pas la 4). Chacune a son interrupteur `Params`, coupé dans le moteur et
+actif dans l'interface : `worldPriceDrift` (prix mondiaux qui suivent le prix normal d'ici, délai `worldPriceDays` =
+365 j), `localMeals` (repas du restaurant non échangeables ; le pain reste échangeable), `homePreference` (une
+importation n'est choisie que si elle est au moins `homeMargin` = 20 % moins chère qu'une offre d'ici). Commit beb542b ;
+référence identique (32 éléments) ; corrections coupées, une partie B est identique au bit près.
+
+Sur le PC, 10 graines appariées × 3 000 jours, mêmes réglages que B (tous les modules, frontières ouvertes, filets
+actifs). B1, B2 et B3 : chaque correction seule ; B123 : les trois. Les 120 parties sont allées au bout. Données :
+`rapports/donnees/tout-actif/corrections/` (`releves.csv`, `agg.txt`, `agg.py`).
+
+Chômage moyen des jours 1 001-3 000 ; entre parenthèses, graines en crise (un relevé de 250 jours au-dessus de 20 %) :
+
+| Citoyens | A | C | B | B1 | B2 | B3 | B123 |
+|---|---|---|---|---|---|---|---|
+| 240 | 4,7 % | 4,0 % | 15,4 % (9) | 12,4 % (8) | 9,7 % (6) | 11,8 % (9) | **8,9 %** (4) |
+| 1 000 | 5,6 % | 3,2 % | 11,6 % (4) | 9,9 % (3) | 16,2 % (6) | 9,2 % (2) | **8,1 %** (4) |
+| 2 500 | 6,1 % | 3,0 % | 10,1 % (4) | 10,2 % (5) | 10,2 % (5) | 9,2 % (3) | **7,5 %** (2) |
+
+- **Les trois ensemble (B123) font mieux que B partout** : chômage − 6,5 points à 240, − 3,5 à 1 000, − 2,6 à 2 500 ;
+  moins de crises ; entreprises actives + 1, + 9 et + 24 ; Gini − 0,04 à − 0,18 ; affamés 0,1 à 0,6 en moyenne.
+- **Mais pas aussi bien que les frontières fermées (C)** : + 4,6 à + 4,9 points de chômage, plus haut dans les 10 graines à
+  chaque taille, et 12 à 27 entreprises actives de moins. Les prix montent plus (indice 6,2 à 240, 3,8 à 1 000, 2,6 à
+  2 500) : les prix mondiaux suivent ceux d'ici, l'importation ne plafonne plus les prix.
+- **Seules, les corrections ont des effets inégaux** : B1 aide à 240 et 1 000 mais pas à 2 500, où les affamés montent
+  (9 en moyenne, 9 graines sur 10) ; B2 aide à 240 mais nuit à 1 000 (16,2 % en moyenne, médiane 10,1 % ; affamés 17,9 en
+  moyenne, tirés par quelques graines) ; B3 aide un peu partout (− 0,9 à − 3,6 points). Ensemble, ces écarts
+  disparaissent : les trois restent actives.
+- Francis juge acceptable un chômage jusqu'à 13 %, « comme en Espagne » : B123 y est à toutes les tailles. Pas d'autre
+  correction pour l'instant.
