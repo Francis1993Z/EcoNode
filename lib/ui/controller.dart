@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../engine/model.dart';
 import '../engine/sim.dart';
+import 'entreprises_tab.dart';
 import 'housing.dart';
 import 'layout.dart';
 
@@ -32,8 +33,10 @@ class Tabs {
   static const housing = 6;
   static const taxes = 7;
   static const parc = 8;
+  static const firms = 9;
   static const labels = [
-    'Inspecteur', 'Diagnostic', 'God mode', 'Économie', 'Journal', 'Modèle', 'Immobilier', 'Impôts', 'Parc'
+    'Inspecteur', 'Diagnostic', 'God mode', 'Économie', 'Journal', 'Modèle', 'Immobilier', 'Impôts', 'Parc',
+    'Entreprises'
   ];
 }
 
@@ -56,6 +59,8 @@ class SimController extends ChangeNotifier {
 
   /// Relevé quotidien du marché immobilier (courbes de l'onglet Immobilier) ; vide si le module est coupé.
   final HousingLog housing = HousingLog();
+  /// Démographie des entreprises (onglet Entreprises) : journal tenu par l'interface, relevé après chaque jour.
+  final FirmLog firmLog = FirmLog();
 
   /// Augmente à chaque notification : le graphe garde son dessin tant qu'elle ne change pas.
   int rev = 0;
@@ -112,6 +117,7 @@ class SimController extends ChangeNotifier {
               ..reservePerCitizen = 2000, // banques : dotation réaliste (voir startParams)
             modules: Modules()) {
     autoLayout(sim);
+    firmLog.sample(sim); // entreprises du plan de départ, au jour 0
   }
 
   void attach(TickerProvider vsync) {
@@ -128,6 +134,7 @@ class SimController extends ChangeNotifier {
       while (_acc >= 1 && n < 120 && sw.elapsedMicroseconds < _budgetUs) {
         sim.step();
         housing.sample(sim);
+        firmLog.sample(sim);
         _acc -= 1;
         n++;
       }
@@ -167,6 +174,7 @@ class SimController extends ChangeNotifier {
     playing = false;
     sim.step();
     housing.sample(sim);
+    firmLog.sample(sim);
     notifyListeners();
   }
 
@@ -268,6 +276,9 @@ class SimController extends ChangeNotifier {
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();
+    firmLog
+      ..clear()
+      ..sample(sim);
     autoLayout(sim);
     selection = const Selection('M');
     _acc = 0;
