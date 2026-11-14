@@ -220,8 +220,6 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.buildingTypes != d.buildingTypes) 'buildingTypes': p.buildingTypes,
     if (p.renoTrigger != d.renoTrigger) 'renoTrigger': _d(p.renoTrigger),
     if (p.renoShare != d.renoShare) 'renoShare': _d(p.renoShare),
-    if (p.renoValue != d.renoValue) 'renoValue': p.renoValue,
-    if (p.renoEntryLimit != d.renoEntryLimit) 'renoEntryLimit': p.renoEntryLimit,
     if (p.cheapestHouse != d.cheapestHouse) 'cheapestHouse': p.cheapestHouse,
     if (p.jointCostBySales != d.jointCostBySales) 'jointCostBySales': p.jointCostBySales,
     if (p.spreadTakeovers != d.spreadTakeovers) 'spreadTakeovers': p.spreadTakeovers,
@@ -418,8 +416,6 @@ Params _paramsFrom(Map j) => Params()
   ..buildingTypes = (j['buildingTypes'] as bool?) ?? false
   ..renoTrigger = _rdOr(j['renoTrigger'], 0.6)
   ..renoShare = _rdOr(j['renoShare'], 0.6)
-  ..renoValue = (j['renoValue'] as int?) ?? 0
-  ..renoEntryLimit = (j['renoEntryLimit'] as bool?) ?? false
   ..cheapestHouse = (j['cheapestHouse'] as bool?) ?? false
   ..jointCostBySales = (j['jointCostBySales'] as bool?) ?? false
   ..spreadTakeovers = (j['spreadTakeovers'] as bool?) ?? false

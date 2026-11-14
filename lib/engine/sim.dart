@@ -2687,14 +2687,6 @@ class Sim {
   bool _renovationImport(Firm f, String g) =>
       renovationActive && renovationTypes.contains(f.type) && renovationGoods.contains(g) && !goods[g]!.perish;
 
-  /// Essai (module renovation, Params.renoEntryLimit) : dans un marché de la chaîne de la rénovation, pas de fondation
-  /// tant qu'une entreprise en place est active et qu'aucune n'a de poste ouvert depuis au moins 5 jours.
-  bool _renoEntryBlocked(String ty) {
-    if (!renovationActive || !params.renoEntryLimit || !renovationTypes.contains(ty)) return false;
-    final active = sellersOf(templates[ty]!.outputs.keys.first).where((f) => f.workers.isNotEmpty).toList();
-    return active.isNotEmpty && !active.any((f) => f.vacancies > 0 && f.unfilledDays >= 5);
-  }
-
   /// Services aux entreprises : comptabilité, entretien, publicité, recherche et développement.
   void _buyServices(Firm f) {
     final p = params;
@@ -3570,7 +3562,6 @@ class Sim {
       } else {
         why = 'demande non servie et fortes marges';
       }
-      if (refused == null && _renoEntryBlocked(ty)) (refused, detail) = ('concurrence', 'les entreprises en place ont des bras');
       refused ??= _found(ty, want, why);
       _funnel('projet', ty, want);
       if (refused == null) {

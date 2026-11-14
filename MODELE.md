@@ -818,8 +818,14 @@ tombe en ruine d'un bloc vers 65-70 ans (`rapports/derive36k.md`).
   fin de la rénovation, puis rentre chez lui (`livesAtHome`) ; sans le module, il reste logé dans sa ruine. Un bailleur
   ne compte plus ses ruines dans son parc quand il décide de construire (un logement en rénovation compte).
 - **Valeur.** La valeur d'un bâtiment (valeur courante, coût du neuf, plafonds des prêts, provision pour l'usure)
-  suit le prix de référence du module (prix d'équilibre au départ, indexé sur les salaires), pas le prix offert du
-  jour (`moduleValue`). La provision pour l'usure d'un bailleur compte une rénovation (× `renoShare`).
+  suit le prix d'équilibre du module au départ, fixe (`moduleValue`, décision de Francis) ; les achats de modules se
+  font au prix offert. Si la valeur suit un prix qui monte, les hypothèques d'achat (95 % de la valeur) créent de la
+  monnaie, les salaires montent et la valeur avec eux : indice des prix final 3,14 au prix offert, 5,74 au prix de départ
+  indexé sur les salaires, 2,54 au prix de départ fixe, contre 2,50 sans le module (4 graines × 3 000 j à 2 500
+  citoyens). Sans le module, la Construction disparaît vite et son prix reste celui du départ : même ancrage. La
+  provision pour l'usure d'un bailleur compte une rénovation (× `renoShare`).
+- **Demande non servie.** Quand aucun module n'est en stock, la demande de rénovation est notée comme non servie, comme
+  un achat sans offre : c'est le signal qui fait fonder un nouvel entrepreneur général quand le dernier disparaît.
 - **Importations de secours** (`_renovationImport`, décision de Francis). Frontières fermées, l'entrepreneur général et
   les métiers achètent à l'étranger, au prix d'import, la part de leurs matériaux que le marché d'ici n'a pas servie,
   comme l'hôpital ; les heures des métiers et les modules restent d'ici.

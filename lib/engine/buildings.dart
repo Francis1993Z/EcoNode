@@ -103,22 +103,14 @@ extension SimBuildings on Sim {
   double moduleCost() => bestPrice('batiment');
 
   /// Prix d'un module pour la valeur des bâtiments (valeur courante, coût du neuf, plafonds des prêts, provision pour
-  /// l'usure). Avec le module renovation, le prix de référence du module (son prix d'équilibre au départ, qui suit les
-  /// salaires) : une rareté passagère de modules, quand un fournisseur de l'entrepreneur général ferme, ne doit pas
-  /// réévaluer tout le parc, donc les loyers et les hypothèques. Mesuré avec le prix offert : module × 3,5, hypothèques
-  /// × 2,7 et indice des prix × 1,9 en 3 000 jours à 2 500 citoyens (rapports/renovation.md). Sans le module, le prix
-  /// offert, comme avant. Les achats de modules se font toujours au prix offert (moduleCost).
-  double moduleValue() {
-    if (!renovationActive) return moduleCost();
-    switch (params.renoValue) {
-      case 1:
-        return moduleCost(); // essai : le prix offert du jour
-      case 2:
-        return worldPrice['batiment']!; // essai : le prix de départ, fixe
-      default:
-        return referencePrice('batiment');
-    }
-  }
+  /// l'usure). Avec le module renovation, le prix d'équilibre du module au départ, fixe (décision de Francis,
+  /// 2026-11-13) : la valeur d'un logement fixe les loyers et la taille des hypothèques d'achat (95 % de la valeur) ; si
+  /// elle suit un prix qui monte, les hypothèques créent de la monnaie, les salaires montent, et la valeur avec eux.
+  /// Mesuré (4 graines × 3 000 j à 2 500 citoyens, indice des prix final 2,50 sans le module) : au prix offert, 3,14 ; au
+  /// prix de départ indexé sur les salaires, 5,74 ; au prix de départ fixe, 2,54. Sans le module, le prix offert, comme
+  /// avant (la Construction disparaît vite et son prix reste alors celui du départ). Les achats de modules se font
+  /// toujours au prix offert (moduleCost).
+  double moduleValue() => renovationActive ? worldPrice['batiment']! : moduleCost();
 
   /// Coût de remplacement d'un logement neuf.
   double replacementCost() => params.dwellingModules * moduleValue();
