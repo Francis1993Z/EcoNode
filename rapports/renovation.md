@@ -27,52 +27,51 @@ IDENTIQUE (32 éléments) » sur le serveur à chaque révision, la parité PC �
 Voir MODELE.md § 6.6 (« Rénovation et métiers du bâtiment ») : chaîne de neuf entreprises, entretien par les métiers,
 rénovation sous l'état 0,6 (modules de l'entrepreneur général, ⌈(1 − état) × 0,6 × modules⌉), financement par la
 trésorerie ou l'épargne puis un prêt pour le manque (seulement pour des modules en stock, l'excédent remboursé le jour
-même), occupant d'une ruine qui loue ailleurs, ruines hors du parc des bailleurs, valeur des bâtiments au prix de
-référence du module, importations de secours des matériaux, parc de départ entre 0,6 et 1.
+même), occupant d'une ruine qui loue ailleurs, ruines hors du parc des bailleurs, valeur des bâtiments au prix de départ
+du module (fixe), importations de secours des matériaux, demande non servie notée sans stock, projets de fondation de
+la chaîne plafonnés à leur équipe et au prix de départ indexé quand plus personne ne vend, parc de départ entre 0,6 et 1.
 
-Essayé et retiré : les « artisans à temps partiel » (les entreprises de la chaîne gardent la productivité de leur type
-au lieu de l'échelle minimale). Prix de départ du module à 240 citoyens : 4 006 $ au lieu de 11 776 $, mais la chaîne
-s'éteint quand même et l'indice des prix finit plus haut (3,8 contre 2,8 à 2 500 citoyens, 18 à 240 ; 4 graines ×
-2 000-3 000 j).
+## 3. Comment on y est arrivé (serveur de calcul, réglages de l'interface avec Produits, Bâtiments et Banques)
 
-## 3. Mesures (serveur de calcul, réglages de l'interface avec Produits, Bâtiments et Banques, 3 000 j, graines appariées)
+Chaque ligne compare des graines appariées sur 3 000 jours, module coupé → actif (le moteur coupé est identique au bit
+près d'une révision à l'autre). Indice des prix et hypothèques au jour 3 000, 2 500 citoyens sauf mention.
 
-« Coupé » : le module coupé (identique au bit près d'une révision à l'autre, référence vérifiée). Chômage : moyenne des
-jours 2 501-3 000 ; autres : jour 3 000.
+| Révision | Changement | Indice des prix | Hypothèques (M$) | Rénovations | Ce qu'on a appris |
+|---|---|---|---|---|---|
+| 5261aaa | première version, valeur au prix offert | 2,56 → 4,85 | 21,8 → 57,8 | 386 | la briqueterie (un seul client) meurt dans 10 graines sur 10 ; module × 3,5 |
+| 000a317 | valeur au prix de départ indexé | 2,56 → 6,54 | 21,8 → 83,6 | 342 | pire : occupants qui réempruntaient chaque jour sans pouvoir acheter |
+| 1a58605 | importations de secours, prêts corrigés | 2,54 → 5,43 | 21,2 → 67,7 | 234 | l'entrepreneur général meurt dans 7 graines sur 8 (8 graines) |
+| 88e463d | demande non servie notée ; essais de valeur (4 graines) | prix offert 3,14 ; indexé 5,74 ; **fixe 2,54** | 30,3 ; 73,0 ; **20,1** | ≈ 380 | `tool/credit.dart` : le crédit en trop vient des hypothèques d'achat, la valeur d'une maison passe de 40 600 à 141 300 $ si elle suit les salaires |
+| 726208a | valeur fixe, projets plafonnés | 2,56 → 2,49 | 21,8 → 20,0 | 387 | à 1 000 citoyens, l'entrepreneur meurt dans 8 graines sur 10 et n'est jamais refondé |
+| bbd6abc | prix attendu indexé, métiers allégés | **2,56 → 2,38** | **21,8 → 19,1** | **386** | chaîne complète dans 9 graines sur 10 ; à 1 000, entrepreneur vivant dans 6 sur 10 |
 
-| Révision | Pop. | Graines | Chômage coupé → actif | Indice final | Module ($) | Hypothèques (M$) | Rénovations | État du parc |
-|---|---|---|---|---|---|---|---|---|
-| 5261aaa (valeur au prix offert) | 2 500 | 10 | 3,30 → 1,97 % (9/10) | 2,56 → 4,85 | 3 846 → 13 331 | 21,8 → 57,8 | 386 | 0,771 → 0,803 |
-| 5261aaa | 1 000 | 10 | 3,16 → 3,13 % | 2,73 → 4,93 | 3 541 → 8 212 | 8,7 → 22,4 | 80 | 0,770 → 0,761 |
-| 5261aaa | 240 | 10 | 3,52 → 3,01 % | 2,81 → 7,69 | 4 920 → 11 791 | 2,1 → 8,0 | 8 | 0,768 → 0,680 |
-| 000a317 (valeur au prix de référence) | 2 500 | 10 | 3,30 → 1,56 % (9/10) | 2,56 → 6,54 | 3 846 → 15 913 | 21,8 → 83,6 | 342 | 0,771 → 0,794 |
-| 000a317 | 1 000 | 10 | 3,16 → 1,84 % (8/10) | 2,73 → 9,48 | 3 541 → 4 334 | 8,7 → 50,0 | 61 | 0,770 → 0,751 |
-| 1a58605 (importations de secours, prêts corrigés) | 2 500 | 8 | 3,08 → 2,08 % (8/8) | 2,54 → 5,43 | 3 892 → 4 252 | 21,2 → 67,7 | 234 | 0,771 → 0,770 |
+Essayé et retiré : les « artisans à temps partiel » (la chaîne garde la productivité de son type au lieu de l'échelle
+minimale : la chaîne s'éteint quand même à 240 citoyens et les prix montent) ; une limite de fondation dans les marchés
+de la chaîne (l'entrepreneur général se retrouve seul et cher, ou meurt sans remplaçant : indice 4,42 avec la valeur au
+prix offert).
 
-Le lot de 1a58605 a été coupé à 14 parties sur 30 (graines 1-8 à 2 500 citoyens finies), à la demande de Francis.
+## 4. Mesure de la version actuelle (bbd6abc, 10 graines appariées × 3 000 j)
 
-Ce que ces lots montrent :
-- **Le chômage baisse** avec le module à 2 500 citoyens dans toutes les variantes (≈ −1 à −1,7 pt sur les 500
-  derniers jours), le salaire réel ne change pas.
-- **La briqueterie** (un seul client, l'entrepreneur général, aux commandes irrégulières) meurt dans 10 graines sur 10 ;
-  sans briques, le module devient rare et cher (5261aaa : × 3,5). Les importations de secours ramènent le prix du module
-  au niveau d'avant (4 252 $ contre 3 892 $).
-- **L'entrepreneuriat inonde ces petits marchés** (sonde `tool/chaine.dart`, graine 1 : 2 briqueteries, 1 câblerie, 5
-  entrepreneurs généraux et 4 charpentiers fondés en 400 jours) ; les entreprises fondées gardent à vie la productivité
-  de leur petite demande de départ (échelle minimale), puis font faillite.
-- **L'entrepreneur général meurt encore** dans 7 graines sur 8 avec les importations de secours (cause pas encore
-  identifiée) : les rénovations s'arrêtent (234 contre 342-386), et l'état du parc n'est pas meilleur que sans le module.
-- **Le crédit hypothécaire triple** dans toutes les variantes, et l'indice des prix final double (× 1,8 à × 3,5). Une
-  pompe à monnaie a été corrigée en 1a58605 (l'occupant empruntait chaque jour où l'entrepreneur n'avait rien à vendre,
-  dépensait une partie de l'argent et réempruntait) ; le crédit reste pourtant × 3,2.
+| | 2 500 citoyens | 1 000 citoyens |
+|---|---|---|
+| Chômage, jours 2 501-3 000 | 3,30 → 3,65 % (écart non significatif, 4/10) | 3,16 → 3,27 % (6/10) |
+| Indice des prix final | 2,56 → 2,38 (8/10) | 2,73 → 2,87 (5/10) |
+| Salaire réel final | 219 → 218 | 202 → 208 (7/10) |
+| État moyen du parc | 0,771 → 0,804 (10/10) | 0,770 → 0,790 (8/10) |
+| Rénovations terminées | 386 | 127 |
+| Hypothèques | 21,8 → 19,1 M$ | 8,7 → 10,1 M$ |
+| Prix du module | 3 846 → 4 135 $ | 3 541 → 8 373 $ (jusqu'à 25 792) |
+| Chaîne complète au jour 3 000 | 9 graines sur 10 (l'entrepreneur dans 10) | entrepreneur dans 6 graines sur 10 |
+| Entreprises actives | 162 → 178 | 100 → 109 |
 
-## 4. Ce qui reste
+À 240 citoyens (5261aaa, 10 graines) : la chaîne s'éteint, indice des prix 2,81 → 7,69 ; d'où le seuil de 1 000
+citoyens dans l'interface. Vitesse (`tool/vitesse.dart`, 1 000 citoyens, seul sur le serveur) : 34,4 ms par jour avec
+le module contre 33,7 sans ; la lenteur de la version web vient du dessin (session séparée).
 
-1. **Trouver d'où vient le crédit en trop** (achats de logements, rénovations, chantiers) : ajouter la part de chaque
-   source à la sonde. Piste : la valeur des logements suit un prix nominal qui monte (le prix offert du module, puis le
-   prix de référence indexé sur les salaires), d'où des hypothèques d'achat plus grosses, de la monnaie et des salaires
-   plus hauts, qui relèvent encore la valeur. Sans le module, la Construction meurt dans 9 graines sur 10 et le module
-   garde son prix de départ : la valeur des logements reste fixe en dollars, ce qui ancre le crédit sans le vouloir.
-2. **Comprendre la mort de l'entrepreneur général** avec les importations de secours (`tool/chaine.dart`).
-3. **Lot long de 36 000 jours** (approuvé avec le plan), seulement quand les points 1 et 2 seront réglés.
-4. Fusion dans `main` : pas avant ; à demander à Francis.
+## 5. Ce qui reste
+
+1. **Lot long de 36 000 jours** (approuvé avec le plan) : vérifier que la crise des 65-70 ans du lot `derive36k`
+   disparaît (20 graines × 2, filets coupés et actifs, ≈ 8 h).
+2. À 1 000 citoyens, l'entrepreneur général manque encore dans 4 graines sur 10 au jour 3 000, et le module y est cher
+   (jusqu'à 25 792 $) ; le parc reste mieux tenu que sans le module.
+3. Fusion dans `main` : à demander à Francis.

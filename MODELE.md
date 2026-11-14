@@ -799,7 +799,8 @@ tombe en ruine d'un bloc vers 65-70 ans (`rapports/derive36k.md`).
 - **Chaîne.** Huit biens (`renovationGoods`) et neuf types (`renovationTypes`) ajoutés à la fin des tables : scierie
   (bois → planches), briqueterie (carburant, argile sur place → briques), tuyauterie, câblerie et fusibles (cuivre +
   plastique), trois métiers qui vendent des heures (charpentier : planches ; électricien : fils et fusibles ; plombier :
-  tuyaux) et l'entrepreneur général (`entrepreneur`), qui remplace la Construction : il vend les modules de chantier
+  tuyaux ; 0,15 planche, 0,1 rouleau de fils et 0,05 boîte de fusibles, 0,15 tuyau par heure) et l'entrepreneur général
+  (`entrepreneur`), qui remplace la Construction : il vend les modules de chantier
   (`batiment`), pour le neuf comme pour la rénovation, avec des briques et des heures des trois métiers. Travail par
   module ≈ 6 jours-personnes, comme la Construction. Une entreprise de chaque au départ (`renovationScenario`), quelle
   que soit la population. Un intrant périssable (heure de sous-traitant) se commande un jour d'avance, pas cinq.
@@ -824,8 +825,12 @@ tombe en ruine d'un bloc vers 65-70 ans (`rapports/derive36k.md`).
   indexé sur les salaires, 2,54 au prix de départ fixe, contre 2,50 sans le module (4 graines × 3 000 j à 2 500
   citoyens). Sans le module, la Construction disparaît vite et son prix reste celui du départ : même ancrage. La
   provision pour l'usure d'un bailleur compte une rénovation (× `renoShare`).
-- **Demande non servie.** Quand aucun module n'est en stock, la demande de rénovation est notée comme non servie, comme
-  un achat sans offre : c'est le signal qui fait fonder un nouvel entrepreneur général quand le dernier disparaît.
+- **Demande non servie et fondations.** Quand aucun module n'est en stock, la demande de rénovation est notée comme non
+  servie, comme un achat sans offre : c'est le signal qui fait fonder un nouvel entrepreneur général quand le dernier
+  disparaît. Un projet de fondation dans la chaîne ne dépasse pas ce que son équipe de départ produit
+  (`projectBatches`) : la demande en attente s'accumule et rendait le capital exigé hors de portée. Quand plus personne
+  ne vend le bien, le projet attend le prix de départ indexé sur les salaires, au plus deux fois (`projectPrice`) : le
+  prix de départ seul, dépassé par l'inflation, ne rendait plus aucune refondation viable.
 - **Importations de secours** (`_renovationImport`, décision de Francis). Frontières fermées, l'entrepreneur général et
   les métiers achètent à l'étranger, au prix d'import, la part de leurs matériaux que le marché d'ici n'a pas servie,
   comme l'hôpital ; les heures des métiers et les modules restent d'ici.
