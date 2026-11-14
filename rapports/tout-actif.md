@@ -142,3 +142,11 @@ Chômage moyen des jours 1 001-3 000 ; entre parenthèses, graines en crise (un 
   disparaissent : les trois restent actives.
 - Francis juge acceptable un chômage jusqu'à 13 %, « comme en Espagne » : B123 y est à toutes les tailles. Pas d'autre
   correction pour l'instant.
+
+**Ce qui reste importé avec les trois corrections** (sonde `tool/commerce.dart`, mêmes graines que § 3, frontières
+ouvertes ; sorties dans `rapports/donnees/tout-actif/commerce-corrige/`). Le change suit maintenant les prix (1,6 à 1 000
+citoyens, 2,4 à 2 500, 2,0 à 240, au lieu de 1,2, 0,9 et 5,1). La filière alimentaire revient : 133 emplois à 1 000
+citoyens (150 frontières fermées, 12 sans correction) et 334 à 2 500 (347 et 267). Les importations tombent de 130 000 à
+29 000 $/j à 1 000 citoyens et de 164 000 à 85 000 à 2 500. Restent surtout importés la viande (44 à 54 %), le poisson
+(26 à 28 %), l'électronique et l'acier ; à 240 citoyens, les machines (90 %), les ordinateurs, les fusibles et les
+planches (100 %) : leurs petites entreprises n'y tiennent toujours pas.
