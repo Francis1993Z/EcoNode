@@ -7,6 +7,9 @@
 //
 // Les deux sorties doivent être identiques. Les nombres sont écrits bit à bit (IEEE 754), car le web n'écrit pas les
 // décimaux comme la VM (1.0 s'y écrit 1).
+//
+// Les parties jouent les réglages par défaut d'avant le 14 novembre 2026 (Modules.historique, Params.historique) : la
+// sortie fait partie de la référence du moteur (tool/reference.sh).
 
 import 'dart:typed_data';
 
@@ -25,12 +28,12 @@ int fold(int h, double v) {
 
 void main() {
   print('hash32 ${[hash32(0, 0), hash32(42, 1), hash32(0xFFFFFFFF, 0x7FFFFFFF), hash32(123456789, 987654321)]}');
-  final s0 = Sim(seed: 42);
+  final s0 = Sim(seed: 42, params: Params.historique(), modules: Modules.historique());
   // Les flux de code 1 à 19 : la référence (tool/reference.sh) les fixe ; les flux ajoutés depuis (code 20 et au-delà) sont
   // couverts par test/hasard_test.dart, qui parcourt tous les flux.
   print('tirages ${[for (final f in Flux.values) if (f.code <= 19) bits(s0.draw(f, 17))].join(' ')}');
   for (final seed in [1, 42]) {
-    final s = Sim(seed: seed);
+    final s = Sim(seed: seed, params: Params.historique(), modules: Modules.historique());
     var h = 0;
     for (var d = 1; d <= 400; d++) {
       s.step();
@@ -44,9 +47,12 @@ void main() {
     }
   }
   // recherche limitée des vendeurs (sellerSample = 5) : liste des vendeurs disponibles, 1 000 citoyens
-  final s = Sim(seed: 7, params: Params()
-    ..population = 1000
-    ..sellerSample = 5);
+  final s = Sim(
+      seed: 7,
+      params: Params.historique()
+        ..population = 1000
+        ..sellerSample = 5,
+      modules: Modules.historique());
   var h = 0;
   for (var d = 1; d <= 100; d++) {
     s.step();

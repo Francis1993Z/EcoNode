@@ -22,7 +22,14 @@ double firmHeight(Firm f) {
   return h + kRowH + kFooterH;
 }
 
-double homesHeight() => kHeaderH + householdGoods.length * kRowH + kFooterH;
+/// Biens que les ménages achètent (ports du node Ménages) : avec le module « renovation », les propriétaires-occupants
+/// achètent aussi des modules de chantier et des heures des métiers.
+List<String> homePorts(Sim sim) => [
+      ...householdGoods,
+      if (sim.renovationActive) ...['batiment', ...buildingCareShares.keys],
+    ];
+
+double homesHeight(Sim sim) => kHeaderH + homePorts(sim).length * kRowH + kFooterH;
 
 final Map<String, int> _depth = {};
 
@@ -71,7 +78,7 @@ void autoLayout(Sim sim) {
   sim.nodePos['E'] = [x, y];
   y += kSmallH + kGapY;
   sim.nodePos['M'] = [x, y];
-  y += homesHeight() + kGapY;
+  y += homesHeight(sim) + kGapY;
   sim.nodePos['B'] = [x, y];
   y += kSmallH + kGapY;
   sim.nodePos['BC'] = [x, y]; // banque centrale (interface seulement : le moteur n'en a pas besoin)

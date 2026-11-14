@@ -1,0 +1,10 @@
+c-p2500-g1-b1.txt commerce.exe 1 2500 3000 --frontieres 1
+c-p2500-g2-b1.txt commerce.exe 2 2500 3000 --frontieres 1
+c-p1000-g1-b1.txt commerce.exe 1 1000 3000 --frontieres 1
+c-p240-g1-b1.txt commerce.exe 1 240 3000 --frontieres 1
+c-p1000-g2-b1.txt commerce.exe 2 1000 3000 --frontieres 1
+c-p240-g2-b1.txt commerce.exe 2 240 3000 --frontieres 1
+c-p1000-g3-b1.txt commerce.exe 3 1000 3000 --frontieres 1
+c-p240-g3-b1.txt commerce.exe 3 240 3000 --frontieres 1
+c-p1000-g4-b1.txt commerce.exe 4 1000 3000 --frontieres 1
+c-p240-g4-b1.txt commerce.exe 4 240 3000 --frontieres 1

@@ -31,10 +31,12 @@ class BuildingStats {
   double gains = 0; // somme des gains de revente (prix − coût d'acquisition du vendeur), quand positifs
   double losses = 0; // somme des pertes de revente (valeur absolue)
   double priceEma = 0; // prix de vente moyen, lissé
+  int renovated = 0; // rénovations terminées (Modules.renovation)
+  double renoSpent = 0; // dépenses de rénovation (modules de chantier)
 
   void clear() {
-    built = sales = foreclosures = opened = refused = abandoned = bought = 0;
-    gains = losses = priceEma = 0;
+    built = sales = foreclosures = opened = refused = abandoned = bought = renovated = 0;
+    gains = losses = priceEma = renoSpent = 0;
   }
 }
 
@@ -76,6 +78,16 @@ extension SimBuildings on Sim {
 
   int get homeOwners => citizens.where((c) => c.homeId != null).length;
 
+  /// Le propriétaire-occupant habite-t-il chez lui ? Avec le module renovation, seulement si son logement est habitable :
+  /// sinon il loue ailleurs (bail) jusqu'à la fin de la rénovation. Sans le module, il y habite toujours.
+  bool livesAtHome(Citizen c) {
+    final id = c.homeId;
+    if (id == null) return false;
+    if (!renovationActive) return true;
+    final b = _bmap[id];
+    return b == null || b.habitable;
+  }
+
   /// Logements habitables (loués ou occupés par leur propriétaire).
   int get dwellings {
     var n = 0;
@@ -90,8 +102,29 @@ extension SimBuildings on Sim {
   /// Prix d'un module de construction : le meilleur prix offert, à défaut le prix de départ.
   double moduleCost() => bestPrice('batiment');
 
+  /// Prix d'un module pour la valeur des bâtiments (valeur courante, coût du neuf, plafonds des prêts, provision pour
+  /// l'usure). Avec le module renovation, le prix d'équilibre du module au départ, fixe (décision de Francis,
+  /// 2026-11-13) : la valeur d'un logement fixe les loyers et la taille des hypothèques d'achat (95 % de la valeur) ; si
+  /// elle suit un prix qui monte, les hypothèques créent de la monnaie, les salaires montent, et la valeur avec eux.
+  /// Mesuré (4 graines × 3 000 j à 2 500 citoyens, indice des prix final 2,50 sans le module) : au prix offert, 3,14 ; au
+  /// prix de départ indexé sur les salaires, 5,74 ; au prix de départ fixe, 2,54. Sans le module, le prix offert, comme
+  /// avant (la Construction disparaît vite et son prix reste alors celui du départ). Les achats de modules se font
+  /// toujours au prix offert (moduleCost).
+  double moduleValue() => renovationActive ? worldPrice['batiment']! : moduleCost();
+
   /// Coût de remplacement d'un logement neuf.
-  double replacementCost() => params.dwellingModules * moduleCost();
+  double replacementCost() => params.dwellingModules * moduleValue();
+
+  /// Prix d'une heure d'entretien courant : une heure de réparation (garages) ; avec le module renovation, le panier des
+  /// heures des métiers (buildingCareShares).
+  double careHourPrice() {
+    if (!renovationActive) return bestPrice('reparation');
+    var x = 0.0;
+    for (final e in buildingCareShares.entries) {
+      x += e.value * bestPrice(e.key);
+    }
+    return x;
+  }
 
   /// Modules de construction d'un bâtiment : ceux de son type (Params.buildingTypes), sinon ceux d'un logement standard.
   int modulesOf(Building b) =>
@@ -101,7 +134,7 @@ extension SimBuildings on Sim {
   double sizeOf(Building b) => b.type == null ? 1.0 : modulesOf(b) / params.dwellingModules;
 
   /// Coût de remplacement d'un bâtiment neuf (sans type : celui d'un logement standard).
-  double buildingCost(Building b) => modulesOf(b) * moduleCost();
+  double buildingCost(Building b) => modulesOf(b) * moduleValue();
 
   /// Valeur courante : coût de remplacement, rabattu selon l'état (un logement à l'état 0 vaut encore le quart : le
   /// terrain et les fondations), un peu plus cher quand les logements manquent (chaleur du marché, de −1 à +1 : ±15 %).
@@ -286,8 +319,12 @@ extension SimBuildings on Sim {
 
   // ------------------------------------------------------------------ parc de départ
 
+  /// Usure du parc de départ : son état est tiré entre 1 − cet écart et 1. Avec le module renovation, entre
+  /// Params.renoTrigger et 1, l'état d'équilibre d'un parc qu'on rénove à ce seuil ; sans lui, entre 0,7 et 1.
+  double _startWearSpan() => renovationActive ? 1 - params.renoTrigger : 0.3;
+
   /// Parc de départ : chaque bailleur possède autant de logements que sa capacité fixée. Ils sont de tout âge (état de
-  /// 0,7 à 1) et valent leur valeur courante.
+  /// 0,7 à 1 ; avec le module renovation, de Params.renoTrigger à 1) et valent leur valeur courante.
   void _seedBuildings() {
     _buildingsSeeded = true;
     final landlords = firms.where((f) => f.type == 'immobilier').toList();
@@ -301,7 +338,7 @@ extension SimBuildings on Sim {
         final b = Building(_nextBuildingId++, 0, f.id, day);
         b.done = true;
         b.modules = params.dwellingModules;
-        b.cond = 1 - 0.3 * draw(Flux.logement, b.id, 7);
+        b.cond = 1 - _startWearSpan() * draw(Flux.logement, b.id, 7);
         b.basis = quantize(fairValue(b));
         buildings.add(b);
         _bmap[b.id] = b;
@@ -326,7 +363,7 @@ extension SimBuildings on Sim {
       final b = Building(id, 0, f.id, day, typeOf(draw(Flux.logement, id, 13)));
       b.done = true;
       b.modules = modulesOf(b);
-      b.cond = 1 - 0.3 * draw(Flux.logement, id, 7);
+      b.cond = 1 - _startWearSpan() * draw(Flux.logement, id, 7);
       b.basis = quantize(fairValue(b));
       buildings.add(b);
       _bmap[b.id] = b;
@@ -431,6 +468,7 @@ extension SimBuildings on Sim {
   /// Après la paie : usure et entretien, service des hypothèques, marché des logements, chantiers.
   void _buildingsDay() {
     _wearAndMaintain();
+    if (renovationActive) _renovations();
     _serviceMortgages();
     _housingMarket();
     _construction();
@@ -458,10 +496,9 @@ extension SimBuildings on Sim {
       }
       final need = p.maintHoursPerDwelling * load;
       final budget = math.max(0.0, f.money - 3 * f.wage * f.workers.length);
-      final r = buy(f, f.id.toString(), 'reparation', need, budget, false);
-      f.costs += r.spent;
-      f.overhead += r.spent;
-      final cover = need > eps ? math.min(1.0, r.qty / need) : 1.0;
+      final (cover, spent) = _care(f, f.id.toString(), need, budget);
+      f.costs += spent;
+      f.overhead += spent;
       for (final b in e.value) {
         b.cond = _worn(b.cond, wear, cover);
       }
@@ -474,14 +511,187 @@ extension SimBuildings on Sim {
         if (c != null) {
           final need = p.maintHoursPerDwelling * sizeOf(b);
           final budget = math.max(0.0, c.money - 3 * needCost);
-          final r = buy(c, 'M', 'reparation', need, budget, false);
-          cover = need > eps ? math.min(1.0, r.qty / need) : 1.0;
+          cover = _care(c, 'M', need, budget).$1;
         }
         b.cond = _worn(b.cond, wear, cover);
       } else if (b.ownerKind == 2) {
         b.cond = _worn(b.cond, wear, 0);
       }
     }
+  }
+
+  /// Entretien courant d'un bâtiment : [need] heures à acheter avec au plus [budget]. Rend la part de l'entretien complet
+  /// obtenue (0 à 1) et la dépense. Sans le module renovation, des heures de réparation (garages) ; avec lui, le panier
+  /// des heures des métiers (buildingCareShares), chaque métier comptant pour sa part.
+  (double, double) _care(Account buyer, String key, double need, double budget) {
+    if (!renovationActive) {
+      final r = buy(buyer, key, 'reparation', need, budget, false);
+      return (need > eps ? math.min(1.0, r.qty / need) : 1.0, r.spent);
+    }
+    if (need <= eps) return (1.0, 0.0);
+    var cover = 0.0, spent = 0.0;
+    for (final e in buildingCareShares.entries) {
+      final q = need * e.value;
+      final r = buy(buyer, key, e.key, q, budget - spent, false);
+      spent += r.spent;
+      cover += e.value * math.min(1.0, r.qty / q);
+    }
+    return (cover, spent);
+  }
+
+  /// Rénovations (module renovation), après l'entretien. Un bâtiment terminé dont l'état passe sous Params.renoTrigger
+  /// ouvre une rénovation jusqu'à l'état neuf : renoShare des modules de sa construction, arrondi au module supérieur.
+  /// Son propriétaire achète chaque jour des modules de chantier à l'entrepreneur général, à la cadence de chantier du
+  /// type ; chaque module ajoute 1 / (renoShare × modules du bâtiment) à l'état, le dernier le remet à neuf. Un bâtiment
+  /// en liquidation attend son prochain propriétaire.
+  void _renovations() {
+    final p = params;
+    for (final b in buildings) {
+      if (!b.done || b.ownerKind == 2) continue;
+      if (b.renoLeft == 0) {
+        if (b.cond >= p.renoTrigger) continue;
+        b.renoLeft = math.max(1, ((1 - b.cond) * p.renoShare * modulesOf(b)).ceil());
+      }
+      final q = math.min(b.type == null ? 1 : buildingKinds[b.type!].crew, b.renoLeft);
+      final got = b.ownerKind == 0 ? _renovateLandlord(b, q) : _renovateHome(b, q);
+      if (got <= 0) continue;
+      b.renoLeft -= got;
+      if (b.renoLeft > 0) {
+        b.cond = math.min(1.0, b.cond + got / (p.renoShare * modulesOf(b)));
+        continue;
+      }
+      b.renoLeft = 0;
+      b.cond = 1;
+      bstats.renovated++;
+      if (trace != null) {
+        _t('compta', 'renovation_terminee', b.ownerKind == 0 ? (_fmap[b.ownerId]?.name ?? '') : (_cmap[b.ownerId]?.name ?? ''),
+            b.ownerId, 'rénovation', 'bâtiment ${b.id} remis à neuf', b.basis, '');
+      }
+    }
+  }
+
+  /// Un bailleur achète [q] modules de rénovation avec sa trésorerie au-dessus de sa réserve (la provision pour l'usure,
+  /// comptée dans son loyer, la finance) ; s'il lui en manque, il tire le manque sur l'hypothèque du bâtiment, sans
+  /// dépasser ltvFirm × le coût du neuf et si sa banque le lui prête. Mesuré : tirer ltvFirm de chaque dépense, comme un
+  /// chantier, créait assez de monnaie pour 18 % d'inflation de plus en 2 000 jours (rapports/renovation.md). Rend les
+  /// modules posés.
+  int _renovateLandlord(Building b, int q) {
+    final p = params;
+    final f = _fmap[b.ownerId];
+    if (f == null) return 0;
+    final price = moduleCost();
+    if (!(price > 0) || !price.isFinite) return 0;
+    q = _modulesToBuy(q); // on n'emprunte que pour des modules qu'on peut acheter aujourd'hui
+    if (q < 1) return 0;
+    final reserve = 3 * f.wage * f.workers.length;
+    final own = math.max(0.0, f.money - reserve);
+    var loan = 0.0;
+    final short = quantize(q * price - own);
+    if (short > 0) {
+      final m = mortgageOf(b);
+      if ((m?.principal ?? 0.0) + short <= p.ltvFirm * buildingCost(b) && _firmMayBorrow(f, short)) {
+        if (m == null) {
+          _originate(f, 0, f.id, b, short, mortgageRate(p.ltvFirm), p.mortgageTermFirm);
+        } else {
+          _draw(m, f, short);
+        }
+        loan = short;
+      }
+    }
+    final budget = f.money - reserve;
+    if (budget <= 0) return 0;
+    final r = buy(f, f.id.toString(), 'batiment', q.toDouble(), budget, true);
+    _repayUnused(b, f, loan, r.spent - own);
+    if (r.qty < 1) return 0;
+    b.basis += r.spent;
+    f.reinvest = math.max(0.0, f.reinvest - r.spent);
+    bstats.renoSpent += r.spent;
+    return r.qty.round();
+  }
+
+  /// Modules de rénovation achetables aujourd'hui, au plus [q] : ceux en stock chez les vendeurs. Le reste de la demande
+  /// est noté comme non servi, comme un achat sans offre : sans cela, quand le dernier entrepreneur général disparaît,
+  /// rien ne signale plus la demande et aucun autre n'est fondé (mesuré : 84 à 273 rénovations en attente au jour 3 000).
+  int _modulesToBuy(int q) {
+    final n = math.min(q, _moduleStock().floor());
+    if (n < q) unmet['batiment'] = (unmet['batiment'] ?? 0) + (q - n);
+    return n;
+  }
+
+  /// Modules de chantier en stock chez ceux qui en vendent.
+  double _moduleStock() {
+    var n = 0.0;
+    for (final f in sellersOf('batiment')) {
+      n += f.inv['batiment'] ?? 0;
+    }
+    return n;
+  }
+
+  /// La part d'un prêt de rénovation qui n'a pas servi aux achats du jour ([used], au-delà des fonds propres) est
+  /// remboursée aussitôt : un prêt ne finance que des modules achetés.
+  void _repayUnused(Building b, Account borrower, double loan, double used) {
+    if (loan <= 0) return;
+    final unused = quantize(loan - math.max(0.0, used));
+    final m = mortgageOf(b);
+    if (m == null || unused <= 0) return;
+    _repayMortgage(m, borrower, unused);
+    if (m.principal <= eps) {
+      _dropMortgage(m);
+    } else {
+      m.payment = quantize(_annuity(m.principal, m.rate / 365, m.termLeft));
+    }
+  }
+
+  /// Un propriétaire-occupant achète [q] modules de rénovation avec son épargne au-delà de 10 jours de besoins ; s'il lui
+  /// en manque, il emprunte sur sa maison (_renoLoan). Rend les modules posés.
+  int _renovateHome(Building b, int q) {
+    final c = _cmap[b.ownerId];
+    if (c == null) return 0;
+    final price = moduleCost();
+    if (!(price > 0) || !price.isFinite) return 0;
+    q = _modulesToBuy(q); // on n'emprunte que pour des modules qu'on peut acheter aujourd'hui
+    if (q < 1) return 0;
+    final cushion = 10 * needCost;
+    final own = math.max(0.0, c.money - cushion);
+    var loan = 0.0;
+    if (own < q * price) {
+      final want = quantize(q * price - own);
+      if (_renoLoan(c, b, want)) loan = want;
+    }
+    final budget = c.money - cushion;
+    if (budget <= 0) return 0;
+    final r = buy(c, 'M', 'batiment', q.toDouble(), budget, true);
+    _repayUnused(b, c, loan, r.spent - own);
+    if (r.qty < 1) return 0;
+    b.basis += r.spent;
+    bstats.renoSpent += r.spent;
+    return r.qty.round();
+  }
+
+  /// Prêt de rénovation d'un propriétaire-occupant : un tirage sur l'hypothèque de sa maison, ou une nouvelle hypothèque.
+  /// Accordé si la dette reste sous ltvHousehold du coût du neuf (la valeur de la maison rénovée), si le versement et
+  /// l'entretien restent sous 35 % de son revenu, et si sa banque en a les fonds propres. Rend vrai si le prêt est fait.
+  bool _renoLoan(Citizen c, Building b, double loan) {
+    final p = params;
+    if (!modules.credit || loan <= 0) return false;
+    final value = buildingCost(b);
+    final m = mortgageOf(b);
+    final owe = m?.principal ?? 0.0;
+    if (!(value > 0) || owe + loan > p.ltvHousehold * value) return false;
+    final rate = m?.rate ?? mortgageRate((owe + loan) / value);
+    final term = m != null && m.termLeft > 0 ? m.termLeft : p.mortgageTermHousehold;
+    final pay = _annuity(owe + loan, rate / 365, term);
+    if (pay + p.maintHoursPerDwelling * careHourPrice() * sizeOf(b) > safeguards.maxPaymentRatio * c.incomeEma) return false;
+    if (!_bankAllows(loan, _lenderOf(c))) {
+      bank.refusals++;
+      return false;
+    }
+    if (m == null) {
+      _originate(c, 1, c.id, b, loan, rate, p.mortgageTermHousehold);
+    } else {
+      _draw(m, c, loan);
+    }
+    return true;
   }
 
   /// Service quotidien des hypothèques : intérêts + capital (versement constant). Un chantier ne paie que les intérêts.
@@ -642,7 +852,7 @@ extension SimBuildings on Sim {
     final p = params;
     final loan = modules.credit ? quantize(price * p.ltvHousehold) : 0.0;
     final rate = mortgageRate(loan / price);
-    final maint = p.maintHoursPerDwelling * bestPrice('reparation') * sizeOf(b);
+    final maint = p.maintHoursPerDwelling * careHourPrice() * sizeOf(b);
     final pay = loan > 0 ? _annuity(loan, rate / 365, p.mortgageTermHousehold) : 0.0;
     return (loan: loan, rate: rate, pay: pay, maint: maint);
   }
@@ -892,9 +1102,10 @@ extension SimBuildings on Sim {
       final sites = [for (final b in mine) if (!b.done) b];
       var units = 0, siteUnits = 0; // logements terminés et en chantier
       for (final b in mine) {
-        if (b.done) {
+        if (b.done && (!renovationActive || b.habitable)) {
           units += b.units;
-        } else {
+        } else if (!b.done || b.renoLeft > 0) {
+          // module renovation : un logement inhabitable en rénovation reviendra ; une ruine sans rénovation ne compte plus
           siteUnits += b.units;
         }
       }
@@ -945,7 +1156,10 @@ extension SimBuildings on Sim {
   /// hypothèques et provision pour la part de l'usure qu'aucun entretien ne compense.
   void _updateCarry() {
     final p = params;
-    final prov = replacementCost() * p.buildingWearYear * (1 - p.buildingMaintShare) / 365;
+    // module renovation : la part de l'usure qu'aucun entretien ne compense se répare au prix d'une rénovation
+    final prov = renovationActive
+        ? replacementCost() * p.renoShare * p.buildingWearYear * (1 - p.buildingMaintShare) / 365
+        : replacementCost() * p.buildingWearYear * (1 - p.buildingMaintShare) / 365;
     for (final f in firms) {
       if (f.type != 'immobilier') continue;
       var interest = 0.0;
@@ -966,7 +1180,7 @@ extension SimBuildings on Sim {
   /// bâtiment, bâtiment habitable. Null sinon.
   Building? dwellingOf(Citizen c) {
     final id = c.dwellingId;
-    if (id == null || c.leaseFirm == null || c.homeId != null) return null;
+    if (id == null || c.leaseFirm == null || livesAtHome(c)) return null;
     final b = _bmap[id];
     return b != null && b.habitable && b.ownerKind == 0 && b.ownerId == c.leaseFirm ? b : null;
   }
@@ -990,7 +1204,7 @@ extension SimBuildings on Sim {
     final next = <int, int>{};
     for (final c in citizens) {
       final lf = c.leaseFirm;
-      if (lf == null || c.homeId != null || c.dwellingId != null) continue;
+      if (lf == null || livesAtHome(c) || c.dwellingId != null) continue;
       if (free == null) {
         free = {};
         for (final b in buildings) {

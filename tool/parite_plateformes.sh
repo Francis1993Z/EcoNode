@@ -5,6 +5,9 @@
 #
 #   bash tool/parite_plateformes.sh <dossier econodes> <dossier de sortie>
 #
+# Toutes les parties jouent les réglages par défaut d'avant le 14 novembre 2026 (--historique : modules et commerce
+# extérieur coupés), pour que la référence du moteur reste comparable depuis que tout est actif par défaut.
+#
 # - parite.exe (graines 1 et 42, 400 jours) ;
 # - 240 habitants : graines 1 à 3 × 1 500 jours, filets actifs et coupés ; empreintes de chaque jour (16 parties de
 #   l'état) et instantanés complets aux jours 100, 500 et 1 500 ;
@@ -20,16 +23,16 @@ t0=$(date +%s)
 "$B/parite.exe" > "$O/parite.txt"
 for f in 1 0; do
   for g in 1 2 3; do
-    ("$B/partie.exe" --graine $g --jours 1500 --filets $f --empreintes "$O/emp-g$g-f$f.jsonl" \
+    ("$B/partie.exe" --historique --graine $g --jours 1500 --filets $f --empreintes "$O/emp-g$g-f$f.jsonl" \
       --snapshot-at 100,500,1500 --snapshot-dir "$O/snap-g$g-f$f" | grep -v '^Temps' > "$O/partie-g$g-f$f.txt") &
   done
 done
 wait
 echo "240 habitants : $(($(date +%s) - t0)) s"
-(cd "$O" && "$B/stabilite.exe" --niveau 0 --save "$O/niveau0.json" --out "$O/niveau0.md" 2> "$O/niveau0.log")
+(cd "$O" && "$B/stabilite.exe" --historique --niveau 0 --save "$O/niveau0.json" --out "$O/niveau0.md" 2> "$O/niveau0.log")
 echo "niveau 0 : $(($(date +%s) - t0)) s"
 for g in 1 2 3; do
-  ("$B/partie.exe" --graine $g --jours 100 --population 10000 --empreintes "$O/emp10k-g$g.jsonl" \
+  ("$B/partie.exe" --historique --graine $g --jours 100 --population 10000 --empreintes "$O/emp10k-g$g.jsonl" \
     --snapshot-at 100 --snapshot-dir "$O/snap10k-g$g" | grep -v '^Temps' > "$O/partie10k-g$g.txt") &
 done
 wait

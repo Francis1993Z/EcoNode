@@ -127,8 +127,8 @@ void main(List<String> args) {
     final produced = <String>{for (final f in s.firms) ...f.outputs.keys};
     // type d'entreprise dont le bien est le premier produit (celui que lit la création automatique)
     final maker = <String, String>{
-      for (final e in templates.entries)
-        if (produced.contains(e.value.outputs.keys.first)) e.value.outputs.keys.first: e.key
+      for (final ty in s.typeKeys)
+        if (produced.contains(templates[ty]!.outputs.keys.first)) templates[ty]!.outputs.keys.first: ty
     };
     final first = <String, int>{};
     final dead = <String>{};

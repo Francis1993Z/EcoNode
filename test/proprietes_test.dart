@@ -24,7 +24,7 @@ class Case {
 
   Case(this.n, int days) {
     _r = Mulberry32(hash32(20261011, n));
-    final p = Params()
+    final p = Params.historique()
       ..population = pick(40, 300)
       ..startWallet = between(1500, 5000)
       ..taxRate = between(0.05, 0.25)
@@ -39,7 +39,7 @@ class Case {
       ..bankCapitalPerCitizen = u() < 0.3 ? 0 : between(0, 200) // une Caisse sans capital bute sur son plancher
       ..dividendFromRetained = u() < 0.5
       ..trade = u() < 0.3;
-    final m = Modules();
+    final m = Modules.historique();
     for (final k in Modules.keys) {
       // les modules apparus après ces cas (Modules.lateKeys) restent coupés et ne consomment pas de tirage : les cas restent
       // les mêmes
@@ -63,7 +63,9 @@ class Case {
           final a = between(-2000, 5000);
           shocks.add((day, (s) => s.godMoney(const Target('allCitizens'), a), 'argent $a'));
         case 1:
-          final g = goods.keys.elementAt(pick(0, goods.length - 1));
+          // les biens d'avant le module renovation (à la fin de la table) : les cas restent ceux d'avant lui
+          final before = [for (final g in goods.keys) if (!renovationGoods.contains(g)) g];
+          final g = before[pick(0, before.length - 1)];
           final pct = between(0.3, 1);
           shocks.add((day, (s) => s.godDestroy(g, pct), 'stocks de $g ×${1 - pct}'));
         case 2:

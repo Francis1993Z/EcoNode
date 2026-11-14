@@ -203,6 +203,11 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.fdStart != d.fdStart) 'fdStart': _d(p.fdStart),
     if (p.fdMaxCap != d.fdMaxCap) 'fdMaxCap': _d(p.fdMaxCap),
     if (p.publicImports != d.publicImports) 'publicImports': p.publicImports,
+    if (p.worldPriceDrift != d.worldPriceDrift) 'worldPriceDrift': p.worldPriceDrift,
+    if (p.worldPriceDays != d.worldPriceDays) 'worldPriceDays': _d(p.worldPriceDays),
+    if (p.localMeals != d.localMeals) 'localMeals': p.localMeals,
+    if (p.homePreference != d.homePreference) 'homePreference': p.homePreference,
+    if (p.homeMargin != d.homeMargin) 'homeMargin': _d(p.homeMargin),
     if (p.stateBorrowing != d.stateBorrowing) 'stateBorrowing': p.stateBorrowing,
     if (p.stateDebtMaxGdp != d.stateDebtMaxGdp) 'stateDebtMaxGdp': _d(p.stateDebtMaxGdp),
     if (p.stateRepayRate != d.stateRepayRate) 'stateRepayRate': _d(p.stateRepayRate),
@@ -218,6 +223,8 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.purchaseLoans != d.purchaseLoans) 'purchaseLoans': p.purchaseLoans,
     if (p.ownersAtStart != d.ownersAtStart) 'ownersAtStart': p.ownersAtStart,
     if (p.buildingTypes != d.buildingTypes) 'buildingTypes': p.buildingTypes,
+    if (p.renoTrigger != d.renoTrigger) 'renoTrigger': _d(p.renoTrigger),
+    if (p.renoShare != d.renoShare) 'renoShare': _d(p.renoShare),
     if (p.cheapestHouse != d.cheapestHouse) 'cheapestHouse': p.cheapestHouse,
     if (p.jointCostBySales != d.jointCostBySales) 'jointCostBySales': p.jointCostBySales,
     if (p.spreadTakeovers != d.spreadTakeovers) 'spreadTakeovers': p.spreadTakeovers,
@@ -397,6 +404,11 @@ Params _paramsFrom(Map j) => Params()
   ..revivalFullCost = (j['revivalFullCost'] as bool?) ?? false
   ..revivalPlannedDemand = (j['revivalPlannedDemand'] as bool?) ?? false
   ..publicImports = (j['publicImports'] as bool?) ?? false
+  ..worldPriceDrift = (j['worldPriceDrift'] as bool?) ?? false
+  ..worldPriceDays = _rdOr(j['worldPriceDays'], 365)
+  ..localMeals = (j['localMeals'] as bool?) ?? false
+  ..homePreference = (j['homePreference'] as bool?) ?? false
+  ..homeMargin = _rdOr(j['homeMargin'], 0.2)
   ..stateBorrowing = (j['stateBorrowing'] as bool?) ?? false
   ..stateDebtMaxGdp = _rdOr(j['stateDebtMaxGdp'], 0.6)
   ..stateRepayRate = _rdOr(j['stateRepayRate'], 0.02)
@@ -412,6 +424,8 @@ Params _paramsFrom(Map j) => Params()
   ..purchaseLoans = (j['purchaseLoans'] as bool?) ?? false
   ..ownersAtStart = (j['ownersAtStart'] as bool?) ?? false
   ..buildingTypes = (j['buildingTypes'] as bool?) ?? false
+  ..renoTrigger = _rdOr(j['renoTrigger'], 0.6)
+  ..renoShare = _rdOr(j['renoShare'], 0.6)
   ..cheapestHouse = (j['cheapestHouse'] as bool?) ?? false
   ..jointCostBySales = (j['jointCostBySales'] as bool?) ?? false
   ..spreadTakeovers = (j['spreadTakeovers'] as bool?) ?? false
@@ -965,18 +979,20 @@ int _fnv(String t) {
 
 List<Object?> _buildingJson(Building b) => [
       b.id, b.ownerKind, b.ownerId, b.payee, b.modules, b.done, _d(b.cond), _d(b.basis), b.mortgageId, b.listedDay, b.builtDay,
-      if (b.type != null) b.type, // Params.buildingTypes : rang dans buildingKinds
+      if (b.type != null || b.renoLeft != 0) b.type, // Params.buildingTypes : rang dans buildingKinds (null : sans type)
+      if (b.renoLeft != 0) b.renoLeft, // Modules.renovation : modules de rénovation restants
     ];
 
 Building _buildingFrom(List j) =>
-    Building(j[0] as int, j[1] as int, j[2] as int?, j[10] as int, j.length > 11 ? j[11] as int : null)
+    Building(j[0] as int, j[1] as int, j[2] as int?, j[10] as int, j.length > 11 ? j[11] as int? : null)
   ..payee = j[3] as int?
   ..modules = j[4] as int
   ..done = j[5] as bool
   ..cond = _rd(j[6])
   ..basis = _rd(j[7])
   ..mortgageId = j[8] as int?
-  ..listedDay = j[9] as int?;
+  ..listedDay = j[9] as int?
+  ..renoLeft = j.length > 12 ? j[12] as int : 0;
 
 List<Object?> _mortgageJson(Mortgage m) => [
       m.id, m.buildingId, m.borrowerKind, m.borrowerId, _d(m.principal), _d(m.rate), m.termLeft, _d(m.payment), m.missed, m.since,
@@ -1001,6 +1017,7 @@ extension SimSnapshot on Sim {
           _d(bstats.gains), _d(bstats.losses), _d(bstats.priceEma),
           if (bstats.bought != 0) bstats.bought, // Params.buildingTypes : immeubles saisis rachetés par un bailleur
         ],
+        if (renovationActive) 'renovation': [bstats.renovated, _d(bstats.renoSpent)], // Modules.renovation
         'list': [for (final b in buildings) _buildingJson(b)],
         'mortgages': [for (final m in mortgages) _mortgageJson(m)],
       };
@@ -1046,6 +1063,7 @@ extension SimSnapshot on Sim {
         if (ledgerTariffs != 0) 'ledgerTariffs': _d(ledgerTariffs),
         if (fxRate != 1 || fxImportsEma != 0 || fxExportsEma != 0) 'fx': [_d(fxRate), _d(fxImportsEma), _d(fxExportsEma)],
         if (foreignOrders.isNotEmpty) 'foreignOrders': _dm(foreignOrders),
+        if (worldDrift.isNotEmpty) 'worldDrift': _dm(worldDrift),
         if (ledgerPublicImports != 0) 'ledgerPublicImports': _d(ledgerPublicImports),
         if (cpiQtyEma.isNotEmpty) 'cpiSmooth': [_dm(cpiValueEma), _dm(cpiQtyEma)],
         if (stateBorrowed != 0)
@@ -1138,6 +1156,7 @@ extension SimSnapshot on Sim {
           _dm(foreignOrders)
         ])),
       if (importEma.isNotEmpty) 'renaissance': _fnv(j(_dm(importEma))),
+      if (worldDrift.isNotEmpty) 'prix_mondiaux': _fnv(j(_dm(worldDrift))),
       if (ledgerPublicImports != 0) 'secours': _fnv(j([_d(ledgerPublicImports)])),
       if (cpiQtyEma.isNotEmpty) 'indice_lisse': _fnv(j([_dm(cpiValueEma), _dm(cpiQtyEma)])),
       if (stateBorrowed != 0)
@@ -1164,10 +1183,16 @@ extension SimSnapshot on Sim {
     devChecks = j['devChecks'] as bool;
     sansHasard = (j['sansHasard'] as bool?) ?? false;
     params = _paramsFrom(j['params'] as Map);
+    // un module apparu après la référence n'est écrit que s'il est actif (Modules.toJson) : absent, il était coupé, même
+    // depuis que tous les modules sont actifs par défaut
     modules = Modules();
+    for (final k in Modules.lateKeys) {
+      modules.set(k, false);
+    }
     for (final e in (j['modules'] as Map).entries) {
       modules.set(e.key as String, e.value as bool);
     }
+    _setKeys();
     safeguards = _safeguardsFrom(j['safeguards'] as Map);
     _nextCitizenId = j['nextCitizenId'] as int;
     _firmSeq
@@ -1214,6 +1239,9 @@ extension SimSnapshot on Sim {
     foreignOrders
       ..clear()
       ..addAll(j['foreignOrders'] == null ? const {} : _rdm(j['foreignOrders']));
+    worldDrift
+      ..clear()
+      ..addAll(j['worldDrift'] == null ? const {} : _rdm(j['worldDrift']));
     ledgerPublicImports = _rdOr(j['ledgerPublicImports'], 0);
     final cs = j['cpiSmooth'] as List?;
     cpiValueEma
@@ -1367,6 +1395,10 @@ extension SimSnapshot on Sim {
         ..losses = _rd(st[7])
         ..priceEma = _rd(st[8])
         ..bought = st.length > 9 ? st[9] as int : 0;
+      final rs = bj['renovation'] as List?;
+      bstats
+        ..renovated = rs != null ? rs[0] as int : 0
+        ..renoSpent = rs != null ? _rd(rs[1]) : 0.0;
       buildings.addAll([for (final b in bj['list'] as List) _buildingFrom(b as List)]);
       for (final b in buildings) {
         _bmap[b.id] = b;

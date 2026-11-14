@@ -55,7 +55,26 @@ const Map<String, Good> goods = {
   'logement': Good('Logement', 'nuitée', true, 40, 'tertiaire'),
   // Module de construction (module « buildings ») : un logement en demande Params.dwellingModules. Ni importé ni exporté.
   'batiment': Good('Construction (module)', 'module', false, 1800, 'secondaire', tradable: false),
+  // Module « renovation » : matériaux et heures des métiers du bâtiment. Ajoutés après la référence du moteur : sans le
+  // module, aucune boucle du moteur ne les voit (Sim.goodKeys).
+  'planches': Good('Planches', 'paquet', false, 30, 'secondaire'),
+  'briques': Good('Briques', 'palette', false, 60, 'secondaire'),
+  'tuyaux': Good('Tuyaux', 'longueur', false, 20, 'secondaire'),
+  'fils': Good('Fils électriques', 'rouleau', false, 40, 'secondaire'),
+  'fusibles': Good('Fusibles', 'boîte', false, 25, 'secondaire'),
+  'charpente': Good('Charpenterie', 'heure', true, 60, 'secondaire'),
+  'electricite': Good('Électricité du bâtiment', 'heure', true, 70, 'secondaire'),
+  'plomberie': Good('Plomberie', 'heure', true, 70, 'secondaire'),
 };
+
+/// Biens du module « renovation » (matériaux et heures des métiers du bâtiment).
+const Set<String> renovationGoods = {
+  'planches', 'briques', 'tuyaux', 'fils', 'fusibles', 'charpente', 'electricite', 'plomberie',
+};
+
+/// Heures des métiers qui font l'entretien courant d'un bâtiment (module « renovation ») : part de chaque métier dans les
+/// Params.maintHoursPerDwelling heures par logement et par jour (choix de jeu).
+const Map<String, double> buildingCareShares = {'charpente': 0.4, 'plomberie': 0.3, 'electricite': 0.3};
 
 const List<String> sectors = ['primaire', 'secondaire', 'tertiaire'];
 const Map<String, String> sectorLabels = {'primaire': 'Primaire', 'secondaire': 'Secondaire', 'tertiaire': 'Tertiaire'};
@@ -265,6 +284,31 @@ const Map<String, Template> templates = {
   // en demande Params.dwellingModules (10 par défaut). Créée au départ seulement si le module est actif.
   'construction': Template('Construction', 'CO', 'secondaire', {'bois': 5, 'acier': 2}, {'batiment': 1}, 0.17,
       capital: 0.5, rnd: 'genie'),
+  // ---- module « renovation » : matériaux, métiers du bâtiment et entrepreneur général. Ajoutés après la référence du
+  // moteur : sans le module, ils ne sont jamais créés (Sim.typeKeys). Avec lui, l'entrepreneur général remplace la
+  // Construction : il vend les modules de chantier, pour le neuf comme pour la rénovation, et sous-traite aux métiers.
+  // Travail par module : ≈ 2 jours-personnes chez l'entrepreneur, ≈ 2,7 chez les métiers, ≈ 1,4 pour les matériaux, soit
+  // ≈ 6 comme la Construction (choix de jeu, rapports/renovation.md).
+  'scierie': Template('Scierie', 'SC', 'secondaire', {'bois': 1}, {'planches': 4}, 4, capital: 0.8),
+  'briqueterie': Template('Briqueterie', 'BR', 'secondaire', {'carburant': 0.1}, {'briques': 1}, 3, capital: 1.0),
+  'tuyauterie':
+      Template('Tuyauterie', 'TU', 'secondaire', {'cuivre': 0.05, 'plastique': 0.3}, {'tuyaux': 1}, 4, capital: 0.8),
+  'cablerie': Template('Câblerie', 'CB', 'secondaire', {'cuivre': 0.1, 'plastique': 0.1}, {'fils': 1}, 4, capital: 0.8),
+  'fusibles': Template('Fusibles', 'FS', 'secondaire', {'cuivre': 0.02, 'plastique': 0.05}, {'fusibles': 1}, 6,
+      skill: 1, capital: 0.8),
+  'charpentier': Template('Charpentier', 'CH', 'secondaire', {'planches': 0.15}, {'charpente': 1}, 6, capital: 0.3),
+  'electricien': Template('Électricien', 'ET', 'secondaire', {'fils': 0.1, 'fusibles': 0.05}, {'electricite': 1}, 6,
+      skill: 1, capital: 0.3),
+  'plombier':
+      Template('Plombier', 'PB', 'secondaire', {'tuyaux': 0.15}, {'plomberie': 1}, 6, skill: 1, capital: 0.3),
+  'entrepreneur': Template('Entrepreneur général', 'EG', 'secondaire',
+      {'briques': 3, 'charpente': 10, 'electricite': 3, 'plomberie': 3}, {'batiment': 1}, 0.5,
+      capital: 0.5, rnd: 'genie'),
+};
+
+/// Types d'entreprises du module « renovation ». Avec lui, l'entrepreneur général remplace la Construction.
+const Set<String> renovationTypes = {
+  'scierie', 'briqueterie', 'tuyauterie', 'cablerie', 'fusibles', 'charpentier', 'electricien', 'plombier', 'entrepreneur',
 };
 
 // ------------------------------------------------------------------ rôles en entreprise (module « jobs »)
@@ -459,6 +503,56 @@ const Map<String, List<Role>> roles = {
     Role('Spécialiste en charpente', 0.5, 1.12, 0.35),
     Role('Chef de chantier', 1, 1.1, 0.15, minTenure: 365),
   ],
+  // ---- module « renovation »
+  'scierie': [
+    Role('Manœuvre de scierie', 0, 1.0, 0.45),
+    Role('Opérateur(trice) de scie', 0.5, 1.1, 0.40),
+    Role('Contremaître de scierie', 1, 1.1, 0.15, minTenure: 365),
+  ],
+  'briqueterie': [
+    Role('Manœuvre de briqueterie', 0, 1.0, 0.50),
+    Role('Opérateur(trice) de four', 0.6, 1.1, 0.35),
+    Role('Contremaître de briqueterie', 1, 1.1, 0.15, minTenure: 365),
+  ],
+  'tuyauterie': [
+    Role('Manœuvre d’usine', 0, 1.0, 0.40),
+    Role('Opérateur(trice) d’extrudeuse', 0.5, 1.08, 0.40),
+    Role('Technicien(ne) de procédés', 1, 1.0, 0.10),
+    Role('Contremaître de production', 1, 1.15, 0.10, minTenure: 365),
+  ],
+  'cablerie': [
+    Role('Manœuvre d’usine', 0, 1.0, 0.40),
+    Role('Opérateur(trice) de tréfileuse', 0.5, 1.08, 0.40),
+    Role('Technicien(ne) de procédés', 1, 1.0, 0.10),
+    Role('Contremaître de production', 1, 1.15, 0.10, minTenure: 365),
+  ],
+  'fusibles': [
+    Role('Assembleur(se)', 0.3, 1.05, 0.35),
+    Role('Technicien(ne) en électrotechnique', 1, 1.0, 0.45),
+    Role('Contrôleur(se) de la qualité', 1, 1.05, 0.10),
+    Role('Responsable de la production', 1.5, 1.1, 0.10, minTenure: 365),
+  ],
+  'charpentier': [
+    Role('Apprenti(e) charpentier', 0, 1.0, 0.40),
+    Role('Charpentier-menuisier', 0.6, 1.12, 0.45),
+    Role('Chef d’équipe en charpenterie', 1, 1.1, 0.15, minTenure: 365),
+  ],
+  'electricien': [
+    Role('Apprenti(e) électricien(ne)', 0.5, 1.0, 0.35),
+    Role('Électricien(ne)', 1, 1.05, 0.50),
+    Role('Maître électricien(ne)', 1.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'plombier': [
+    Role('Apprenti(e) plombier', 0.5, 1.0, 0.35),
+    Role('Plombier(ère)', 1, 1.05, 0.50),
+    Role('Maître plombier', 1.5, 1.15, 0.15, minTenure: 365),
+  ],
+  'entrepreneur': [
+    Role('Manœuvre de chantier', 0, 1.0, 0.45),
+    Role('Maçon(ne)', 0.6, 1.12, 0.35),
+    Role('Estimateur(trice)', 1, 1.0, 0.05),
+    Role('Chef de chantier', 1, 1.1, 0.15, minTenure: 365),
+  ],
 };
 
 const List<Role> _mineRoles = [
@@ -523,6 +617,14 @@ final Map<String, String> producerOf = {
 
 /// Paramètres de la partie. Tout paramètre ajouté doit l'être aussi dans les instantanés (snapshot.dart).
 class Params {
+  /// Réglages par défaut : le commerce extérieur est actif depuis le 14 novembre 2026.
+  Params();
+
+  /// Les réglages par défaut d'avant le 14 novembre 2026 : commerce extérieur coupé (voir Modules.historique).
+  Params.historique() {
+    trade = false;
+  }
+
   int population = 240;
   double startWallet = 3000;
   double startWage = 150;
@@ -535,7 +637,10 @@ class Params {
   double mpcIncome = 0.6;
   double wealthTargetDays = 20;
   double get propensity => (1 - mpcIncome) / wealthTargetDays;
-  bool trade = false;
+  // Commerce extérieur (frontières ouvertes) : importations au prix mondial × importMarkup, exportations des surplus et,
+  // avec foreignDemand, commandes de l'étranger. Actif par défaut depuis le 14 novembre 2026 (demande de Francis) ;
+  // Params.historique le coupe, comme avant.
+  bool trade = true;
   double importMarkup = 1.3;
   double exportDiscount = 0.7;
   double ubi = 0;
@@ -736,6 +841,12 @@ class Params {
   double landlordBuildAbove = 0.96;
   // Un ménage achète si son coût mensuel de propriétaire (versement + entretien) ne dépasse pas ce multiple du loyer.
   double buyRentRatio = 1.2;
+  // Rénovation (Modules.renovation, 2026-11-12) : sous l'état renoTrigger, le propriétaire rénove jusqu'à l'état neuf en
+  // achetant des modules de chantier à l'entrepreneur général ; remettre à neuf un bâtiment coûte renoShare des modules
+  // de sa construction (chaque module ajoute 1 / (renoShare × modules du bâtiment) à son état). À 0,6, un bâtiment
+  // entretenu (−1 %/an) se rénove tous les ≈ 40 ans pour ≈ 24 % du prix du neuf. Choix de jeu (rapports/renovation.md).
+  double renoTrigger = 0.6;
+  double renoShare = 0.6;
 
   // ---- Entrepreneuriat des citoyens (Modules.entrepreneurship). Aucune de ces valeurs n'est réglée sur une cible : ce sont
   // des ordres de grandeur a priori, exposés pour être changés. Repère (non visé) : au Canada, environ 10 % d'entrées et 9 %
@@ -882,6 +993,22 @@ class Params {
   // à 240 citoyens, la mort des petites filières (cuivre, pétrole) arrête l'électronique et le plastique, puis l'hôpital,
   // et la santé s'effondre (anomalie A1). Frontières ouvertes, l'importation ordinaire suffit.
   bool publicImports = false;
+  // Commerce extérieur (2026-11-14, rapports/tout-actif.md § 3) : trois corrections choisies par Francis, coupées dans le
+  // moteur, actives dans l'interface. Sans elles, frontières ouvertes, les prix mondiaux restent ceux du plan de départ
+  // pendant que les prix relatifs d'ici dérivent (nourriture × 2 à 3, or × 0,3) : l'or et les bijoux s'exportent, le change
+  // reste bas et toute la filière alimentaire est importée.
+  // 1. Prix mondiaux qui vivent (worldPriceDrift) : le prix d'import et d'export d'un bien échangeable suit lentement son
+  //    prix normal ici (coût au taux d'utilisation normal des vendeurs actifs, pondéré par leur production lissée, × markup)
+  //    au rythme de 1 / worldPriceDays par jour : le reste du monde a les mêmes techniques. Sim.worldPrice ne change pas
+  //    (prix de référence des choix des ménages, des coproduits, de la valeur des bâtiments) : seul Sim.worldDrift bouge.
+  bool worldPriceDrift = false;
+  double worldPriceDays = 365;
+  // 2. Repas non échangeables (localMeals) : les repas du restaurant ne s'importent ni ne s'exportent, comme l'hôtel.
+  bool localMeals = false;
+  // 3. Préférence pour ce qui est fait ici (homePreference) : un acheteur ne prend une importation que si elle est moins
+  //    chère qu'une offre d'ici d'au moins homeMargin (transport, fraîcheur, habitudes) ; il paie le prix d'import.
+  bool homePreference = false;
+  double homeMargin = 0.2;
   // Dette publique (stateBorrowing, 2026-10-30) : quand le trésor, au-dessus de son plancher, ne suffit pas aux
   // enveloppes des établissements publics, l'État emprunte la différence à la Caisse (création de monnaie, comme un prêt
   // à une entreprise), jusqu'à stateDebtMaxGdp du PIB annuel (60 % : repère de Maastricht). Il paie chaque jour les
@@ -1043,27 +1170,46 @@ class Modules {
   // Caisse encaissait la perte. Aucun paramètre.
   bool bankruptcy = true;
   // Bâtiments et hypothèques : le parc de logements est fait de bâtiments qu'on construit, qu'on loue, qu'on achète à
-  // crédit (hypothèque de la Caisse), qu'on revend et qui s'usent. Coupé par défaut : le parc suit alors la capacité fixée
-  // au départ (comportement historique).
-  bool buildings = false;
+  // crédit (hypothèque de la Caisse), qu'on revend et qui s'usent. Actif par défaut depuis le 14 novembre 2026 (voir
+  // Modules.historique) ; coupé, le parc suit la capacité fixée au départ (comportement historique).
+  bool buildings = true;
   // Rôles, contrats individuels et négociation salariale : chaque employé a un rôle de l'organigramme de son entreprise,
   // un salaire négocié à l'embauche (salaire de réserve contre plafond de l'employeur), révisé à chaque anniversaire et
-  // relevé par une contre-offre quand un concurrent veut le débaucher ; promotions internes. Coupé par défaut : un seul
-  // salaire par entreprise (comportement historique). L'interface lance ses parties avec le module actif.
-  bool jobs = false;
+  // relevé par une contre-offre quand un concurrent veut le débaucher ; promotions internes. Actif par défaut ; coupé, un seul
+  // salaire par entreprise (comportement historique).
+  bool jobs = true;
   // Entrepreneuriat des citoyens : des citoyens ambitieux et peu averses au risque fondent des entreprises avec leur épargne
-  // et un prêt de la Caisse, au lieu de créations mécaniques de clones. Coupé par défaut. Suppose « Entrée et sortie
+  // et un prêt de la Caisse, au lieu de créations mécaniques de clones. Actif par défaut. Suppose « Entrée et sortie
   // d'entreprises » (les fermetures) : seule la fondation change.
-  bool entrepreneurship = false;
+  bool entrepreneurship = true;
   // Variétés de produits et marques : chaque entreprise d'un bien de consommation ou d'équipement vend sa variété (nom,
-  // qualité, goût des ménages, notoriété) au lieu d'un clone. Coupé par défaut. Les variétés naissent et meurent avec les
+  // qualité, goût des ménages, notoriété) au lieu d'un clone. Actif par défaut. Les variétés naissent et meurent avec les
   // entreprises : leur nombre n'est jamais fixé d'avance.
-  bool products = false;
+  bool products = true;
   // Crédit aux citoyens (prêt personnel, carte de crédit, cote, faillite personnelle) et, à partir de deux banques,
-  // concurrence bancaire (réserves, marché interbancaire, fondations et faillites de banques). Coupé par défaut.
-  bool banking = false;
+  // concurrence bancaire (réserves, marché interbancaire, fondations et faillites de banques). Actif par défaut.
+  bool banking = true;
+  // Rénovation et métiers du bâtiment (suppose « buildings » ; réglé au départ d'une partie) : une chaîne de matériaux
+  // (scierie, briqueterie, tuyauterie, câblerie, fusibles), trois métiers (charpentier, électricien, plombier) et un
+  // entrepreneur général qui remplace la Construction. Les propriétaires rénovent un bâtiment usé en achetant des modules
+  // de chantier, et l'entretien courant passe aux métiers. Actif par défaut (MODELE.md § 6.6).
+  bool renovation = true;
 
+  /// Réglages par défaut : depuis le 14 novembre 2026, tous les modules sont actifs (demande de Francis : tous les
+  /// modules actifs par défaut, dans l'interface et sans elle).
   Modules();
+
+  /// Les réglages par défaut d'avant le 14 novembre 2026 : bâtiments, rôles, entrepreneuriat, produits, banques et
+  /// rénovation coupés. La batterie de parité et la référence du moteur (tool/reference.sh) les rejouent, avec le
+  /// commerce extérieur coupé (Params.historique) : l'empreinte reste comparable d'une révision à l'autre.
+  Modules.historique() {
+    buildings = false;
+    jobs = false;
+    entrepreneurship = false;
+    products = false;
+    banking = false;
+    renovation = false;
+  }
 
   /// Tous les modules coupés : chaînes de production, emploi, nourriture, logement, loisirs.
   Modules.none() {
@@ -1088,12 +1234,12 @@ class Modules {
   static const List<String> keys = [
     'credit', 'capital', 'rnd', 'marketing', 'accounting', 'health', 'education', 'publicHealth', 'publicEducation',
     'entry', 'dividendTest', 'publicBudget', 'insurance', 'bankRegulation', 'bankruptcy', 'buildings', 'jobs',
-    'entrepreneurship', 'products', 'banking',
+    'entrepreneurship', 'products', 'banking', 'renovation',
   ];
 
   /// Modules apparus après la référence du moteur : ils n'apparaissent dans les instantanés, les empreintes et les
   /// synthèses que lorsqu'ils sont actifs.
-  static const List<String> lateKeys = ['entrepreneurship', 'products', 'banking'];
+  static const List<String> lateKeys = ['entrepreneurship', 'products', 'banking', 'renovation'];
 
   /// Les modules sous forme de table pour les instantanés et les empreintes. Un module apparu après la référence du moteur
   /// n'y figure que lorsqu'il est actif : coupé, la sérialisation est celle d'avant lui.
@@ -1122,6 +1268,7 @@ class Modules {
     'entrepreneurship': 'Entrepreneuriat des citoyens',
     'products': 'Variétés de produits et marques',
     'banking': 'Crédit aux citoyens et banques',
+    'renovation': 'Rénovation et métiers du bâtiment',
   };
 
   bool get(String k) {
@@ -1166,6 +1313,8 @@ class Modules {
         return products;
       case 'banking':
         return banking;
+      case 'renovation':
+        return renovation;
     }
     throw ArgumentError('Module inconnu : $k');
   }
@@ -1212,6 +1361,8 @@ class Modules {
         products = v;
       case 'banking':
         banking = v;
+      case 'renovation':
+        renovation = v;
       default:
         throw ArgumentError('Module inconnu : $k');
     }
@@ -1486,6 +1637,20 @@ const List<ScenarioFirm> defaultScenario = [
   ScenarioFirm('ecole', 'Cégep du Nord'),
   ScenarioFirm('immobilier', 'Gestion Bédard'),
   ScenarioFirm('divertissement', 'Bar Le Trappeur'),
+];
+
+/// Module renovation : la chaîne des matériaux, les métiers et l'entrepreneur général, une entreprise de chaque, comme la
+/// Construction qu'ils remplacent (elle n'est pas répétée avec la population : le plan dimensionne leurs équipes).
+const List<ScenarioFirm> renovationScenario = [
+  ScenarioFirm('scierie', 'Scierie Ouellet'),
+  ScenarioFirm('briqueterie', 'Briqueterie Laprairie'),
+  ScenarioFirm('tuyauterie', 'Tuyaux Cloutier'),
+  ScenarioFirm('cablerie', 'Câbles Paquette'),
+  ScenarioFirm('fusibles', 'Fusibles Girard'),
+  ScenarioFirm('charpentier', 'Charpenterie Dubé'),
+  ScenarioFirm('electricien', 'Électricité Poirier'),
+  ScenarioFirm('plombier', 'Plomberie Fournier'),
+  ScenarioFirm('entrepreneur', 'Entreprise générale Pelletier'),
 ];
 
 const List<String> firstNames = [
@@ -1919,6 +2084,7 @@ class Building {
   int? listedDay; // jour de mise en vente (null : pas en vente)
   final int builtDay;
   int? type; // rang dans buildingKinds (Params.buildingTypes) ; null : logement standard
+  int renoLeft = 0; // modules de rénovation restant à poser (Modules.renovation) ; 0 : pas de rénovation en cours
   Building(this.id, this.ownerKind, this.ownerId, this.builtDay, [this.type]);
 
   /// Sous ce seuil d'état, le logement est inhabitable.

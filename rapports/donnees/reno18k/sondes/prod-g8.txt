@@ -1,0 +1,72 @@
+jour 500
+  scierie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.36, tech ×1.00, lots/employé ÷ base 0.20, utilisation 0.55
+  briqueterie : 1 entr., 1 employés, niveau tech 1.00, machines ×1.57, tech ×1.00, lots/employé ÷ base 1.57, utilisation 0.52
+  tuyauterie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.25, tech ×1.00, lots/employé ÷ base 0.40, utilisation 0.62
+  cablerie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.26, tech ×1.00, lots/employé ÷ base 0.27, utilisation 0.58
+  fusibles : 1 entr., 2 employés, niveau tech 1.00, machines ×1.23, tech ×1.00, lots/employé ÷ base 0.09, utilisation 0.64
+  charpentier : 2 entr., 5 employés, niveau tech 1.00, machines ×1.16, tech ×1.00, lots/employé ÷ base 1.15, utilisation 0.70
+  electricien : 1 entr., 2 employés, niveau tech 1.00, machines ×1.31, tech ×1.00, lots/employé ÷ base 1.31, utilisation 0.71
+  plombier : 1 entr., 2 employés, niveau tech 1.00, machines ×1.28, tech ×1.00, lots/employé ÷ base 1.28, utilisation 0.74
+  entrepreneur : 5 entr., 7 employés, niveau tech 1.80, machines ×1.05, tech ×1.15, lots/employé ÷ base 1.01, utilisation 0.48
+  toutes : 222 entr., 2417 employés, niveau tech 1.32, machines ×1.46, tech ×1.05, lots/employé ÷ base 1.39, utilisation 0.94
+  emploi de la filière du bâtiment : 25 sur 2417 (1.03 %)
+jour 1000
+  scierie : 1 entr., 1 employés, niveau tech 1.00, machines ×1.00, tech ×1.00, lots/employé ÷ base 0.40, utilisation 0.43
+  briqueterie : aucune
+  tuyauterie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.41, tech ×1.00, lots/employé ÷ base 0.46, utilisation 0.50
+  cablerie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.32, tech ×1.00, lots/employé ÷ base 0.28, utilisation 0.55
+  fusibles : 1 entr., 2 employés, niveau tech 1.00, machines ×1.30, tech ×1.00, lots/employé ÷ base 0.09, utilisation 0.59
+  charpentier : 1 entr., 3 employés, niveau tech 1.00, machines ×1.25, tech ×1.00, lots/employé ÷ base 1.25, utilisation 0.68
+  electricien : 1 entr., 3 employés, niveau tech 1.00, machines ×1.18, tech ×1.00, lots/employé ÷ base 1.18, utilisation 0.55
+  plombier : 1 entr., 2 employés, niveau tech 1.00, machines ×1.24, tech ×1.00, lots/employé ÷ base 1.24, utilisation 0.70
+  entrepreneur : 1 entr., 1 employés, niveau tech 6.00, machines ×1.28, tech ×2.01, lots/employé ÷ base 2.57, utilisation 0.32
+  toutes : 170 entr., 2443 employés, niveau tech 1.58, machines ×1.51, tech ×1.10, lots/employé ÷ base 1.61, utilisation 0.95
+  emploi de la filière du bâtiment : 16 sur 2443 (0.65 %)
+jour 1500
+  scierie : 1 entr., 1 employés, niveau tech 1.00, machines ×1.57, tech ×1.00, lots/employé ÷ base 0.63, utilisation 0.39
+  briqueterie : 1 entr., 1 employés, niveau tech 1.00, machines ×2.24, tech ×1.00, lots/employé ÷ base 2.24, utilisation 0.60
+  tuyauterie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.85, tech ×1.00, lots/employé ÷ base 0.60, utilisation 0.48
+  cablerie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.71, tech ×1.00, lots/employé ÷ base 0.37, utilisation 0.51
+  fusibles : 1 entr., 2 employés, niveau tech 1.00, machines ×1.83, tech ×1.00, lots/employé ÷ base 0.13, utilisation 0.58
+  charpentier : 2 entr., 3 employés, niveau tech 1.00, machines ×1.38, tech ×1.00, lots/employé ÷ base 1.38, utilisation 0.81
+  electricien : 1 entr., 3 employés, niveau tech 1.00, machines ×1.30, tech ×1.00, lots/employé ÷ base 1.30, utilisation 0.54
+  plombier : 1 entr., 2 employés, niveau tech 1.00, machines ×1.37, tech ×1.00, lots/employé ÷ base 1.37, utilisation 0.71
+  entrepreneur : 1 entr., 1 employés, niveau tech 5.00, machines ×1.61, tech ×1.75, lots/employé ÷ base 2.82, utilisation 0.52
+  toutes : 153 entr., 2415 employés, niveau tech 1.68, machines ×1.52, tech ×1.14, lots/employé ÷ base 1.67, utilisation 0.95
+  emploi de la filière du bâtiment : 17 sur 2415 (0.70 %)
+jour 2000
+  scierie : 1 entr., 1 employés, niveau tech 1.00, machines ×1.19, tech ×1.00, lots/employé ÷ base 0.48, utilisation 0.29
+  briqueterie : aucune
+  tuyauterie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.39, tech ×1.00, lots/employé ÷ base 0.45, utilisation 0.38
+  cablerie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.27, tech ×1.00, lots/employé ÷ base 0.27, utilisation 0.42
+  fusibles : 1 entr., 2 employés, niveau tech 1.00, machines ×1.39, tech ×1.00, lots/employé ÷ base 0.10, utilisation 0.39
+  charpentier : 1 entr., 3 employés, niveau tech 1.00, machines ×1.30, tech ×1.00, lots/employé ÷ base 1.30, utilisation 0.62
+  electricien : 1 entr., 3 employés, niveau tech 1.00, machines ×1.13, tech ×1.00, lots/employé ÷ base 1.12, utilisation 0.49
+  plombier : 1 entr., 2 employés, niveau tech 1.00, machines ×1.28, tech ×1.00, lots/employé ÷ base 1.28, utilisation 0.67
+  entrepreneur : aucune
+  toutes : 140 entr., 2436 employés, niveau tech 1.78, machines ×1.46, tech ×1.18, lots/employé ÷ base 1.72, utilisation 0.97
+  emploi de la filière du bâtiment : 15 sur 2436 (0.62 %)
+jour 2500
+  scierie : 1 entr., 1 employés, niveau tech 1.00, machines ×1.04, tech ×1.00, lots/employé ÷ base 0.42, utilisation 0.41
+  briqueterie : aucune
+  tuyauterie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.23, tech ×1.00, lots/employé ÷ base 0.40, utilisation 0.49
+  cablerie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.20, tech ×1.00, lots/employé ÷ base 0.26, utilisation 0.50
+  fusibles : 1 entr., 2 employés, niveau tech 1.00, machines ×1.23, tech ×1.00, lots/employé ÷ base 0.09, utilisation 0.49
+  charpentier : 1 entr., 3 employés, niveau tech 1.00, machines ×1.31, tech ×1.00, lots/employé ÷ base 1.31, utilisation 0.74
+  electricien : 1 entr., 3 employés, niveau tech 1.00, machines ×1.10, tech ×1.00, lots/employé ÷ base 1.10, utilisation 0.56
+  plombier : 1 entr., 3 employés, niveau tech 1.00, machines ×1.15, tech ×1.00, lots/employé ÷ base 1.15, utilisation 0.56
+  entrepreneur : 1 entr., 1 employés, niveau tech 3.00, machines ×1.44, tech ×1.32, lots/employé ÷ base 1.91, utilisation 0.46
+  toutes : 131 entr., 2302 employés, niveau tech 1.85, machines ×1.45, tech ×1.23, lots/employé ÷ base 1.76, utilisation 0.99
+  emploi de la filière du bâtiment : 17 sur 2302 (0.74 %)
+jour 3000
+  scierie : 1 entr., 1 employés, niveau tech 1.00, machines ×1.01, tech ×1.00, lots/employé ÷ base 0.41, utilisation 0.44
+  briqueterie : 1 entr., 1 employés, niveau tech 1.00, machines ×1.00, tech ×1.00, lots/employé ÷ base 0.87, utilisation 0.51
+  tuyauterie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.06, tech ×1.00, lots/employé ÷ base 0.34, utilisation 0.59
+  cablerie : 1 entr., 2 employés, niveau tech 1.00, machines ×1.05, tech ×1.00, lots/employé ÷ base 0.23, utilisation 0.60
+  fusibles : 1 entr., 2 employés, niveau tech 1.00, machines ×1.06, tech ×1.00, lots/employé ÷ base 0.08, utilisation 0.59
+  charpentier : 1 entr., 3 employés, niveau tech 1.00, machines ×1.35, tech ×1.00, lots/employé ÷ base 1.35, utilisation 0.74
+  electricien : 1 entr., 3 employés, niveau tech 1.00, machines ×1.02, tech ×1.00, lots/employé ÷ base 1.02, utilisation 0.60
+  plombier : 1 entr., 3 employés, niveau tech 1.00, machines ×1.04, tech ×1.00, lots/employé ÷ base 1.04, utilisation 0.58
+  entrepreneur : 1 entr., 3 employés, niveau tech 4.00, machines ×1.06, tech ×1.52, lots/employé ÷ base 1.62, utilisation 0.44
+  toutes : 124 entr., 2304 employés, niveau tech 1.96, machines ×1.41, tech ×1.30, lots/employé ÷ base 1.84, utilisation 0.99
+  emploi de la filière du bâtiment : 20 sur 2304 (0.87 %)

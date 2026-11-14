@@ -126,11 +126,11 @@ List<NodeBox> allBoxes(Sim sim) {
   final m = sim.nodePos['M']!;
   final inY = <String, double>{};
   var y = m[1] + kHeaderH;
-  for (final g in householdGoods) {
+  for (final g in homePorts(sim)) {
     inY[g] = y + kRowH / 2;
     y += kRowH;
   }
-  out.add(NodeBox(const Selection('M'), Rect.fromLTWH(m[0], m[1], kNodeW, homesHeight()), {}, inY));
+  out.add(NodeBox(const Selection('M'), Rect.fromLTWH(m[0], m[1], kNodeW, homesHeight(sim)), {}, inY));
   for (final k in const ['E', 'B']) {
     final p = sim.nodePos[k]!;
     out.add(NodeBox(Selection(k), Rect.fromLTWH(p[0], p[1], kNodeW, kSmallH), {}, {}));
@@ -1277,7 +1277,7 @@ class GraphPainter extends CustomPainter {
     _header(canvas, r, pal.ink2, 'M', 'Ménages',
         '$n citoyens · ${pct(n > 0 ? unemployed / n : 0.0)} chôm. · bonheur ${pct(n > 0 ? happy / n : 0.0)}');
     var y = r.top + kHeaderH;
-    for (final g in householdGoods) {
+    for (final g in homePorts(sim)) {
       final gd = goods[g]!;
       final un = sim.unmet[g] ?? 0.0;
       _row(canvas, r, y, pal.sector(gd.sector), gd.label, money(sim.bestPrice(g)), rightColor: un > 0.5 ? pal.bad : null);

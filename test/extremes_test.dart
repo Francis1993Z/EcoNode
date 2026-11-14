@@ -15,7 +15,7 @@ void run(Sim s, int days) {
 /// Toute la monnaie de départ multipliée par [k] (citoyens, entreprises, État, Caisse), par le god mode : la masse
 /// monétaire reste expliquée et les invariants comptables tiennent.
 Sim moneyTimes(int seed, double k) {
-  final s = Sim(seed: seed, devChecks: true);
+  final s = Sim(seed: seed, devChecks: true, params: Params.historique(), modules: Modules.historique());
   if (k == 1) return s;
   for (final c in List.of(s.citizens)) {
     s.godMoney(Target('citizen', c.id), c.money * (k - 1));
@@ -30,14 +30,14 @@ Sim moneyTimes(int seed, double k) {
 
 /// Une partie sans hasard : le drapeau joue dès la naissance des citoyens, la partie est donc refaite avec lui.
 Sim noRandom(int seed) {
-  final s = Sim(seed: seed, devChecks: true)..sansHasard = true;
+  final s = Sim(seed: seed, devChecks: true, params: Params.historique(), modules: Modules.historique())..sansHasard = true;
   s.reset(seed: seed);
   return s;
 }
 
 void main() {
   test('zéro citoyen : rien ne se produit, la monnaie ne bouge pas, les entreprises sans employé ferment', () {
-    final s = Sim(seed: 3, params: Params()..population = 0, devChecks: true);
+    final s = Sim(seed: 3, params: Params.historique()..population = 0, devChecks: true, modules: Modules.historique());
     final m0 = s.totalMoney();
     final exit = s.params.exitIdleDays;
     run(s, exit + 20);
@@ -56,7 +56,7 @@ void main() {
   test('coproduit sans acheteur (A3) : la ferme vend ses céréales au coût complet et garde ses employés', () {
     Sim game(bool rule) => Sim(
         seed: 3,
-        params: Params()..jointCostBySales = rule,
+        params: Params.historique()..jointCostBySales = rule,
         scenario: const [
           ScenarioFirm('ferme', 'Ferme'),
           ScenarioFirm('boulangerie', 'Boulangerie'),
@@ -93,7 +93,7 @@ void main() {
   test('une seule entreprise par secteur (ferme, boulangerie, immobilier) : personne n’a faim ni ne dort dehors', () {
     final s = Sim(
         seed: 3,
-        params: Params()..jointCostBySales = true,
+        params: Params.historique()..jointCostBySales = true,
         scenario: const [
           ScenarioFirm('ferme', 'Ferme'),
           ScenarioFirm('boulangerie', 'Boulangerie'),
@@ -110,7 +110,7 @@ void main() {
   }, skip: 'attendu non obtenu : trois entreprises n’emploient pas 240 citoyens, sans aide ni création ; voir le commentaire');
 
   test('salaires figés : aucun salaire ne bouge, les invariants tiennent', () {
-    final s = Sim(seed: 3, modules: Modules()..entry = false, devChecks: true);
+    final s = Sim(seed: 3, modules: Modules.historique()..entry = false, devChecks: true, params: Params.historique());
     for (final f in s.firms) {
       f.lockWage = true;
     }

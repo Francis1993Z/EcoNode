@@ -47,6 +47,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     var founders = ctrl.sim.modules.entrepreneurship;
     var varieties = ctrl.sim.modules.products;
     var banking = ctrl.sim.modules.banking;
+    var renovation = ctrl.sim.modules.renovation;
     final seedCtl = TextEditingController(text: '42');
     final go = await showDialog<bool>(
       context: context,
@@ -79,6 +80,19 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 title: const Text('Marché immobilier', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                 subtitle: const Text('Maisons, duplex et immeubles construits, loués, achetés et revendus ; hypothèques '
                     'de la Caisse. Le parc s’explore dans l’onglet Parc.', style: TextStyle(fontSize: 12)),
+              ),
+              SwitchListTile(
+                contentPadding: const EdgeInsets.only(left: 16),
+                value: housing && renovation,
+                onChanged: housing ? (v) => set(() => renovation = v) : null,
+                title: const Text('Rénovation et métiers du bâtiment',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: const Text(
+                    'Scierie, briqueterie, tuyaux, câbles et fusibles ; charpentiers, électriciens, plombiers et un '
+                    'entrepreneur général, qui remplace la Construction. Les propriétaires rénovent leurs bâtiments usés '
+                    'et l’entretien passe aux métiers. Sous 1 000 citoyens environ, l’entrepreneur général et la '
+                    'briqueterie trouvent rarement assez de travail pour durer.',
+                    style: TextStyle(fontSize: 12)),
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -153,6 +167,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ctrl.sim.modules.entrepreneurship = founders;
       ctrl.sim.modules.products = varieties;
       ctrl.sim.modules.banking = banking;
+      ctrl.sim.modules.renovation = housing && renovation;
       ctrl.newGame(seed, params: freshParams(ctrl.startParams, pop.round()));
     }
     seedCtl.dispose();

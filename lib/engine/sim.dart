@@ -162,8 +162,9 @@ class _BestOffers {
   late final List<double> sortedPrices = [for (final f in byPrice) f.price[good]!]; // les prix ne changent pas ici
   final double imported; // prix d'importation, ou l'infini
   final double fallback; // plus bas prix affiché, sinon le prix mondial
+  final double bias; // Params.homePreference : l'importation n'est prise que si imported × bias est plus bas
   int _next = 0; // premier vendeur qui peut encore avoir une unité en stock
-  _BestOffers._(this.good, this.sellers, this.byPrice, this.imported, this.fallback);
+  _BestOffers._(this.good, this.sellers, this.byPrice, this.imported, this.fallback, this.bias);
 
   /// Attrait de chaque vendeur pour un ménage (la notoriété ne change pas pendant la consommation).
   List<double> householdPulls(Sim s) => _pulls ??= [for (final f in sellers) 1 / (1 + s.brandPull(f))];
@@ -173,9 +174,9 @@ class _BestOffers {
     final list = List<Firm>.of(sellers)..sort((a, b) => a.price[good]!.compareTo(b.price[good]!));
     final p = s.params;
     final g = goods[good]!;
-    final imported = p.trade && !g.perish && g.tradable ? s.importPrice(good) : double.infinity;
+    final imported = p.trade && !g.perish && s.tradable(good) ? s.importPrice(good) : double.infinity;
     final fallback = list.isEmpty ? s.worldPrice[good]! : list.first.price[good]!;
-    return _BestOffers._(good, sellers, list, imported, fallback);
+    return _BestOffers._(good, sellers, list, imported, fallback, s.importBias);
   }
 
   List<int>? _priceIdx;
@@ -191,7 +192,8 @@ class _BestOffers {
       _next++;
     }
     final best = _next < byPrice.length ? sortedPrices[_next] : double.infinity;
-    return math.min(best, imported);
+    if (bias == 1) return math.min(best, imported);
+    return imported * bias < best ? imported : best;
   }
 
   double bestPrice() {
@@ -248,9 +250,9 @@ class _AllOffers {
       offers.add(_Offer(f, f.price[good]!, s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, f.id)), 1 / (1 + s.brandPull(f))));
     }
     final p = s.params;
-    if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
-      offers.add(
-          _Offer(null, s.importPrice(good), s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), 1));
+    if (p.trade && !goods[good]!.perish && s.tradable(good)) {
+      offers.add(_Offer(
+          null, s.importPrice(good), s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), s.importBias));
     }
     keys = [for (final o in offers) o.p * (1 + 0.03 * o.r) * o.pull];
     used = List<bool>.filled(offers.length, false);
@@ -283,9 +285,9 @@ class _AllOffers {
       }
     }
     final p = s.params;
-    if (p.trade && !goods[good]!.perish && goods[good]!.tradable) {
-      offers.add(
-          _Offer(null, s.importPrice(good), s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), 1));
+    if (p.trade && !goods[good]!.perish && s.tradable(good)) {
+      offers.add(_Offer(
+          null, s.importPrice(good), s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0)), s.importBias));
     }
     keys = [for (final o in offers) o.p * (1 + 0.03 * o.r) * o.pull];
     used = List<bool>.filled(offers.length, false);
@@ -327,6 +329,8 @@ class _LazyOffers {
   int _front = 0;
   bool _import;
   final double _importPrice;
+  final double _bias; // Params.homePreference (1 sinon)
+  final double _importKey; // plus petite clé possible de l'offre d'importation
   // tas binaire des offres examinées : clé, place ; offers[i] est l'offre
   final List<double> _keys = [];
   final List<int> _place = [];
@@ -334,9 +338,13 @@ class _LazyOffers {
 
   _LazyOffers(this.s, this.bo, this.buyer, this.good, this.base)
       : idx = bo.priceIdx,
-        _import = s.params.trade && !goods[good]!.perish && goods[good]!.tradable,
-        _importPrice = s.params.trade && !goods[good]!.perish && goods[good]!.tradable
+        _import = s.params.trade && !goods[good]!.perish && s.tradable(good),
+        _importPrice = s.params.trade && !goods[good]!.perish && s.tradable(good)
             ? s.importPrice(good)
+            : double.infinity,
+        _bias = s.importBias,
+        _importKey = s.params.trade && !goods[good]!.perish && s.tradable(good)
+            ? s.importPrice(good) * s.importBias
             : double.infinity;
 
   bool _less(int a, int b) => _keys[a] < _keys[b] || (_keys[a] == _keys[b] && _place[a] < _place[b]);
@@ -389,13 +397,13 @@ class _LazyOffers {
     for (;;) {
       // plus petit prix parmi les vendeurs pas encore examinés (leur clé ne peut pas être plus basse)
       final nextSeller = _front < bo.byPrice.length ? bo.sortedPrices[_front] : double.infinity;
-      final lb = _import && _importPrice < nextSeller ? _importPrice : nextSeller;
+      final lb = _import && _importKey < nextSeller ? _importKey : nextSeller;
       if (_keys.isNotEmpty && (lb == double.infinity || _keys[0] < lb)) return _pop();
       if (lb == double.infinity) return null;
-      if (_import && _importPrice <= nextSeller) {
+      if (_import && _importKey <= nextSeller) {
         _import = false;
         final r = s.sansHasard ? 0.5 : Mulberry32.first(hash32(base, 0));
-        final o = _Offer(null, _importPrice, r, 1);
+        final o = _Offer(null, _importPrice, r, _bias);
         _push(o.p * (1 + 0.03 * o.r) * o.pull, 1 << 30, o);
         continue;
       }
@@ -589,6 +597,12 @@ class Sim {
   double fxRate = 1, fxImportsEma = 0, fxExportsEma = 0;
   /// Commandes quotidiennes de l'étranger (Params.foreignDemand), en unités, par « identifiant d'entreprise:bien ».
   final Map<String, double> foreignOrders = {};
+  /// Prix mondiaux qui vivent (Params.worldPriceDrift) : multiplicateur du prix mondial de départ dans les prix d'import et
+  /// d'export, par bien (1 au départ) ; vide tant que la correction n'a pas servi.
+  final Map<String, double> worldDrift = {};
+  /// Relevés du jour pour worldDrift (Params.worldPriceDrift), refaits par _decide : somme des coûts normaux pondérés par
+  /// la production lissée des vendeurs actifs, et somme des poids, par bien.
+  final Map<String, double> _normalCostSum = {}, _normalCostW = {};
   /// Importations de secours des établissements publics (Params.publicImports), en dollars, depuis le début.
   double ledgerPublicImports = 0;
   /// Dette publique envers la Caisse (Params.stateBorrowing) et ses totaux : emprunté, intérêts payés ou capitalisés,
@@ -633,6 +647,14 @@ class Sim {
   /// Crédit et banques (module banking) : les banques (vide : la Caisse seule), totaux des prêts aux particuliers, pertes
   /// lissées, et caches du jour (dette pondérée au début de la consommation, crédit accordé depuis).
   bool bankingActive = false;
+  /// Rénovation et métiers du bâtiment (module renovation) : actif pour toute la partie si le module (et celui des
+  /// bâtiments) l'est au départ ; ses entreprises naissent avec le scénario. Biens et types d'entreprises en jeu : sans
+  /// le module, ses biens et ses types n'existent pas pour le moteur (ni prix, ni statistiques, ni création), et les
+  /// boucles parcourent exactement les biens et les types d'avant lui ; avec lui, l'entrepreneur général remplace la
+  /// Construction.
+  bool renovationActive = false;
+  List<String> goodKeys = const [];
+  List<String> typeKeys = const [];
   final List<Bank> banks = [];
   double consumerLent = 0;
   int stateBank = 0; // module banking : la banque de l'État (la Caisse ; Params.equalBanks : celle qui la reprend)
@@ -748,6 +770,17 @@ class Sim {
   static final Map<String, int> _goodIndex = {for (final (i, g) in goods.keys.indexed) g: i};
   static final Map<String, int> _typeIndex = {for (final (i, t) in templates.keys.indexed) t: i};
 
+  /// Biens et types d'entreprises en jeu dans cette partie (voir renovationActive). Les biens et les types du module
+  /// renovation sont à la fin des tables : coupé, l'ordre et les index des autres ne changent pas.
+  void _setKeys() {
+    renovationActive = modules.renovation && modules.buildings;
+    goodKeys = [for (final g in goods.keys) if (renovationActive || !renovationGoods.contains(g)) g];
+    typeKeys = [
+      for (final t in templates.keys)
+        if (renovationActive ? t != 'construction' : !renovationTypes.contains(t)) t,
+    ];
+  }
+
   /// Identifiant d'un compte acheteur pour les tirages : citoyen, entreprise, ou 0 pour l'État.
   int _accountId(Account a) => a is Citizen ? a.id : (a is Firm ? a.id : 0);
 
@@ -758,6 +791,7 @@ class Sim {
     this.params = params ?? Params();
     this.modules = modules ?? Modules();
     this.safeguards = safeguards ?? Safeguards();
+    _setKeys();
     day = 0;
     _nextCitizenId = 1;
     _firmSeq.clear();
@@ -779,6 +813,7 @@ class Sim {
     fxImportsEma = 0;
     fxExportsEma = 0;
     foreignOrders.clear();
+    worldDrift.clear();
     ledgerPublicImports = 0;
     stateDebt = stateBorrowed = stateInterest = stateRepaid = stateInterestToday = 0;
     cpiValueEma.clear();
@@ -850,7 +885,7 @@ class Sim {
     state = StateAccount(250.0 * p.population);
     bank = BankAccount(quantize(p.bankCapitalPerCitizen * p.population));
     bank.capital = bank.money;
-    for (final g in goods.keys) {
+    for (final g in goodKeys) {
       marketStats[g] = MarketStat();
     }
 
@@ -864,7 +899,13 @@ class Sim {
           ]),
     ];
     // module buildings : l'entreprise de construction fait partie du scénario ; elle n'est créée que si elle a une demande
-    if (this.modules.buildings && !full.any((s) => s.type == 'construction')) {
+    if (renovationActive) {
+      // module renovation : l'entrepreneur général et ses fournisseurs remplacent la Construction
+      full.removeWhere((s) => s.type == 'construction');
+      for (final s in renovationScenario) {
+        if (!full.any((x) => x.type == s.type)) full.add(s);
+      }
+    } else if (this.modules.buildings && !full.any((s) => s.type == 'construction')) {
       full.add(const ScenarioFirm('construction', 'Construction Pelletier'));
     }
     final perType = <String, int>{};
@@ -976,7 +1017,7 @@ class Sim {
       }
       var inputCost = 0.0;
       for (final e in f.inputs.entries) {
-        f.inv[e.key] = batches * e.value * 5;
+        f.inv[e.key] = batches * e.value * (goods[e.key]!.perish ? 1 : 5);
         inputCost += batches * e.value * plan.price[e.key]!;
       }
       f.machines = (plan.machinesPerWorker[f.type]! * f.workers.length).roundToDouble();
@@ -1074,7 +1115,7 @@ class Sim {
   _Plan _plan(Params p, List<ScenarioFirm> scen, Map<String, int> count, {Map<String, double>? basket}) {
     final m = modules;
     final types = count.keys.toList();
-    final price = <String, double>{for (final g in goods.keys) g: goods[g]!.guess};
+    final price = <String, double>{for (final g in goodKeys) g: goods[g]!.guess};
     final pop = p.population.toDouble();
     final r = (p.policyPassThrough ? p.policyRate + p.policySpread : p.interestRate) / 365; // banque centrale
     final b = <String, double>{for (final t in types) t: 1.0};
@@ -1084,6 +1125,14 @@ class Sim {
     if (!m.health) basic.remove('soins');
     if (!m.education) basic.remove('cours');
     if (!m.buildings) basic.remove('batiment');
+    if (renovationActive) {
+      // module renovation : l'entretien courant du parc (≈ 1,06 logement par citoyen) en heures des métiers
+      for (final e in buildingCareShares.entries) {
+        basic[e.key] = 1.06 * p.maintHoursPerDwelling * e.value;
+      }
+    }
+    // besoins fixes du parc (module renovation) : jamais pris dans le panier mesuré, que les ménages ne paient qu'en partie
+    bool fixedNeed(String g) => renovationActive && (g == 'batiment' || buildingCareShares.containsKey(g));
 
     // effectifs réalistes (Params.planWorkforce) : efficacité d'équilibre des employés (facteur santé)
     final planEff = p.planWorkforce && m.health ? 0.4 + 0.6 * 0.875 : 1.0;
@@ -1135,7 +1184,7 @@ class Sim {
         // chaque essai d'échelle repart des valeurs initiales (N18) : sinon l'essai à λ = 0 (avec le panier mesuré, le
         // logement seul) laisse un prix des machines exorbitant, plus aucune entreprise n'en veut, et l'économie de départ
         // naît sans machines, sans Machinerie, mine de fer, fonderie ni garage
-        for (final g in goods.keys) {
+        for (final g in goodKeys) {
           price[g] = goods[g]!.guess;
         }
         for (final t in types) {
@@ -1146,12 +1195,12 @@ class Sim {
       }
       for (var it = 0; it < 80; it++) {
         final d = <String, double>{
-          for (final g in goods.keys)
+          for (final g in goodKeys)
             // panier mesuré des ménages ; le logement reste un besoin fixe, une nuit par personne : mesuré, il manquait
             // les propriétaires-occupants et les sans-abri de la partie provisoire, et l'échelle lambda le réduisait
             // (bailleurs sous-dimensionnés, jusqu'à 1 086 sans-abri au jour 1 à 2 500 citoyens avec bâtiments et banques)
             g: basket != null
-                ? pop * (basket.containsKey(g) && g != 'logement' ? lambda * basket[g]! : (basic[g] ?? 0))
+                ? pop * (basket.containsKey(g) && g != 'logement' && !fixedNeed(g) ? lambda * basket[g]! : (basic[g] ?? 0))
                 : pop * ((basic[g] ?? 0) + lambda * (_extraDemand[g] ?? 0)),
         };
         for (final ty in types) {
@@ -1668,8 +1717,13 @@ class Sim {
       }
     }
     if (verifyFastPaths && best != _quoteScan(good)) throw StateError('Meilleur prix (tableaux) différent au jour $day ($good)');
-    if (params.trade && !goods[good]!.perish && goods[good]!.tradable) {
-      best = math.min(best, importPrice(good));
+    if (params.trade && !goods[good]!.perish && tradable(good)) {
+      final ip = importPrice(good), bias = importBias;
+      if (bias == 1) {
+        best = math.min(best, ip);
+      } else if (ip * bias < best) {
+        best = ip;
+      }
     }
     return best;
   }
@@ -1918,7 +1972,7 @@ class Sim {
     flows = {};
     unmet = {};
     householdSpend = 0;
-    for (final g in goods.keys) {
+    for (final g in goodKeys) {
       marketStats[g] = MarketStat();
     }
     for (final f in firms) {
@@ -1976,8 +2030,9 @@ class Sim {
     _capital();
     _quoteCache = null;
     _decide();
+    if (p.worldPriceDrift) _driftWorldPrices(); // prix mondiaux qui vivent, sur les coûts relevés par _decide
     _finance();
-    for (final g in goods.keys) {
+    for (final g in goodKeys) {
       unmetEma[g] = 0.9 * (unmetEma[g] ?? 0) + 0.1 * (unmet[g] ?? 0);
     }
     if (p.revival) _revivalEvening();
@@ -2612,7 +2667,8 @@ class Sim {
         final want = <String, double>{};
         var wantValue = 0.0;
         for (final e in f.inputs.entries) {
-          final target = plan * e.value * 5;
+          // une heure de sous-traitant (module renovation) ne se garde pas : un jour d'avance, pas cinq
+          final target = plan * e.value * (goods[e.key]!.perish ? 1 : 5);
           final deficit = target - (f.inv[e.key] ?? 0);
           if (deficit > eps) {
             want[e.key] = deficit;
@@ -2627,7 +2683,9 @@ class Sim {
             _setStock(f, e.key, (f.inv[e.key] ?? 0) + r.qty);
             f.costs += r.spent;
             f.inputSpend += r.spent;
-            if (params.publicImports && !params.trade && r.qty < e.value - eps && publicService(f)) {
+            if (!params.trade &&
+                r.qty < e.value - eps &&
+                ((params.publicImports && publicService(f)) || _renovationImport(f, e.key))) {
               // importations de secours : le reste du besoin, que le marché d'ici n'a pas servi (le manque reste noté)
               final x = _publicImport(f, e.key, e.value - r.qty, math.min(share, f.money) - r.spent);
               _setStock(f, e.key, (f.inv[e.key] ?? 0) + x.$1);
@@ -2641,6 +2699,14 @@ class Sim {
     }
     _quoteCache = null;
   }
+
+  /// Module renovation : l'entrepreneur général et les métiers achètent à l'étranger, au prix d'import, la part de leurs
+  /// matériaux que le marché d'ici n'a pas servie, frontières fermées, comme l'hôpital (décision de Francis,
+  /// 2026-11-13). Sans elles, la briqueterie (un seul client, aux commandes irrégulières) meurt dans 10 graines sur 10 en
+  /// 3 000 jours à 1 000 et 2 500 citoyens, et l'entrepreneur général avec elle. Les heures des métiers et les modules
+  /// restent d'ici.
+  bool _renovationImport(Firm f, String g) =>
+      renovationActive && renovationTypes.contains(f.type) && renovationGoods.contains(g) && !goods[g]!.perish;
 
   /// Services aux entreprises : comptabilité, entretien, publicité, recherche et développement.
   void _buyServices(Firm f) {
@@ -2739,9 +2805,10 @@ class Sim {
       }
       c.hungerDays = c.sat['faim']! < 0.5 ? c.hungerDays + 1 : 0;
       // 2. se loger
-      // un propriétaire-occupant habite chez lui (module buildings) : pas de nuitée à payer
+      // un propriétaire-occupant habite chez lui (module buildings) : pas de nuitée à payer ; module renovation : si son
+      // logement est inhabitable, il loue ailleurs jusqu'à la fin de la rénovation
       // Params.leases : un locataire paie son loyer à son bailleur ; sans bail (ou bail perdu), il loue sur le marché
-      var rl = c.homeId != null
+      var rl = livesAtHome(c)
           ? const BuyResult(1, 0)
           : (p.leases && c.leaseFirm != null ? _payRent(c) : const BuyResult(0, 0));
       if (rl.qty < 1) {
@@ -2785,7 +2852,7 @@ class Sim {
       final id = c.leaseFirm;
       if (id == null) continue;
       final f = _fmap[id];
-      if (f == null || c.homeId != null || !f.outputs.containsKey('logement')) {
+      if (f == null || livesAtHome(c) || !f.outputs.containsKey('logement')) {
         c.leaseFirm = null;
         continue;
       }
@@ -3182,7 +3249,7 @@ class Sim {
     if (params.foreignDemand) _foreignOrders(); // commandes de l'étranger d'abord, puis surplus de stock
     for (final f in firms) {
       for (final g in f.outputs.keys) {
-        if (goods[g]!.perish || !goods[g]!.tradable) continue;
+        if (goods[g]!.perish || !tradable(g)) continue;
         final excess = (f.inv[g] ?? 0) - 8 * math.max(f.demandEma[g] ?? 0, 0.5);
         if (excess <= eps) continue;
         final value = transfer(null, f, excess * exportPrice(g));
@@ -3479,7 +3546,7 @@ class Sim {
     // Entonnoir (mesure) : les conditions sont lues dans un ordre qui permet de nommer la première qui manque ; la
     // décision est la même qu'avant (toutes les conditions sont requises, une seule création par jour).
     var created = false;
-    for (final ty in templates.keys) {
+    for (final ty in typeKeys) {
       final t = templates[ty]!;
       final g = t.outputs.keys.first;
       if (publicGood(g)) continue; // l'État fournit ce service : pas de concurrent privé
@@ -3536,15 +3603,40 @@ class Sim {
     }
   }
 
+  /// Prix de vente qu'un projet de création attend pour [g] : le meilleur prix offert, au plus deux fois le prix de départ.
+  /// Module renovation, entreprises de la chaîne, quand plus personne ne vend le bien : le prix de départ indexé sur les
+  /// salaires (au plus deux fois), car le meilleur prix retombe alors sur le prix de départ, que l'inflation a dépassé
+  /// depuis (mesuré à 1 000 citoyens : au jour 800, un entrepreneur général n'était plus jamais viable, recette 6 120 $/j
+  /// contre 950 $ de travail et 5 300 $ d'intrants, et 26 rénovations attendaient). Sans le module, comme avant.
+  double projectPrice(String ty, String g) {
+    if (renovationActive && renovationTypes.contains(ty) && !hasActiveProducer(g)) {
+      final ref = referencePrice(g);
+      return math.min(math.max(bestPrice(g), ref), 2 * ref);
+    }
+    return math.min(bestPrice(g), 2 * worldPrice[g]!);
+  }
+
+  /// Lots par jour d'un projet de création qui répond à [want] unités par jour non servies avec une équipe de [team]. Module
+  /// renovation, entreprises de la chaîne : au plus ce que l'équipe produit, car la demande non servie d'une chaîne
+  /// éteinte s'accumule (chaque rénovation en attente redemande ses modules chaque jour) ; sans plafond, le capital exigé
+  /// (cinq jours d'intrants pour toute cette demande) dépassait plusieurs centaines de milliers de dollars et aucun
+  /// entrepreneur général n'était plus fondé (mesuré : 6 graines sur 10 à 1 000 citoyens, jusqu'à 138 rénovations en
+  /// attente au jour 3 000). Sans le module, toute la demande, comme avant.
+  double projectBatches(String ty, double want, int team) {
+    final t = templates[ty]!;
+    final b = want / t.outputs[t.outputs.keys.first]!;
+    return renovationActive && renovationTypes.contains(ty) ? math.min(b, team * t.rate) : b;
+  }
+
   /// Un citoyen fonde une entreprise de ce type avec son épargne (10 jours de salaires, 5 jours d'intrants).
   /// Rend null si l'entreprise est créée, sinon la cause du refus : main_oeuvre, viabilite ou capital.
   String? _found(String ty, double want, String why) {
     final p = params;
     final t = templates[ty]!;
     final g = t.outputs.keys.first;
-    final batches = want / t.outputs[g]!;
-    final w = batches / t.rate; // employés nécessaires à productivité nominale
+    final w = want / t.outputs[g]! / t.rate; // employés nécessaires à productivité nominale
     final team = w.ceil().clamp(1, 3).toInt();
+    final batches = projectBatches(ty, want, team);
     // module jobs : coût moyen d'un employé de l'organigramme, au salaire affiché du marché
     final wage = modules.jobs ? marketOffer(t.skill) * avgRoleRel(ty) : marketWage(t.skill);
     var inputCost = 0.0;
@@ -3558,7 +3650,7 @@ class Sim {
     // l'équipe et ses intrants ; un marché trop petit pour un employé reste sans producteur
     var revenue0 = 0.0;
     for (final e in t.outputs.entries) {
-      revenue0 += batches * e.value * math.min(bestPrice(e.key), 2 * worldPrice[e.key]!);
+      revenue0 += batches * e.value * projectPrice(ty, e.key);
     }
     final hours = revivesByHours(g); // Params.revivalHours : relance à temps partiel
     final labour = hours ? entryLabour(g, w, team, wage) : team * wage;
@@ -3710,6 +3802,10 @@ class Sim {
     final tw = wn[0] + wn[1] + wn[2];
     avgWage = tw > 0 ? (wsum[0] + wsum[1] + wsum[2]) / tw : p.startWage;
     final baseMk = p.markup - 1;
+    if (p.worldPriceDrift) {
+      _normalCostSum.clear();
+      _normalCostW.clear();
+    }
 
     for (final f in firms) {
       f.revenueEma = 0.9 * f.revenueEma + 0.1 * f.revenue;
@@ -3719,6 +3815,17 @@ class Sim {
       // prix au coût normal (A7) : la fixation du prix ignore la sous-utilisation de l'équipe ; le coût réel reste en cache
       final pricing = params.normalUtil > 0 ? unitCost(f, normal: true) : null;
       f.unitCostCache = cost;
+      if (p.worldPriceDrift && f.workers.isNotEmpty && !publicService(f)) {
+        // prix mondiaux qui vivent : coût normal de chaque extrant, pondéré par la production lissée
+        final nc = pricing ?? cost;
+        for (final e in f.outputs.entries) {
+          final c = nc[e.key];
+          if (c == null || !c.isFinite || c <= 0) continue;
+          final w = math.max(f.outputEma, 0.01) * e.value;
+          _normalCostSum[e.key] = (_normalCostSum[e.key] ?? 0) + c * w;
+          _normalCostW[e.key] = (_normalCostW[e.key] ?? 0) + w;
+        }
+      }
       for (final g in f.outputs.keys) {
         final um = f.unmetShare[g] ?? 0;
         f.unmetShare[g] = 0;
@@ -4096,7 +4203,7 @@ class Sim {
       tech += f.techLevel;
     }
     final prices = <String, double>{};
-    for (final g in goods.keys) {
+    for (final g in goodKeys) {
       final ms = marketStats[g];
       // sans transaction aujourd'hui, on reprend le dernier prix observé (comme les instituts statistiques) :
       // un bien qui ne se vend pas ne fait pas bouger l'indice quand son vendeur ferme ou change d'affiche

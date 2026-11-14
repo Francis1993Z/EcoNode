@@ -152,7 +152,7 @@ extension SimEntrepreneurship on Sim {
         : (c.eiBenefit > 0 ? c.eiBenefit : p.benefit);
     final aversion = 2 * (1 - tol);
     _Project? best;
-    for (final ty in templates.keys) {
+    for (final ty in typeKeys) {
       final t = templates[ty]!;
       final g = t.outputs.keys.first;
       if (publicGood(g)) continue; // l'État fournit ce service
@@ -164,9 +164,9 @@ extension SimEntrepreneurship on Sim {
       final perWorker0 = t.rate * t.outputs[g]!;
       if (want < p.entryMinShare * perWorker0) continue; // pas de signal : pas de projet
       if (c.skill + eps < t.skill) continue; // il travaillera dans son entreprise
-      final batches = want / t.outputs[g]!;
-      final w = batches / t.rate; // employés nécessaires à productivité nominale
+      final w = want / t.outputs[g]! / t.rate; // employés nécessaires à productivité nominale
       final team = w.ceil().clamp(1, 3).toInt();
+      final batches = projectBatches(ty, want, team); // module renovation : au plus ce que l'équipe produit
       if (avail[t.skill] - (c.employer == null && c.skill + eps >= t.skill ? 1 : 0) < team - 1) continue; // pas assez de chômeurs
       final wage = modules.jobs ? marketOffer(t.skill) * avgRoleRel(ty) : marketWage(t.skill);
       var inputCost = 0.0;
@@ -175,7 +175,7 @@ extension SimEntrepreneurship on Sim {
       }
       var revenue0 = 0.0;
       for (final e in t.outputs.entries) {
-        revenue0 += batches * e.value * math.min(bestPrice(e.key), 2 * worldPrice[e.key]!);
+        revenue0 += batches * e.value * projectPrice(ty, e.key);
       }
       // Params.revivalHours : une relance à temps partiel ne paie que les heures nécessaires
       final labour = p.revival ? entryLabour(g, w, team, wage) : team * wage;
@@ -254,10 +254,11 @@ extension SimEntrepreneurship on Sim {
       _lend(f, loan);
       lent = loan;
     }
+    final planned = projectBatches(pr.type, pr.want, pr.team); // module renovation : au plus ce que l'équipe produit
     for (final e in f.outputs.entries) {
-      f.demandEma[e.key] = batches * e.value;
+      f.demandEma[e.key] = planned * e.value;
     }
-    f.outputEma = batches;
+    f.outputEma = planned;
     final cost = unitCost(f);
     var revenue = 0.0;
     for (final o in f.outputs.keys) {

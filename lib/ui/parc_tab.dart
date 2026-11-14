@@ -63,7 +63,8 @@ class Occupancy {
     final left = <int, int>{};
     if (p.leases) {
       for (final c in sim.citizens) {
-        if (c.leaseFirm != null && c.homeId == null) left[c.leaseFirm!] = (left[c.leaseFirm!] ?? 0) + 1;
+        // un propriétaire dont le logement est inhabitable (module renovation) loue ailleurs, comme un locataire
+        if (c.leaseFirm != null && !sim.livesAtHome(c)) left[c.leaseFirm!] = (left[c.leaseFirm!] ?? 0) + 1;
       }
     } else {
       for (final f in sim.firms) {
@@ -108,6 +109,7 @@ const Map<String, String> _status = {
   'vente': 'En vente',
   'saisis': 'Saisis',
   'chantiers': 'Chantiers',
+  'renovations': 'En rénovation',
   'inhabitables': 'Inhabitables',
 };
 
@@ -130,6 +132,8 @@ class _ParcTabState extends State<ParcTab> {
         return b.done && b.ownerKind == 2;
       case 'chantiers':
         return !b.done;
+      case 'renovations':
+        return b.renoLeft > 0;
       case 'inhabitables':
         return b.done && !b.habitable;
       default:
@@ -257,6 +261,9 @@ class _ParcTabState extends State<ParcTab> {
               KV('Logements habitables', '${sim.dwellings}  (inhabitables : ${all.ruined})',
                   color: all.ruined > 0 ? pal.warn : null),
               KV('Propriétaires-occupants', '${sim.homeOwners}'),
+              if (sim.renovationActive)
+                KV('Rénovations en cours / terminées',
+                    '${sim.buildings.where((b) => b.renoLeft > 0).length} / ${sim.bstats.renovated}'),
               KV('Sans-abri', '$homeless  (dont $homelessWorking avec un emploi)', color: homeless > 0 ? pal.bad : null),
               if (!occ.exact)
                 Text(
@@ -484,6 +491,14 @@ class _BuildingCard extends StatelessWidget {
         if (!b.done) KV('Dépensé jusqu’ici', money0(b.basis)),
         if (b.done) ...[
           KV('État', pct(b.cond), color: b.habitable ? null : pal.bad),
+          // module renovation : rénovation en cours, ou seuil où elle commencera
+          if (sim.renovationActive)
+            KV(
+                'Rénovation',
+                b.renoLeft > 0
+                    ? 'en cours : ${b.renoLeft} module${b.renoLeft > 1 ? 's' : ''} à poser'
+                    : 'sous ${pct(sim.params.renoTrigger)} d’état',
+                color: b.renoLeft > 0 ? pal.accent : null),
           KV('Valeur courante', money0(fair)),
           KV('Coût de remplacement (neuf)', money0(sim.buildingCost(b))),
           KV('Payé ou dépensé par le propriétaire', money0(b.basis)),

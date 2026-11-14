@@ -16,6 +16,9 @@
 //   --shock-nets both        chocs sans filets (off), avec filets (on) ou les deux (both)
 //   --modules credit=0,...   coupe (0) ou active (1) des modules
 //   --noyau                  coupe tous les modules ajoutés au modèle de base (les institutions restent actives)
+//   --historique             réglages par défaut d'avant le 14 novembre 2026 : Modules.historique() et commerce
+//                            extérieur coupé (Params.historique) ; pour la batterie de parité et la référence du moteur.
+//                            À placer avant --modules et --param, qui s'appliquent par-dessus
 //   --param nom=valeur       change un paramètre (variantes mesurées ; voir applyParam)
 //   --population 1000        taille de la population (comme --param population=1000)
 //   --niveau 0|1|2           niveau du protocole (remplace graines, durée, étapes et population) :
@@ -60,10 +63,11 @@ class Config {
   final String label;
   Modules modules;
   final Map<String, String> params;
-  Config(this.label, this.modules, this.params);
+  final bool historique; // Params.historique au lieu de Params() (option --historique)
+  Config(this.label, this.modules, this.params, [this.historique = false]);
 
   Params newParams() {
-    final p = Params();
+    final p = historique ? Params.historique() : Params();
     for (final e in params.entries) {
       applyParam(p, e.key, e.value);
     }
@@ -81,7 +85,7 @@ class Config {
   ///   <module>=0|1            un module (Modules.keys)
   ///   param:<nom>=<valeur>    un paramètre (applyParam)
   Config apply(String spec) {
-    final c = Config(spec, modules.copy(), Map.of(params));
+    final c = Config(spec, modules.copy(), Map.of(params), historique);
     if (spec == 'ref') return c;
     for (final t in spec.split(',')) {
       if (t == 'noyau') {
@@ -170,6 +174,8 @@ class Options {
           shockNets = v == 'both' ? {'off', 'on'} : {v};
         case '--noyau':
           config.modules = Modules.noyau();
+        case '--historique':
+          config = Config(config.label, Modules.historique(), config.params, true);
         case '--sauf':
           final v = next();
           if (v == 'chacun') {
@@ -338,6 +344,16 @@ void applyParam(Params p, String k, String v) {
       p.stateRepayRate = double.parse(v);
     case 'publicImports': // importations de secours des établissements publics (frontières fermées)
       p.publicImports = b();
+    case 'worldPriceDrift': // commerce : prix mondiaux qui suivent le prix normal d'ici
+      p.worldPriceDrift = b();
+    case 'worldPriceDays':
+      p.worldPriceDays = double.parse(v);
+    case 'localMeals': // commerce : repas du restaurant non échangeables
+      p.localMeals = b();
+    case 'homePreference': // commerce : préférence pour ce qui est fait ici (marge homeMargin)
+      p.homePreference = b();
+    case 'homeMargin':
+      p.homeMargin = double.parse(v);
     case 'foreignDemand': // douane : demande étrangère active (carnet de commandes)
       p.foreignDemand = b();
     case 'fdGrowth':
@@ -399,6 +415,10 @@ void applyParam(Params p, String k, String v) {
       p.maxInterviews = int.parse(v);
     case 'directedSearch': // candidature ciblée : seuls se présentent les chômeurs que le plafond couvre (N18)
       p.directedSearch = b();
+    case 'renoTrigger': // module renovation : état sous lequel un propriétaire rénove
+      p.renoTrigger = double.parse(v);
+    case 'renoShare': // module renovation : part des modules du neuf que coûte une remise à neuf
+      p.renoShare = double.parse(v);
     case 'reviewDays':
       p.reviewDays = int.parse(v);
     case 'reviewCutMax':
@@ -620,7 +640,7 @@ void observe(Sim s, RunStats r, int warmup) {
       c[2] += e.value.length;
       c[3] += 1;
     }
-    for (final g in goods.keys) {
+    for (final g in s.goodKeys) {
       final u = r.unmetSum[g] ??= [0, 0];
       u[0] += s.unmet[g] ?? 0;
       u[1] += s.marketStats[g]?.qty ?? 0;

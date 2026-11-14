@@ -86,6 +86,11 @@ On compte 33 biens :
 - dont 13 achetés par les ménages (`householdGoods`), et 6 services et biens d'équipement achetés par les entreprises
   hors recette (`businessServices`).
 
+S'y ajoutent le module de construction (`batiment`, module Bâtiments) et, avec le module Rénovation (§ 6.6), huit biens
+placés à la fin de la table : planches, briques, tuyaux, fils électriques, fusibles, et les heures de charpente,
+d'électricité et de plomberie (`renovationGoods`). Sans ce module, aucune boucle du moteur ne les voit
+(`Sim.goodKeys`).
+
 Ce que chaque bien apporte aux désirs, et le goût de chaque classe pour lui, sont dans `model.dart:uses`.
 
 ### Types d'entreprises (`model.dart:templates`, classe `Template`)
@@ -103,6 +108,10 @@ Ce que chaque bien apporte aux désirs, et le goût de chaque classe pour lui, s
 
 Il y a 32 types. Le scénario par défaut (`model.dart:defaultScenario`) prévoit une entreprise de chaque type. Le
 chantier forestier n'est pas créé : son plan de départ ne lui trouve aucune demande, car le bois n'a pas d'acheteur.
+Avec le module Bâtiments s'ajoute la Construction ; avec le module Rénovation, neuf types placés à la fin de la table
+(`renovationTypes` : scierie, briqueterie, tuyauterie, câblerie, fusibles, charpentier, électricien, plombier,
+entrepreneur général) la remplacent (`renovationScenario`, § 6.6). Sans ce module, ils ne sont jamais créés
+(`Sim.typeKeys`).
 
 ### Citoyen (`model.dart:Citizen`)
 
@@ -169,9 +178,15 @@ ristournes, refus. Identité de bilan : réserves + prêts = dépôts + fonds pr
     éducation publique, entrée et sortie d'entreprises ;
   - institutions I1 à I5 : test de solvabilité, enveloppe des services publics, assurance-emploi, règles prudentielles,
     faillite ordonnée.
-- **Modules coupés par défaut :** bâtiments et hypothèques (`buildings`) ; rôles, contrats et négociation salariale
-  (`jobs`, § 6.16), que l'interface active pour ses parties (`ui/controller.dart`) mais que le protocole et les tests
-  laissent coupé sauf mention.
+- **Modules ajoutés depuis, actifs par défaut depuis le 14 novembre 2026** (demande de Francis : tous les modules
+  actifs par défaut, dans l'interface et sans elle) : bâtiments et hypothèques (`buildings`) ; rôles, contrats et
+  négociation salariale (`jobs`, § 6.16) ; entrepreneuriat des citoyens (`entrepreneurship`, § 6.17) ; variétés de
+  produits (`products`, § 6.18) ; crédit aux citoyens et banques (`banking`, § 6.19) ; rénovation et métiers du
+  bâtiment (`renovation`, § 6.6, suppose `buildings`, réglé au départ d'une partie, à toutes les tailles). Le commerce
+  extérieur (`Params.trade`) est ouvert par défaut depuis la même date.
+- **Anciens défauts** (`Modules.historique`, `Params.historique`) : ces six modules et le commerce extérieur coupés. La
+  batterie de parité (`tool/parite_plateformes.sh`, option `--historique` de `partie` et `stabilite`) et la référence du
+  moteur (`tool/reference.sh`) les rejouent : l'empreinte reste comparable d'une révision à l'autre.
 - **Filets** (`model.dart:Safeguards`), actifs par défaut dans le jeu : anti-famine, renflouement, plancher de logement,
   plafond de dérive, anti-crédit-fou. Ce sont des instruments de diagnostic : chaque déclenchement est compté et
   journalisé.
@@ -189,6 +204,7 @@ ristournes, refus. Identité de bilan : réserves + prêts = dépôts + fonds pr
 | 2 | Enveloppes des établissements publics | `_publicBudget` | I2 |
 | 3 | Production | `_produce` | toujours |
 | 4 | Paie : salaires, impôt, cotisations ; mise à pied si la paie est impossible. Module `jobs` : le salaire de chaque contrat | `_payWages`, `_payContracts` | toujours |
+| 4 bis | Bâtiments : usure et entretien (module `renovation` : entretien par les métiers, puis rénovations), service des hypothèques, marché des logements, chantiers | `buildings.dart:_buildingsDay` | module `buildings` |
 | 5 | Achats des entreprises (ordre `achats`) : intrants, puis services | `_buyInputs`, `_buyServices` | toujours |
 | 6 | Ménages (ordre `consommation`) : usure des désirs, manger, se loger, santé, ordinateur, études, loisirs, bonheur ; puis files des services publics | `_consume`, `_serveQueues` | files : I2 |
 | 7 | Filets anti-famine et plancher de logement | `_safetyNets` | filets actifs |
@@ -373,7 +389,10 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `bufferDays` | 12 | coussin d'épargne, en jours de survie | choix de jeu |
 | `mpcIncome` | 0,6 | propension à consommer le revenu discrétionnaire (α₁) | modèle SIM de Godley et Lavoie |
 | `wealthTargetDays` | 20 | richesse visée T, en jours de revenu discrétionnaire ; α₂ = (1 − α₁)/T | calibration interne : reproduit la richesse de départ (2 750 $ ≈ 21 jours) |
-| `trade`, `importMarkup`, `exportDiscount` | non, 1,3, 0,7 | commerce extérieur : import au prix mondial × 1,3, export × 0,7 | choix de jeu |
+| `trade`, `importMarkup`, `exportDiscount` | oui (depuis le 14 novembre 2026 ; non dans `Params.historique`), 1,3, 0,7 | commerce extérieur : import au prix mondial × 1,3, export × 0,7 | choix de jeu |
+| `worldPriceDrift`, `worldPriceDays` | non (interface : oui), 365 | prix mondiaux qui suivent le prix normal d'ici (§ 6.21) | décision de Francis, 2026-11-14 |
+| `localMeals` | non (interface : oui) | repas du restaurant non échangeables (§ 6.21) | idem |
+| `homePreference`, `homeMargin` | non (interface : oui), 0,2 | une importation n'est prise que 20 % moins chère qu'ici (§ 6.21) | idem |
 | `tradeWaves`, `tradeWaveAmp`, `tradeWavePeriod`, `tradeNoise`, `tariff` | non, 0,3, 365 j, 0,02, 0 | douane (§ 6.21) : prix mondiaux en vagues, droit sur les importations | choix de jeu |
 | `floatingFx`, `fxSpeed` | non, 0,05 | douane (§ 6.21) : taux de change flottant et sa vitesse d'ajustement par jour | mesure § 6.21 |
 | `foreignDemand`, `fdGrowth`, `fdMinMargin`, `fdStart`, `fdMaxCap` | non, 0,02, 0,05, 0,1, 1 | douane (§ 6.21) : commandes de l'étranger | mesure § 6.21 |
@@ -384,6 +403,7 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `ownersAtStart` | non | démarrage (§ 5) : propriétaires de départ, logement payé (module Bâtiments) | mesure § 5 |
 | `purchaseLoans` | non | crédit (§ 6.19) : le prêt d'un ordinateur sert à l'acheter (en stock, montant qui manque) | mesure § 6.19 |
 | `buildingTypes` | non | types de bâtiments (§ 6.6) : maisons, duplex et immeubles, avec leurs logements, leur coût, leur durée de chantier et leur valeur | mesure § 6.6 |
+| `renoTrigger`, `renoShare` | 0,6, 0,6 | module `renovation` (§ 6.6) : état sous lequel un propriétaire rénove ; part des modules du neuf que coûte une remise à neuf | choix de jeu ; à 0,6, un bâtiment entretenu se rénove tous les ≈ 40 ans pour ≈ 24 % du neuf |
 | `cheapestHouse` | non | types de bâtiments, variante de mesure (§ 6.6) : le ménage tente la maison la moins chère | mesure § 6.6 |
 | `leases` | non | baux (§ 6.6) : un locataire garde son logement tant qu'il paie ; le personnel du bailleur ne sert qu'aux nouveaux baux ; loyer = coût d'usage du logement | mesure § 6.6 |
 | `ubi` | 0 | revenu de base créé par le god mode | outil du joueur |
@@ -779,6 +799,54 @@ de jeu, non calibrés.
   10 graines sur 10) et indice final 2,01. **Avec les Banques** (règle « la plus chère abordable », gardée ; sur le PC) :
   mêmes écarts (2 500 citoyens : chômage 5,9 → 4,6 %, indice final 1,73 → 2,25 ; 240 : 5,0 → 3,8 %, 1,67 → 2,31), aucune
   saisie, pas de spirale prix-crédit. Détails : `rapports/types-batiments.md`.
+
+**Rénovation et métiers du bâtiment (`Modules.renovation`, 2026-11-12, avec le module Bâtiments).** Réglé au départ
+d'une partie ; actif par défaut depuis le 14 novembre 2026, dans le moteur et l'interface, à toutes les tailles (décision
+de Francis ; sous 1 000 citoyens environ, l'entrepreneur général et la briqueterie meurent souvent faute de travail). Motivation : sans rénovation, le parc de départ
+tombe en ruine d'un bloc vers 65-70 ans (`rapports/derive36k.md`).
+- **Chaîne.** Huit biens (`renovationGoods`) et neuf types (`renovationTypes`) ajoutés à la fin des tables : scierie
+  (bois → planches), briqueterie (carburant, argile sur place → briques), tuyauterie, câblerie et fusibles (cuivre +
+  plastique), trois métiers qui vendent des heures (charpentier : planches ; électricien : fils et fusibles ; plombier :
+  tuyaux ; 0,15 planche, 0,1 rouleau de fils et 0,05 boîte de fusibles, 0,15 tuyau par heure) et l'entrepreneur général
+  (`entrepreneur`), qui remplace la Construction : il vend les modules de chantier
+  (`batiment`), pour le neuf comme pour la rénovation, avec des briques et des heures des trois métiers. Travail par
+  module ≈ 6 jours-personnes, comme la Construction. Une entreprise de chaque au départ (`renovationScenario`), quelle
+  que soit la population. Un intrant périssable (heure de sous-traitant) se commande un jour d'avance, pas cinq.
+- **Entretien courant.** Les `maintHoursPerDwelling` heures par logement et par jour s'achètent aux métiers
+  (`buildingCareShares` : charpente 40 %, plomberie 30 %, électricité 30 %) au lieu des garages ; l'entretien obtenu est
+  la moyenne pondérée des parts servies (`_care`).
+- **Rénovation** (`_renovations`). Un bâtiment terminé dont l'état passe sous `renoTrigger` (0,6) ouvre une rénovation
+  jusqu'à l'état neuf : ⌈(1 − état) × `renoShare` (0,6) × modules du bâtiment⌉ modules, posés à la cadence de chantier
+  du type ; chaque module ajoute 1 / (`renoShare` × modules) à l'état, le dernier le remet à neuf. Un bailleur paie
+  avec sa trésorerie au-delà de 3 jours de salaires et emprunte le manque sur l'hypothèque du bâtiment (au plus
+  `ltvFirm` × le coût du neuf) ; un propriétaire-occupant paie avec son épargne au-delà de 10 jours de besoins et
+  emprunte le manque sur sa maison (au plus `ltvHousehold` × le coût du neuf, versement et entretien sous 35 % de son
+  revenu, règle de fonds propres). On n'emprunte que pour des modules en stock, et la part qui n'a pas servi est
+  remboursée le jour même. Un bâtiment en liquidation attend son prochain propriétaire.
+- **Habitabilité.** Un propriétaire-occupant dont le logement passe sous l'état 0,3 loue ailleurs (bail) jusqu'à la
+  fin de la rénovation, puis rentre chez lui (`livesAtHome`) ; sans le module, il reste logé dans sa ruine. Un bailleur
+  ne compte plus ses ruines dans son parc quand il décide de construire (un logement en rénovation compte).
+- **Valeur.** La valeur d'un bâtiment (valeur courante, coût du neuf, plafonds des prêts, provision pour l'usure)
+  suit le prix d'équilibre du module au départ, fixe (`moduleValue`, décision de Francis) ; les achats de modules se
+  font au prix offert. Si la valeur suit un prix qui monte, les hypothèques d'achat (95 % de la valeur) créent de la
+  monnaie, les salaires montent et la valeur avec eux : indice des prix final 3,14 au prix offert, 5,74 au prix de départ
+  indexé sur les salaires, 2,54 au prix de départ fixe, contre 2,50 sans le module (4 graines × 3 000 j à 2 500
+  citoyens). Sans le module, la Construction disparaît vite et son prix reste celui du départ : même ancrage. La
+  provision pour l'usure d'un bailleur compte une rénovation (× `renoShare`).
+- **Demande non servie et fondations.** Quand aucun module n'est en stock, la demande de rénovation est notée comme non
+  servie, comme un achat sans offre : c'est le signal qui fait fonder un nouvel entrepreneur général quand le dernier
+  disparaît. Un projet de fondation dans la chaîne ne dépasse pas ce que son équipe de départ produit
+  (`projectBatches`) : la demande en attente s'accumule et rendait le capital exigé hors de portée. Quand plus personne
+  ne vend le bien, le projet attend le prix de départ indexé sur les salaires, au plus deux fois (`projectPrice`) : le
+  prix de départ seul, dépassé par l'inflation, ne rendait plus aucune refondation viable.
+- **Importations de secours** (`_renovationImport`, décision de Francis). Frontières fermées, l'entrepreneur général et
+  les métiers achètent à l'étranger, au prix d'import, la part de leurs matériaux que le marché d'ici n'a pas servie,
+  comme l'hôpital ; les heures des métiers et les modules restent d'ici.
+- **Parc de départ.** Son état est tiré entre `renoTrigger` et 1 (l'état d'équilibre d'un parc qu'on rénove à ce seuil),
+  avec le même tirage qu'avant (flux `logement`, sous-tirage 7).
+- **Plan de départ.** Les heures d'entretien du parc (≈ 1,06 logement par citoyen) entrent dans la demande de base des
+  métiers ; ces besoins ne sont jamais pris dans le panier mesuré des ménages.
+- **Mesures** : `rapports/renovation.md`.
 4. **Santé, ordinateur, études** : §§ 6.7 à 6.9.
 5. **Loisirs.**
    - **Budget du jour, à la Godley-Lavoie :** C = α₁ × max(0 ; revenu lissé − coût de survie) + α₂ × `adsBoost` ×
@@ -1052,8 +1120,8 @@ Les résultats de ces variantes sont au journal (tâche 4). Les règles prudenti
 
 ### 6.16 Rôles, contrats et négociation salariale (module `jobs`, `jobs.dart`)
 
-Coupé par défaut dans le moteur (empreinte de parité identique au bit près quand il est coupé) ; l'interface l'active
-pour ses parties. Mesures et choix : [`rapports/emplois-negociation.md`](rapports/emplois-negociation.md).
+Actif par défaut depuis le 14 novembre 2026 (coupé dans `Modules.historique`, que rejoue la référence du moteur).
+Mesures et choix : [`rapports/emplois-negociation.md`](rapports/emplois-negociation.md).
 
 - **Organigrammes** (`model.dart:roles`). Chaque type d'entreprise a 3 à 5 rôles. Un rôle a une qualification minimale
   (0 à 3 ; sa partie entière, plafonnée à 2, donne sa classe), une prime à l'intérieur de sa classe, une part visée de
@@ -1130,7 +1198,7 @@ avec Produits, 8,4 → 6,6 % (7 sur 10 ; pire graine 13,8 → 10,3 %), indice +0
 
 ### 6.17 Entrepreneuriat des citoyens (module `entrepreneurship`, `entrepreneuriat.dart`)
 
-Coupé par défaut (le moteur, le protocole et `reference.sh` ne changent pas ; l'interface le lance actif). Avec le module,
+Actif par défaut depuis le 14 novembre 2026 (coupé dans `Modules.historique`, que rejoue la référence du moteur). Avec le module,
 `_entryExit` ne crée plus de « clone » mécanique (`_found`) : les fermetures restent celles de l'inactivité (I5 inchangée),
 la fondation devient une décision de citoyen. Il suppose le module `entry`.
 - **Candidat** : pas déjà propriétaire, veut posséder (trait `wantsToOwn` avec les bâtiments, sinon même tirage de part `ownerShare`),
@@ -1151,7 +1219,7 @@ la fondation devient une décision de citoyen. Il suppose le module `entry`.
 
 ### 6.18 Variétés de produits et marques (module `products`, `produits.dart`)
 
-Coupé par défaut (l'interface le lance actif). Une **catégorie** est un bien ; une **variété**, le produit d'une entreprise (une par
+Actif par défaut depuis le 14 novembre 2026 (coupé dans `Modules.historique`). Une **catégorie** est un bien ; une **variété**, le produit d'une entreprise (une par
 entreprise) dans les catégories différenciées : consommation (`consumerVarieties` : pain, viande, repas, télé, loisirs, hôtel, voyages,
 bijoux, ordinateurs) et équipement (`machines`). Les matières premières et biens intermédiaires ne changent pas. Aucune catégorie ajoutée,
 aucune variété créée d'avance : une entreprise lance la sienne à sa création (ou à l'activation), l'abandonne à sa fermeture.
@@ -1182,7 +1250,7 @@ aucune variété créée d'avance : une entreprise lance la sienne à sa créati
 
 ### 6.19 Crédit aux citoyens et banques (module `banking`, `banques.dart`)
 
-Coupé par défaut (l'interface le lance actif). **Crédit aux particuliers** : carte de crédit quand l'argent ne couvre pas les besoins
+Actif par défaut depuis le 14 novembre 2026 (coupé dans `Modules.historique`). **Crédit aux particuliers** : carte de crédit quand l'argent ne couvre pas les besoins
 du jour (limite `cardLimitDays` jours de revenu selon la cote, paiement minimum `cardMinPct` par mois, taux `cardRate` + marge de la
 banque + prime de cote), prêt personnel à mensualités constantes (`loanTermMonths`) pour un creux de chômage ou un achat important ;
 remboursement de la carte quand le revenu arrive. Cote 300–900 (retards récents, dette / revenu, emploi, faillite) ; service de la
@@ -1291,6 +1359,25 @@ lié à la demande d'ici, une entreprise de transformation (restaurant : intrant
 Mesure (240 citoyens, 5 graines, chômage moyen des jours 1000 à 1500) : frontières fermées 23 %, change seul 38 %,
 change + demande étrangère 30 % (15 à 20 % dans 4 graines ; la cinquième s'effondre vers le jour 900 : des filières
 d'intrants disparaissent, les intrants importés rendent l'export non rentable, et le taux au plafond n'y peut rien).
+
+**Corrections du commerce extérieur (2026-11-14, choisies par Francis ; coupées dans le moteur, actives dans
+l'interface).** Diagnostic (`rapports/tout-actif.md` § 3, sonde `tool/commerce.dart`) : les prix mondiaux restaient ceux
+du plan de départ pendant que les prix relatifs d'ici dérivent avec le crédit et la productivité (nourriture à 2 ou 3 fois
+le prix mondial, or et bijoux à 0,3-0,6 fois, même frontières fermées). Frontières ouvertes, l'or, les bijoux, le pétrole
+et le carburant s'exportaient en masse, le change restait bas et toute la filière alimentaire était importée (≈ 140
+emplois perdus sur 1 000 citoyens) ; les repas du restaurant étaient le premier poste d'importation.
+- **Prix mondiaux qui vivent** (`worldPriceDrift`, `worldPriceDays` = 365) : `Sim.worldDrift[g]` (1 au départ) multiplie
+  le prix mondial dans `importPrice` et `exportPrice`. Après `_decide`, `_driftWorldPrices` le rapproche chaque jour de
+  1 / `worldPriceDays` de (prix normal ici / prix mondial de départ), borné à [0,1 ; 20] ; le prix normal est le coût au
+  taux d'utilisation normal (`unitCost(normal: true)`, sinon le coût du jour) des vendeurs actifs, pondéré par leur
+  production lissée, × `markup`. Un bien sans vendeur actif garde son facteur. `worldPrice` lui-même ne change pas : il
+  reste la référence des choix des ménages, du partage des coproduits et de la valeur des bâtiments. Instantané :
+  `worldDrift` (écrit s'il n'est pas vide).
+- **Repas non échangeables** (`localMeals`) : `Sim.tradable` exclut `repas`, partout où l'on importe ou exporte.
+- **Préférence pour ce qui est fait ici** (`homePreference`, `homeMargin` = 0,2) : la clé de l'offre d'importation est
+  multipliée par `importBias` = 1 + `homeMargin` (`_AllOffers`, `_LazyOffers`, `_BestOffers.quote`, `bestPrice`, choix
+  d'une variété, viabilité d'une relance) ; l'acheteur paie toujours le prix d'import.
+Mesure : `rapports/tout-actif.md` § 5.
 
 Importations de secours (`publicImports`, coupées par défaut dans le moteur, actives dans l'interface) : frontières
 fermées, un établissement public (hôpital ; l'école n'a pas d'intrant) achète d'abord ses intrants sur le marché d'ici,

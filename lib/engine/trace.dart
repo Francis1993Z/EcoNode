@@ -93,9 +93,9 @@ class Tracer {
 
   // ---------------------------------------------------------------- séries quotidiennes
 
-  /// Colonnes de series.csv : les indicateurs que regardent les détecteurs, puis le détail par alerte, filet, bien,
-  /// désir et classe.
-  static final List<String> seriesColumns = [
+  /// Colonnes de series.csv : les indicateurs que regardent les détecteurs, puis le détail par alerte, filet, bien
+  /// en jeu (Sim.goodKeys), désir et classe.
+  List<String> get seriesColumns => [
     'jour', 'population', 'chomage', 'salaire_moyen', 'pib', 'indice_prix', 'inflation_jour', 'inflation_100j', 'gini',
     'richesse_mediane', 'besoins_jour', 'richesse_mediane_jours', 'bonheur', 'part_affames', 'part_sans_abri',
     'sante_moyenne', 'efficacite_moyenne', 'postes_non_pourvus', 'part_postes_non_pourvus', 'postes_bloques',
@@ -105,7 +105,7 @@ class Tracer {
     'ecart_compta', 'alertes_actives', 'alertes_critiques',
     for (final t in alertLabels.keys) 'alerte_$t',
     for (final k in Safeguards.keys) 'filet_${k}_jour',
-    for (final g in goods.keys) 'prix_$g',
+    for (final g in sim.goodKeys) 'prix_$g',
     for (final d in desires) 'satisfaction_$d',
     'classe_manoeuvre', 'classe_technicien', 'classe_professionnel',
   ];
@@ -153,7 +153,7 @@ class Tracer {
       s.monitor.active.length, s.monitor.criticalCount,
       for (final t in alertLabels.keys) active[t] ?? 0,
       for (final k in Safeguards.keys) (nets[k] ?? 0) - (_netsBefore[k] ?? 0),
-      for (final g in goods.keys) h.prices[g] ?? 0.0,
+      for (final g in s.goodKeys) h.prices[g] ?? 0.0,
       for (final d in desires) h.sat[d] ?? 0.0,
       ...h.classes,
     ];

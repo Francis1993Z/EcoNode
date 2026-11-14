@@ -17,6 +17,12 @@ part of 'sim.dart';
 // Pas de math.sin (résultats différents entre la VM et le web) : approximation de Bhaskara, en opérations élémentaires.
 
 extension Douane on Sim {
+  /// Le bien s'importe et s'exporte (Good.tradable ; Params.localMeals : pas les repas du restaurant).
+  bool tradable(String good) => goods[good]!.tradable && !(params.localMeals && good == 'repas');
+
+  /// Multiplicateur de la clé d'une offre d'importation (Params.homePreference) : 1 + homeMargin, sinon 1.
+  double get importBias => params.homePreference ? 1 + params.homeMargin : 1.0;
+
   /// Facteur du jour des prix mondiaux d'un bien (1 sans vagues).
   double tradeFactorOf(String good) => params.tradeWaves ? (tradeFactor[good] ?? 1.0) : 1.0;
 
@@ -26,6 +32,7 @@ extension Douane on Sim {
   /// Prix d'une unité importée, droit de douane compris.
   double importPrice(String good) {
     var v = worldPrice[good]! * params.importMarkup;
+    if (params.worldPriceDrift) v *= worldDrift[good] ?? 1.0;
     if (params.tradeWaves) v *= tradeFactor[good] ?? 1.0;
     if (params.floatingFx) v *= fxRate;
     if (params.tariff != 0) v *= 1 + params.tariff;
@@ -35,6 +42,7 @@ extension Douane on Sim {
   /// Prix reçu pour une unité exportée.
   double exportPrice(String good) {
     var v = worldPrice[good]! * params.exportDiscount;
+    if (params.worldPriceDrift) v *= worldDrift[good] ?? 1.0;
     if (params.tradeWaves) v *= tradeFactor[good] ?? 1.0;
     if (params.floatingFx) v *= fxRate;
     return v;
@@ -54,7 +62,7 @@ extension Douane on Sim {
   /// de [budget]. Mêmes comptes qu'un achat importé (`buy`) : sortie de monnaie, droit de douane éventuel à l'État.
   /// Rend (quantité, dépense).
   (double, double) _publicImport(Firm f, String g, double q, double budget) {
-    if (goods[g]!.perish || !goods[g]!.tradable) return (0.0, 0.0);
+    if (goods[g]!.perish || !tradable(g)) return (0.0, 0.0);
     final price = importPrice(g);
     q = math.min(q, math.min(budget, f.money) / price);
     if (q <= eps) return (0.0, 0.0);
@@ -93,7 +101,7 @@ extension Douane on Sim {
       if (f.workers.isEmpty || publicService(f)) continue;
       for (final e in f.outputs.entries) {
         final g = e.key;
-        if (goods[g]!.perish || !goods[g]!.tradable) continue;
+        if (goods[g]!.perish || !tradable(g)) continue;
         final key = '${f.id}:$g';
         var order = foreignOrders[key] ?? 0.0;
         final cost = f.unitCostCache[g];
@@ -133,6 +141,21 @@ extension Douane on Sim {
       ..addAll(next);
   }
 
+  /// Prix mondiaux qui vivent (Params.worldPriceDrift), après les décisions du jour : pour chaque bien échangeable qui a
+  /// des vendeurs actifs, worldDrift va vers prix normal ici / prix mondial de départ (borné à [0,1 ; 20]) au rythme de
+  /// 1 / worldPriceDays par jour. Le prix normal vient des coûts relevés par _decide (_normalCostSum, _normalCostW).
+  void _driftWorldPrices() {
+    final k = 1 / math.max(1.0, params.worldPriceDays);
+    for (final g in goodKeys) {
+      if (goods[g]!.perish || !tradable(g)) continue;
+      final w = _normalCostW[g] ?? 0.0;
+      if (w <= 0) continue;
+      final target = (_normalCostSum[g]! / w * params.markup / worldPrice[g]!).clamp(0.1, 20.0).toDouble();
+      final d = worldDrift[g] ?? 1.0;
+      worldDrift[g] = d + (target - d) * k;
+    }
+  }
+
   /// Caractéristiques fixes de la vague d'un bien, tirées de la graine : (phase en tours, période en jours, amplitude).
   (double, double, double) tradeWaveOf(int gi) {
     final h = hash32(hash32(seed, 0x0D0A4E), gi);
@@ -145,7 +168,7 @@ extension Douane on Sim {
   void _updateTradeFactors() {
     final p = params;
     var gi = 0;
-    for (final g in goods.keys) {
+    for (final g in goodKeys) {
       gi++;
       final (phase, period, amp) = tradeWaveOf(gi);
       var t = day / period + phase;

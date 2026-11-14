@@ -19,7 +19,7 @@ Future<void> show(WidgetTester tester, Widget panel) async {
 
 SimController housingGame({int days = 150}) {
   final ctrl = SimController(seed: 5);
-  ctrl.sim = Sim(seed: 5, modules: Modules()..buildings = true);
+  ctrl.sim = Sim(seed: 5, modules: Modules.historique()..buildings = true, params: Params.historique());
   for (var d = 0; d < days; d++) {
     ctrl.sim.step();
     ctrl.housing.sample(ctrl.sim);
@@ -129,7 +129,8 @@ void main() {
   });
 
   testWidgets('module coupé : l’onglet l’explique et propose de l’activer', (tester) async {
-    final ctrl = SimController(seed: 3);
+    // anciens défauts (module coupé) : depuis le 14 novembre 2026, l'interface le lance actif
+    final ctrl = SimController(seed: 3)..sim = Sim(seed: 3, params: Params.historique(), modules: Modules.historique());
     expect(ctrl.sim.modules.buildings, isFalse);
     await show(tester, HousingTab(ctrl));
     expect(find.text('MODULE COUPÉ'), findsOneWidget);

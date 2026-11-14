@@ -22,7 +22,7 @@ void main() {
   });
 
   test('déterminisme : même graine, même partie', () {
-    final a = Sim(seed: 7), b = Sim(seed: 7);
+    final a = Sim(seed: 7, params: Params.historique(), modules: Modules.historique()), b = Sim(seed: 7, params: Params.historique(), modules: Modules.historique());
     run(a, 300);
     run(b, 300);
     for (var i = 0; i < a.history.length; i++) {
@@ -51,13 +51,13 @@ void main() {
     // sans crédit, les règles prudentielles (I4) ne s'appliquent jamais ; sans santé ni éducation, l'enveloppe (I2)
     // non plus
     List<HistPoint> game(bool on) {
-      final m = Modules()
+      final m = Modules.historique()
         ..credit = false
         ..health = false
         ..education = false
         ..bankRegulation = on
         ..publicBudget = on;
-      final s = Sim(seed: 4, modules: m);
+      final s = Sim(seed: 4, modules: m, params: Params.historique());
       run(s, 600);
       return s.history;
     }
@@ -67,7 +67,7 @@ void main() {
 
   test('une action sans effet ne décale pas les tirages du reste de la partie', () {
     // une épidémie qui ne frappe personne : avec un générateur unique, ses 240 tirages décalaient toute la suite
-    final a = Sim(seed: 6), b = Sim(seed: 6);
+    final a = Sim(seed: 6, params: Params.historique(), modules: Modules.historique()), b = Sim(seed: 6, params: Params.historique(), modules: Modules.historique());
     run(a, 100);
     run(b, 100);
     expect(b.godEpidemic(0), 0);
@@ -78,18 +78,18 @@ void main() {
 
   test('invariants comptables exacts à chaque jour, avec et sans filets', () {
     for (final seed in [1, 2]) {
-      final s = Sim(seed: seed, devChecks: true); // lève une exception au premier écart
+      final s = Sim(seed: seed, devChecks: true, params: Params.historique(), modules: Modules.historique()); // lève une exception au premier écart
       run(s, 1500);
       expect(s.inv.worst, 0, reason: 'graine $seed');
       expect(s.totalMoney(), s.expectedMoney());
     }
-    final s = Sim(seed: 3, safeguards: Safeguards.none(), devChecks: true);
+    final s = Sim(seed: 3, safeguards: Safeguards.none(), devChecks: true, params: Params.historique(), modules: Modules.historique());
     run(s, 800);
     expect(s.inv.worst, 0);
   });
 
   test('god mode : injections, crédit, faillite, fermeture gardent les invariants exacts', () {
-    final s = Sim(seed: 5, devChecks: true);
+    final s = Sim(seed: 5, devChecks: true, params: Params.historique(), modules: Modules.historique());
     run(s, 100);
     s.godMoney(const Target('allCitizens'), 5000);
     s.godMoney(const Target('allFirms'), -1000);
@@ -110,7 +110,7 @@ void main() {
   });
 
   test('anti-famine : sans aucun aliment, l’État nourrit et la cause est « pas de producteur »', () {
-    final s = Sim(seed: 4);
+    final s = Sim(seed: 4, params: Params.historique(), modules: Modules.historique());
     for (final t in ['boulangerie', 'boucherie', 'peche', 'restaurant']) {
       s.removeFirm(s.firms.firstWhere((f) => f.type == t).id);
     }
@@ -121,7 +121,7 @@ void main() {
   });
 
   test('plancher de logement : sans parc immobilier, abri d’urgence pour cause de « parc plein »', () {
-    final s = Sim(seed: 4);
+    final s = Sim(seed: 4, params: Params.historique(), modules: Modules.historique());
     s.removeFirm(s.firms.firstWhere((f) => f.type == 'immobilier').id);
     run(s, 10);
     expect(s.nets.total('shelter'), greaterThan(0));
@@ -129,7 +129,7 @@ void main() {
   });
 
   test('un filet coupé ne se déclenche plus ; chaque déclenchement est compté une fois', () {
-    final s = Sim(seed: 6);
+    final s = Sim(seed: 6, params: Params.historique(), modules: Modules.historique());
     run(s, 150);
     for (final k in Safeguards.keys) {
       final byAgent = (s.nets.byAgent[k] ?? const <String, int>{}).values.fold(0, (a, b) => a + b);
@@ -144,14 +144,14 @@ void main() {
   });
 
   test('détecteur d’invariant : de l’argent apparu hors grand livre ouvre une alerte critique', () {
-    final s = Sim(seed: 8);
+    final s = Sim(seed: 8, params: Params.historique(), modules: Modules.historique());
     run(s, 20);
     s.citizens.first.money += 1; // création monétaire sauvage
     s.step();
     expect(s.inv.money, closeTo(1, 1e-9));
     expect(s.monitor.active.containsKey('invariant'), isTrue);
     expect(s.monitor.active['invariant']!.critical, isTrue);
-    final dev = Sim(seed: 8, devChecks: true);
+    final dev = Sim(seed: 8, devChecks: true, params: Params.historique(), modules: Modules.historique());
     run(dev, 20);
     dev.citizens.first.money += 1;
     expect(dev.step, throwsStateError);
@@ -159,7 +159,7 @@ void main() {
 
   test('détecteurs : entreprise sans employé, chômage très élevé', () {
     // sans entrée ni sortie d'entreprises : on teste les détecteurs, pas la résorption du chômage
-    final s = Sim(seed: 9, safeguards: Safeguards.none(), modules: Modules()..entry = false);
+    final s = Sim(seed: 9, safeguards: Safeguards.none(), modules: Modules.historique()..entry = false, params: Params.historique());
     run(s, 30);
     final f = s.firms.firstWhere((f) => f.type == 'tourisme');
     s.godBankrupt(f.id);
@@ -177,7 +177,7 @@ void main() {
 
   test('détecteurs de causes : santé, efficacité, pénurie de main-d’œuvre, prix aberrant', () {
     // santé : sans hôpital (ni création d'entreprise), une population mal en point ne se soigne plus
-    final s = Sim(seed: 11, modules: Modules()..entry = false);
+    final s = Sim(seed: 11, modules: Modules.historique()..entry = false, params: Params.historique());
     run(s, 20);
     for (final f in s.firms.where((f) => f.type == 'hopital').toList()) {
       s.removeFirm(f.id);
@@ -193,7 +193,7 @@ void main() {
 
     // pénurie de main-d'œuvre : des entreprises qui ont de quoi embaucher ouvrent des postes que personne ne pourvoit
     // (persistance réduite : on teste la condition, pas la durée)
-    final p = Sim(seed: 1, modules: Modules()..entry = false);
+    final p = Sim(seed: 1, modules: Modules.historique()..entry = false, params: Params.historique());
     run(p, 150);
     expect(p.monitor.active.containsKey('penurieTravail'), isFalse);
     p.monitor.cfg.laborShortageDays = 10;
@@ -206,7 +206,7 @@ void main() {
 
     // embauches bloquées : l'immobilier, privé de trésorerie chaque jour, ne peut pas rouvrir les postes que sa
     // demande exige (seuil et persistance abaissés : on teste l'entreprise provoquée)
-    final b = Sim(seed: 9, safeguards: Safeguards.none(), modules: Modules()..entry = false);
+    final b = Sim(seed: 9, safeguards: Safeguards.none(), modules: Modules.historique()..entry = false, params: Params.historique());
     b.monitor.cfg
       ..blockedHiring = 0.03
       ..blockedHiringDays = 10;
@@ -221,7 +221,7 @@ void main() {
     expect(b.monitor.active.containsKey('embaucheBloquee'), isTrue);
 
     // prix aberrant : le logement vendu 8 fois son prix de référence pendant plus de 30 jours
-    final q = Sim(seed: 1, modules: Modules()..entry = false);
+    final q = Sim(seed: 1, modules: Modules.historique()..entry = false, params: Params.historique());
     run(q, 150);
     final im = q.firms.firstWhere((f) => f.type == 'immobilier');
     final key = 'prixAberrant:${im.id}';
@@ -236,7 +236,7 @@ void main() {
     double paid(bool on) {
       // temps plein : avec le temps partiel (défaut), l'entreprise neuve ne paie que ses heures et devient rentable, et un
       // dividende pris sur ce bénéfice est permis ; le scénario du test est celui d'une entreprise sans bénéfice
-      final s = Sim(seed: 5, params: Params()..partTime = false, modules: Modules()..dividendTest = on);
+      final s = Sim(seed: 5, params: Params.historique()..partTime = false, modules: Modules.historique()..dividendTest = on);
       run(s, 50);
       final f = s.addFirm('bijouterie', 'Bijouterie test', 20000, s.citizens.first.id, 600, 300);
       var total = 0.0;
@@ -253,7 +253,7 @@ void main() {
   });
 
   test('I2 : hôpital et école publics, enveloppe de l’État, file d’attente par ordre d’arrivée', () {
-    final s = Sim(seed: 3, devChecks: true);
+    final s = Sim(seed: 3, devChecks: true, params: Params.historique(), modules: Modules.historique());
     run(s, 300);
     final hp = s.firms.where((f) => f.type == 'hopital').toList();
     expect(hp, isNotEmpty);
@@ -278,7 +278,7 @@ void main() {
   });
 
   test('I3 : assurance-emploi indexée, puis aide sociale', () {
-    final s = Sim(seed: 2, devChecks: true);
+    final s = Sim(seed: 2, devChecks: true, params: Params.historique(), modules: Modules.historique());
     run(s, 150);
     expect(s.state.eiPremiums, greaterThan(0));
     // un employé assuré perd son emploi : 55 % de son dernier salaire, plafonné au salaire moyen
@@ -306,7 +306,7 @@ void main() {
 
   test('I4 : sans filet, la Caisse applique ses règles prudentielles', () {
     double lentAfter(bool regulation) {
-      final s = Sim(seed: 1, safeguards: Safeguards.none(), modules: Modules()..bankRegulation = regulation, devChecks: true);
+      final s = Sim(seed: 1, safeguards: Safeguards.none(), modules: Modules.historique()..bankRegulation = regulation, devChecks: true, params: Params.historique());
       run(s, 50);
       s.godMoney(const Target('bank'), -s.bank.money); // la Caisse perd ses fonds propres
       final lent = s.bank.lent;
@@ -320,7 +320,7 @@ void main() {
   });
 
   test('I5 : faillite ordonnée, la trésorerie rembourse la dette avant le propriétaire', () {
-    final s = Sim(seed: 5, devChecks: true);
+    final s = Sim(seed: 5, devChecks: true, params: Params.historique(), modules: Modules.historique());
     Firm? f;
     for (var i = 0; i < 800 && f == null; i++) {
       s.step();
@@ -339,7 +339,7 @@ void main() {
   });
 
   test('modules coupés : ni machines, ni dette, ni publicité, invariants exacts', () {
-    final s = Sim(seed: 10, modules: Modules.none(), devChecks: true);
+    final s = Sim(seed: 10, modules: Modules.none(), devChecks: true, params: Params.historique());
     run(s, 300);
     expect(s.totalDebt(), 0);
     expect(s.bank.lent, 0);

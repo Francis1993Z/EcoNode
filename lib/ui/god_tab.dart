@@ -101,7 +101,10 @@ class _GodTabState extends State<GodTab> {
         Row(children: [
           DropdownButton<String>(
             value: destroyGood,
-            items: [for (final e in goods.entries) DropdownMenuItem(value: e.key, child: Text(e.value.label))],
+            items: [
+              for (final e in goods.entries)
+                if (ctrl.sim.goodKeys.contains(e.key)) DropdownMenuItem(value: e.key, child: Text(e.value.label)),
+            ],
             onChanged: (v) => setState(() => destroyGood = v ?? destroyGood),
           ),
           const SizedBox(width: 12),
@@ -172,7 +175,8 @@ class _GodTabState extends State<GodTab> {
           value: newType,
           items: [
             for (final e in templates.entries)
-              DropdownMenuItem(value: e.key, child: Text('${e.value.label} (${sectorLabels[e.value.sector]!.toLowerCase()})')),
+              if (ctrl.sim.typeKeys.contains(e.key))
+                DropdownMenuItem(value: e.key, child: Text('${e.value.label} (${sectorLabels[e.value.sector]!.toLowerCase()})')),
           ],
           onChanged: (v) => setState(() => newType = v ?? newType),
         ),

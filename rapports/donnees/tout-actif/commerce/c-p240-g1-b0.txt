@@ -1,0 +1,72 @@
+j500 : change 1.00, importations 630.65 $/j, exportations 0.00 $/j, chômage 3.28 %, indice 2.27, monnaie ménages + entreprises 3.00 M, entreprises actives 38
+j1000 : change 1.00, importations 383.28 $/j, exportations 0.00 $/j, chômage 4.57 %, indice 3.31, monnaie ménages + entreprises 3.42 M, entreprises actives 39
+j1500 : change 1.00, importations 441.33 $/j, exportations 0.00 $/j, chômage 4.69 %, indice 2.76, monnaie ménages + entreprises 3.23 M, entreprises actives 39
+j2000 : change 1.00, importations 413.20 $/j, exportations 0.00 $/j, chômage 5.16 %, indice 2.81, monnaie ménages + entreprises 3.20 M, entreprises actives 37
+j2500 : change 1.00, importations 426.47 $/j, exportations 0.00 $/j, chômage 5.12 %, indice 2.39, monnaie ménages + entreprises 2.95 M, entreprises actives 37
+j3000 : change 1.00, importations 422.11 $/j, exportations 0.00 $/j, chômage 8.29 %, indice 2.15, monnaie ménages + entreprises 2.59 M, entreprises actives 39
+change moyen après le jour 1000 : 1.00
+BIEN {"bien":"planches","production":0.0,"importations":0.17952834212694088,"exportations":0.0,"importationsValeur":299.0982744140625,"exportationsValeur":0.0,"partImportee":1.0,"prixIci":null,"prixImport":1680.0578856695488,"prixMondial":1283.2876186244246,"facteur":1.007063577166822,"emplois":0.0}
+BIEN {"bien":"electronique","production":0.0,"importations":0.582483531910148,"exportations":0.0,"importationsValeur":51.1833095703125,"exportationsValeur":0.0,"partImportee":1.0,"prixIci":null,"prixImport":87.48411001035998,"prixMondial":67.7675366547552,"facteur":0.9930340183615953,"emplois":0.0}
+BIEN {"bien":"fusibles","production":0.03995221418388328,"importations":0.005926539171129435,"exportations":0.0,"importationsValeur":29.10156396484375,"exportationsValeur":0.0,"partImportee":0.12917829578475024,"prixIci":39919.34841093606,"prixImport":4913.605732039393,"prixMondial":3832.9113440585384,"facteur":0.9861163949988948,"emplois":1.0}
+BIEN {"bien":"tuyaux","production":0.12272624241367484,"importations":0.015216094236609542,"exportations":0.0,"importationsValeur":22.92877978515625,"exportationsValeur":0.0,"partImportee":0.11030764452820492,"prixIci":16429.23693251983,"prixImport":1511.1560353122704,"prixMondial":1176.1699313357985,"facteur":0.988316134005215,"emplois":1.0}
+BIEN {"bien":"fils","production":0.08148722555830126,"importations":0.01027028115172395,"exportations":0.0,"importationsValeur":22.90166650390625,"exportationsValeur":0.0,"partImportee":0.11192851157323179,"prixIci":28471.322725393497,"prixImport":2245.238907067828,"prixMondial":1730.7254288031854,"facteur":0.9979092135862051,"emplois":1.0}
+BIEN {"bien":"plastique","production":1.2086332921567957,"importations":0.004386159571057756,"exportations":0.0,"importationsValeur":0.5624599609375,"exportationsValeur":0.0,"partImportee":0.0036159020902838844,"prixIci":169.0777531934598,"prixImport":133.05485259702903,"prixMondial":104.55490704897704,"facteur":0.978910406999406,"emplois":1.0}
+BIEN {"bien":"acier","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":258.3105538482633,"prixMondial":196.6335247927993,"facteur":1.0105114387106895,"emplois":0.0}
+BIEN {"bien":"betail","production":1.3593604040340717,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":748.7311579539803,"prixImport":324.1446537790755,"prixMondial":249.03300976116037,"facteur":1.001240926283852,"emplois":5.3}
+BIEN {"bien":"cuivre","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":493.0371808372874,"prixMondial":380.16983504445125,"facteur":0.9976051093861529,"emplois":0.0}
+BIEN {"bien":"viande","production":65.97911903642287,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":50.434518576256316,"prixImport":22.69042909703981,"prixMondial":17.71207720596123,"facteur":0.9854392585087502,"emplois":4.9355}
+BIEN {"bien":"pain","production":217.8902988946182,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":23.892885817718394,"prixImport":9.972301058835786,"prixMondial":7.709139473215454,"facteur":0.9950527994909282,"emplois":7.4265}
+BIEN {"bien":"carburant","production":34.48151843797398,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":188.67922458352507,"prixImport":115.97090339265614,"prixMondial":88.38739360378311,"facteur":1.0092885827702662,"emplois":4.73}
+BIEN {"bien":"poisson","production":23.719763529686137,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":57.78936179964873,"prixImport":25.509780634254685,"prixMondial":19.4303770871528,"facteur":1.009908767708396,"emplois":4.276}
+BIEN {"bien":"grain","production":21.749766464545147,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":62.98423188868023,"prixImport":24.72683881567295,"prixMondial":18.67747573208702,"facteur":1.018373441661006,"emplois":5.3}
+BIEN {"bien":"aluminium","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":534.2808884466937,"prixMondial":406.5767588680275,"facteur":1.0108430692137802,"emplois":0.0}
+BIEN {"bien":"petrole","production":34.690708662978196,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":85.76644447971555,"prixImport":52.138853317831824,"prixMondial":40.47650236221221,"facteur":0.990866500410094,"emplois":4.9995}
+BIEN {"bien":"cpu","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":2909.1040612765228,"prixMondial":2240.282001368622,"facteur":0.9988797631106301,"emplois":0.0}
+BIEN {"bien":"ordinateur","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":5431.638728008482,"prixMondial":4205.498983432011,"facteur":0.9935048500522735,"emplois":0.0}
+BIEN {"bien":"bijoux","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":188135.2000407628,"prixMondial":145978.00764667647,"facteur":0.9913779957664438,"emplois":0.0}
+BIEN {"bien":"machines","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":7907.099134561278,"prixImport":2537.3703246936357,"prixMondial":1962.4214445049515,"facteur":0.9945994690145593,"emplois":0.9995}
+BIEN {"bien":"reparation","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":null,"prixMondial":51.41340170972517,"facteur":null,"emplois":0.0}
+BIEN {"bien":"genie","production":12.473166133157665,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":136.47753842225072,"prixImport":null,"prixMondial":74.35437361860308,"facteur":null,"emplois":3.615}
+BIEN {"bien":"conception","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":429.14657228923727,"prixMondial":331.30908345771076,"facteur":0.9963890650674989,"emplois":0.0}
+BIEN {"bien":"pub","production":16.98757604427889,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":183.88839587725394,"prixImport":null,"prixMondial":95.34444409579439,"facteur":null,"emplois":6.471}
+BIEN {"bien":"compta","production":10.930066396920042,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":77.83676922085483,"prixImport":null,"prixMondial":48.925897025002534,"facteur":null,"emplois":2.565}
+BIEN {"bien":"repas","production":232.720371267029,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":82.085826201937,"prixImport":34.95157800099336,"prixMondial":27.002520542846856,"facteur":0.9956785030075861,"emplois":28.6025}
+BIEN {"bien":"tele","production":1058.18509171148,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":13.099106210986545,"prixImport":null,"prixMondial":4.5688798468279606,"facteur":null,"emplois":20.357}
+BIEN {"bien":"plomberie","production":0.919609943569639,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":3253.0523716480698,"prixImport":null,"prixMondial":400.45094670918826,"facteur":null,"emplois":1.0}
+BIEN {"bien":"hotel","production":119.84960006205549,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":152.3567652745676,"prixImport":null,"prixMondial":56.518467589016275,"facteur":null,"emplois":31.7215}
+BIEN {"bien":"voyage","production":114.25651955694003,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":297.79512013936846,"prixImport":null,"prixMondial":149.229577988976,"facteur":null,"emplois":62.328}
+BIEN {"bien":"soins","production":5.829361143250766,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":108.51411421429036,"prixImport":null,"prixMondial":108.51411421429408,"facteur":null,"emplois":3.118}
+BIEN {"bien":"cours","production":3.3792337598801745,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":23.712939509018,"prixImport":null,"prixMondial":23.71293950901836,"facteur":null,"emplois":1.1125}
+BIEN {"bien":"logement","production":78.8151215197939,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":59.305795190365174,"prixImport":null,"prixMondial":24.352068953328892,"facteur":null,"emplois":1.0}
+BIEN {"bien":"batiment","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":null,"prixMondial":11725.80616830762,"facteur":null,"emplois":0.0}
+BIEN {"bien":"loisirs","production":197.30401672302403,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":62.21699776841968,"prixImport":null,"prixMondial":24.185669014795167,"facteur":null,"emplois":25.486}
+BIEN {"bien":"briques","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":922.5519611677822,"prixMondial":704.3583018862433,"facteur":1.0075203952931626,"emplois":0.0}
+BIEN {"bien":"bois","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":3036.0603912968118,"prixMondial":2343.8578270528715,"facteur":0.9964047491587177,"emplois":0.0}
+BIEN {"bien":"fer","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":53.90704207014723,"prixMondial":41.206337689456106,"facteur":1.0063247006099574,"emplois":0.0}
+BIEN {"bien":"or","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":5000.718131952703,"prixMondial":3807.051657899416,"facteur":1.0104160912464994,"emplois":0.0}
+BIEN {"bien":"charpente","production":1.1982568527395574,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":570.0751343685787,"prixImport":null,"prixMondial":316.25266306131596,"facteur":null,"emplois":1.0}
+BIEN {"bien":"electricite","production":0.9175637519172163,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0.0,"prixIci":5980.22897206422,"prixImport":null,"prixMondial":616.9874601494953,"facteur":null,"emplois":1.0}
+BIEN {"bien":"bauxite","production":0.0,"importations":0.0,"exportations":0.0,"importationsValeur":0.0,"exportationsValeur":0.0,"partImportee":0,"prixIci":null,"prixImport":105.12944374530261,"prixMondial":81.45922412136314,"facteur":0.992751941272096,"emplois":0.0}
+TYPE {"type":"ordinateurs","fermetures":{"sans_employe":1},"fondations":0}
+TYPE {"type":"cpu","fermetures":{"faillite":1,"demande_perdue":1},"fondations":1}
+TYPE {"type":"mineCuivre","fermetures":{"demande_perdue":1,"faillite":1},"fondations":1}
+TYPE {"type":"petrochimie","fermetures":{"sans_employe":1},"fondations":1}
+TYPE {"type":"bucheron","fermetures":{"faillite":3},"fondations":2}
+TYPE {"type":"briqueterie","fermetures":{"faillite":4},"fondations":3}
+TYPE {"type":"mineOr","fermetures":{"faillite":1},"fondations":0}
+TYPE {"type":"ingCpu","fermetures":{"faillite":1},"fondations":0}
+TYPE {"type":"fonderie","fermetures":{"sans_employe":1},"fondations":0}
+TYPE {"type":"electronique","fermetures":{"sans_employe":1},"fondations":0}
+TYPE {"type":"mineFer","fermetures":{"demande_perdue":1},"fondations":0}
+TYPE {"type":"aluminerie","fermetures":{"faillite":1},"fondations":0}
+TYPE {"type":"mineBauxite","fermetures":{"demande_perdue":1},"fondations":0}
+TYPE {"type":"entrepreneur","fermetures":{"faillite":1},"fondations":0}
+TYPE {"type":"divertissement","fermetures":{"faillite":4},"fondations":7}
+TYPE {"type":"garage","fermetures":{"sans_employe":1},"fondations":0}
+TYPE {"type":"scierie","fermetures":{"sans_employe":1},"fondations":0}
+TYPE {"type":"ferme","fermetures":{"faillite":1},"fondations":1}
+TYPE {"type":"hotel","fermetures":{"faillite":2},"fondations":4}
+TYPE {"type":"peche","fermetures":{"faillite":1},"fondations":1}
+TYPE {"type":"tele","fermetures":{},"fondations":3}
+TYPE {"type":"tourisme","fermetures":{},"fondations":5}
+TYPE {"type":"restaurant","fermetures":{},"fondations":1}

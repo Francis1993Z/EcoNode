@@ -1,0 +1,10 @@
+Unhandled exception:
+Bad state: Transfert à découvert
+#0      Sim.transfer (package:econodes/engine/sim.dart:1501)
+#1      Sim._insurance (package:econodes/engine/sim.dart:2132)
+#2      Sim._jobDays (package:econodes/engine/sim.dart:2058)
+#3      Sim._laborMarket (package:econodes/engine/sim.dart:2012)
+#4      Sim.step (package:econodes/engine/sim.dart:1963)
+#5      main (file:///home/ubuntu/econodes/4b7a13272921/tool/derive.dart:75)
+#6      _delayEntrypointInvocation.<anonymous closure> (dart:isolate-patch/isolate_patch.dart:312)
+#7      _RawReceivePort._handleMessage (dart:isolate-patch/isolate_patch.dart:193)
