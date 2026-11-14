@@ -836,6 +836,11 @@ class Params {
   // entretenu (−1 %/an) se rénove tous les ≈ 40 ans pour ≈ 24 % du prix du neuf. Choix de jeu (rapports/renovation.md).
   double renoTrigger = 0.6;
   double renoShare = 0.6;
+  // Essais (module renovation, 2026-11-13) : valeur des bâtiments au prix de référence du module (0), au prix offert (1)
+  // ou au prix de départ, fixe (2) ; renoEntryLimit : dans les marchés de la chaîne, on ne fonde une entreprise que si
+  // celles en place manquent de bras (un poste ouvert depuis au moins 5 jours) ou s'il n'y en a plus.
+  int renoValue = 0;
+  bool renoEntryLimit = false;
 
   // ---- Entrepreneuriat des citoyens (Modules.entrepreneurship). Aucune de ces valeurs n'est réglée sur une cible : ce sont
   // des ordres de grandeur a priori, exposés pour être changés. Repère (non visé) : au Canada, environ 10 % d'entrées et 9 %

@@ -403,6 +403,10 @@ void applyParam(Params p, String k, String v) {
       p.renoTrigger = double.parse(v);
     case 'renoShare': // module renovation : part des modules du neuf que coûte une remise à neuf
       p.renoShare = double.parse(v);
+    case 'renoValue': // essai : valeur des bâtiments (0 référence, 1 prix offert, 2 prix de départ)
+      p.renoValue = int.parse(v);
+    case 'renoEntryLimit': // essai : fondations limitées dans les marchés de la chaîne
+      p.renoEntryLimit = b();
     case 'reviewDays':
       p.reviewDays = int.parse(v);
     case 'reviewCutMax':

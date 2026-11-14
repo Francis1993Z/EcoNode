@@ -158,6 +158,7 @@ extension SimEntrepreneurship on Sim {
       if (publicGood(g)) continue; // l'État fournit ce service
       if (g == 'logement' && modules.buildings) continue; // on construit, on ne fonde pas un bailleur sans bâtiment
       if (day - (_lastEntry[ty] ?? -100000) < p.entryCooldown) continue;
+      if (_renoEntryBlocked(ty)) continue; // essai (Params.renoEntryLimit) : les entreprises en place ont des bras
       var want = entryWant(g); // demande non servie (module products : aussi faiblement servie)
       if (want < 0) continue; // module products : marge des variétés en place peu attrayante
       if (p.revival) want = math.max(want, revivalWant(g)); // bien sans producteur actif : signal de renaissance

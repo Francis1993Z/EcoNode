@@ -108,7 +108,17 @@ extension SimBuildings on Sim {
   /// réévaluer tout le parc, donc les loyers et les hypothèques. Mesuré avec le prix offert : module × 3,5, hypothèques
   /// × 2,7 et indice des prix × 1,9 en 3 000 jours à 2 500 citoyens (rapports/renovation.md). Sans le module, le prix
   /// offert, comme avant. Les achats de modules se font toujours au prix offert (moduleCost).
-  double moduleValue() => renovationActive ? referencePrice('batiment') : moduleCost();
+  double moduleValue() {
+    if (!renovationActive) return moduleCost();
+    switch (params.renoValue) {
+      case 1:
+        return moduleCost(); // essai : le prix offert du jour
+      case 2:
+        return worldPrice['batiment']!; // essai : le prix de départ, fixe
+      default:
+        return referencePrice('batiment');
+    }
+  }
 
   /// Coût de remplacement d'un logement neuf.
   double replacementCost() => params.dwellingModules * moduleValue();
@@ -579,7 +589,7 @@ extension SimBuildings on Sim {
     if (f == null) return 0;
     final price = moduleCost();
     if (!(price > 0) || !price.isFinite) return 0;
-    q = math.min(q, _moduleStock().floor()); // on n'emprunte que pour des modules qu'on peut acheter aujourd'hui
+    q = _modulesToBuy(q); // on n'emprunte que pour des modules qu'on peut acheter aujourd'hui
     if (q < 1) return 0;
     final reserve = 3 * f.wage * f.workers.length;
     final own = math.max(0.0, f.money - reserve);
@@ -605,6 +615,15 @@ extension SimBuildings on Sim {
     f.reinvest = math.max(0.0, f.reinvest - r.spent);
     bstats.renoSpent += r.spent;
     return r.qty.round();
+  }
+
+  /// Modules de rénovation achetables aujourd'hui, au plus [q] : ceux en stock chez les vendeurs. Le reste de la demande
+  /// est noté comme non servi, comme un achat sans offre : sans cela, quand le dernier entrepreneur général disparaît,
+  /// rien ne signale plus la demande et aucun autre n'est fondé (mesuré : 84 à 273 rénovations en attente au jour 3 000).
+  int _modulesToBuy(int q) {
+    final n = math.min(q, _moduleStock().floor());
+    if (n < q) unmet['batiment'] = (unmet['batiment'] ?? 0) + (q - n);
+    return n;
   }
 
   /// Modules de chantier en stock chez ceux qui en vendent.
@@ -638,7 +657,7 @@ extension SimBuildings on Sim {
     if (c == null) return 0;
     final price = moduleCost();
     if (!(price > 0) || !price.isFinite) return 0;
-    q = math.min(q, _moduleStock().floor()); // on n'emprunte que pour des modules qu'on peut acheter aujourd'hui
+    q = _modulesToBuy(q); // on n'emprunte que pour des modules qu'on peut acheter aujourd'hui
     if (q < 1) return 0;
     final cushion = 10 * needCost;
     final own = math.max(0.0, c.money - cushion);
