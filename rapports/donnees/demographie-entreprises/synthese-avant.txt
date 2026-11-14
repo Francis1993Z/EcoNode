@@ -1,0 +1,47 @@
+## demographie-entreprises/avant
+
+### 240 citoyens (12 graines, 3650 jours)
+- Entreprises privées (moyenne des années 2+) : moyenne 41, médiane 42
+- Taux de naissance annuel : moyenne 8.1 %, médiane 7.7 %
+- Taux de mort annuel : moyenne 5.9 %, médiane 5.8 %
+- Rachats par an (part des entreprises) : moyenne 13.9 %, médiane 14.2 %
+- Survie à 1 an(s) des entreprises nées en partie : moyenne 69.8 %, médiane 74.4 %
+- Survie à 3 an(s) des entreprises nées en partie : moyenne 61.8 %, médiane 64.2 %
+- Survie à 5 an(s) des entreprises nées en partie : moyenne 55.5 %, médiane 52.2 %
+- Mortalité à l’âge 0-1 ans (nées en partie) : moyenne 39.4 %, médiane 31.0 %
+- Mortalité à l’âge 1-2 ans (nées en partie) : moyenne 6.8 %, médiane 4.1 %
+- Mortalité à l’âge 2-3 ans (nées en partie) : moyenne 6.3 %, médiane 4.7 %
+- Mortalité à l’âge 3-5 ans (nées en partie) : moyenne 4.6 %, médiane 3.8 %
+- Mortalité à l’âge 5-99 ans (nées en partie) : moyenne 3.2 %, médiane 3.4 %
+- Mortalité annuelle des entreprises du départ (années 2+) : moyenne 2.4 %, médiane 2.3 %
+- Âge moyen des entreprises vivantes à la fin (ans) : moyenne 8.4, médiane 8.5
+- Part des vivantes à la fin nées en partie : moyenne 48.4 %, médiane 49.4 %
+- Part des morts : demande_perdue : moyenne 6.7 %, médiane 6.7 %
+- Part des morts : faillite : moyenne 92.6 %, médiane 92.5 %
+- Part des morts : sans_employe : moyenne 5.9 %, médiane 4.2 %
+- Chômage moyen (années 2+) : moyenne 4.8 %, médiane 4.8 %
+- Chômage des deux dernières années : moyenne 4.5 %, médiane 4.4 %
+- Indice des prix à la fin : moyenne 1.14, médiane 1.18
+
+### 2500 citoyens (12 graines, 3650 jours)
+- Entreprises privées (moyenne des années 2+) : moyenne 169, médiane 169
+- Taux de naissance annuel : moyenne 4.3 %, médiane 4.5 %
+- Taux de mort annuel : moyenne 12.6 %, médiane 12.5 %
+- Rachats par an (part des entreprises) : moyenne 14.3 %, médiane 14.1 %
+- Survie à 1 an(s) des entreprises nées en partie : moyenne 83.8 %, médiane 85.7 %
+- Survie à 3 an(s) des entreprises nées en partie : moyenne 61.1 %, médiane 61.7 %
+- Survie à 5 an(s) des entreprises nées en partie : moyenne 51.2 %, médiane 51.9 %
+- Mortalité à l’âge 0-1 ans (nées en partie) : moyenne 17.2 %, médiane 14.6 %
+- Mortalité à l’âge 1-2 ans (nées en partie) : moyenne 16.2 %, médiane 16.1 %
+- Mortalité à l’âge 2-3 ans (nées en partie) : moyenne 14.1 %, médiane 12.8 %
+- Mortalité à l’âge 3-5 ans (nées en partie) : moyenne 9.7 %, médiane 10.7 %
+- Mortalité à l’âge 5-99 ans (nées en partie) : moyenne 4.4 %, médiane 4.2 %
+- Mortalité annuelle des entreprises du départ (années 2+) : moyenne 12.9 %, médiane 12.7 %
+- Âge moyen des entreprises vivantes à la fin (ans) : moyenne 8.2, médiane 8.2
+- Part des vivantes à la fin nées en partie : moyenne 36.9 %, médiane 36.3 %
+- Part des morts : demande_perdue : moyenne 5.2 %, médiane 4.8 %
+- Part des morts : faillite : moyenne 92.1 %, médiane 91.8 %
+- Part des morts : sans_employe : moyenne 2.7 %, médiane 2.1 %
+- Chômage moyen (années 2+) : moyenne 6.0 %, médiane 6.1 %
+- Chômage des deux dernières années : moyenne 6.5 %, médiane 6.6 %
+- Indice des prix à la fin : moyenne 1.20, médiane 1.18
