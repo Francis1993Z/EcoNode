@@ -1,0 +1,132 @@
+jours 1-500 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 7.33, export/coût 7.54, jours actifs 498
+  briques : 0.00 $/j, commande 0 j, export/prix 0.57, export/coût 0.51, jours actifs 383
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.44, export/coût 0.53, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.43, export/coût 0.51, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.45, export/coût 0.53, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 1.00, export/coût 1.70, jours actifs 500
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.40, export/coût 0.52, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.40, export/coût 0.53, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix 0.60, export/coût 0.67, jours actifs 500
+  premiers : 
+jours 501-1000 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 11.88, export/coût 11.34, jours actifs 492
+  briques : 0.00 $/j, commande 0 j, export/prix 0.74, export/coût 0.67, jours actifs 289
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.35, export/coût 0.40, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.36, export/coût 0.43, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.40, export/coût 0.47, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 0.87, export/coût 1.97, jours actifs 500
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.36, export/coût 0.48, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.36, export/coût 0.48, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix 0.68, export/coût 0.85, jours actifs 500
+  premiers : 
+jours 1001-1500 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 4.47, export/coût 4.96, jours actifs 497
+  briques : 0.00 $/j, commande 0 j, export/prix 0.59, export/coût 0.36, jours actifs 243
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.27, export/coût 0.32, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.27, export/coût 0.32, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.40, export/coût 0.47, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 0.89, export/coût 1.21, jours actifs 496
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.34, export/coût 0.44, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.33, export/coût 0.44, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix 0.45, export/coût 0.46, jours actifs 314
+  premiers : 
+jours 1501-2000 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 2.17, export/coût 2.54, jours actifs 500
+  briques : 0.00 $/j, commande 0 j, export/prix 0.47, export/coût 0.38, jours actifs 97
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.31, export/coût 0.36, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.29, export/coût 0.33, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.36, export/coût 0.42, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 0.61, export/coût 0.94, jours actifs 500
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.29, export/coût 0.41, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.25, export/coût 0.37, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix 0.54, export/coût 0.57, jours actifs 500
+  premiers : 
+jours 2001-2500 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 1.77, export/coût 2.05, jours actifs 500
+  briques : 0.00 $/j, commande 0 j, export/prix 0.47, export/coût 0.38, jours actifs 204
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.24, export/coût 0.27, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.21, export/coût 0.24, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.29, export/coût 0.33, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 0.47, export/coût 0.92, jours actifs 500
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.25, export/coût 0.34, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.26, export/coût 0.36, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix 0.50, export/coût 0.58, jours actifs 496
+  premiers : 
+jours 2501-3000 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 1.47, export/coût 1.73, jours actifs 500
+  briques : 0.00 $/j, commande 0 j, export/prix 0.49, export/coût 0.35, jours actifs 176
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.22, export/coût 0.25, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.22, export/coût 0.26, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.26, export/coût 0.30, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 0.41, export/coût 0.78, jours actifs 500
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.21, export/coût 0.31, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.22, export/coût 0.33, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix 0.38, export/coût 0.43, jours actifs 496
+  premiers : 
+jours 3001-3500 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 1.23, export/coût 1.44, jours actifs 500
+  briques : 0.00 $/j, commande 0 j, export/prix 0.51, export/coût 0.36, jours actifs 225
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.22, export/coût 0.25, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.19, export/coût 0.22, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.22, export/coût 0.26, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 0.49, export/coût 0.69, jours actifs 500
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.20, export/coût 0.27, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.19, export/coût 0.27, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix 0.33, export/coût 0.35, jours actifs 375
+  premiers : 
+jours 3501-4000 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 1.39, export/coût 1.66, jours actifs 500
+  briques : 0.00 $/j, commande 0 j, export/prix 0.51, export/coût 0.41, jours actifs 255
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.22, export/coût 0.25, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.20, export/coût 0.23, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.23, export/coût 0.28, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 0.56, export/coût 0.76, jours actifs 500
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.19, export/coût 0.28, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.21, export/coût 0.31, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix 0.40, export/coût 0.44, jours actifs 421
+  premiers : 
+jours 4001-4500 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 1.51, export/coût 1.81, jours actifs 500
+  briques : 0.00 $/j, commande 0 j, export/prix 0.57, export/coût 0.46, jours actifs 227
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.19, export/coût 0.23, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.19, export/coût 0.23, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.21, export/coût 0.25, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 0.43, export/coût 0.80, jours actifs 500
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.17, export/coût 0.28, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.17, export/coût 0.27, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix 0.33, export/coût 0.39, jours actifs 500
+  premiers : 
+jours 4501-5000 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 1.30, export/coût 1.53, jours actifs 500
+  briques : 0.00 $/j, commande 0 j, export/prix 0.51, export/coût 0.42, jours actifs 209
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.20, export/coût 0.24, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.17, export/coût 0.20, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.21, export/coût 0.25, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 0.49, export/coût 0.62, jours actifs 500
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.20, export/coût 0.27, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.19, export/coût 0.25, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix 0.38, export/coût 0.37, jours actifs 307
+  premiers : 
+jours 5001-5500 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 1.08, export/coût 1.24, jours actifs 500
+  briques : 0.00 $/j, commande 0 j, export/prix NaN, export/coût NaN, jours actifs 0
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.16, export/coût 0.19, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.16, export/coût 0.18, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.18, export/coût 0.21, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 0.67, export/coût 0.77, jours actifs 500
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.19, export/coût 0.21, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.21, export/coût 0.24, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix NaN, export/coût NaN, jours actifs 0
+  premiers : 
+jours 5501-6000 : exportations 0.00 k$/j, taux de change 1.00
+  planches : 0.00 $/j, commande 0 j, export/prix 0.90, export/coût 1.03, jours actifs 500
+  briques : 0.00 $/j, commande 0 j, export/prix NaN, export/coût NaN, jours actifs 0
+  tuyaux : 0.00 $/j, commande 0 j, export/prix 0.15, export/coût 0.17, jours actifs 500
+  fils : 0.00 $/j, commande 0 j, export/prix 0.13, export/coût 0.15, jours actifs 500
+  fusibles : 0.00 $/j, commande 0 j, export/prix 0.18, export/coût 0.20, jours actifs 500
+  charpente : 0.00 $/j, commande 0 j, export/prix 0.61, export/coût 0.70, jours actifs 500
+  electricite : 0.00 $/j, commande 0 j, export/prix 0.18, export/coût 0.21, jours actifs 500
+  plomberie : 0.00 $/j, commande 0 j, export/prix 0.18, export/coût 0.21, jours actifs 500
+  batiment : 0.00 $/j, commande 0 j, export/prix NaN, export/coût NaN, jours actifs 0
+  premiers : 

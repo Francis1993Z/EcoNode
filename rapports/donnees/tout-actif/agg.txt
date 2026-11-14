@@ -1,0 +1,24 @@
+=== 240 citoyens (moyenne des graines, jours 1 001-3 000 ; médiane entre crochets)
+  A (10 parties, 10 au bout, 25 s) : chômage % 4.67 [4.55], indice 1.09 [1.06], indice j3000 1.12 [1.10], salaire 201.71 [198.30], sans-abri 0.00 [0.00], affamés 0.00 [0.00], Gini 0.32 [0.31], bonheur % 97.60 [97.59] ; relevés chômage > 20 % : 0 (0 graines)
+  B (10 parties, 10 au bout, 34 s) : chômage % 15.43 [13.85], indice 4.04 [3.94], indice j3000 4.35 [4.23], salaire 641.71 [654.55], sans-abri 1.64 [0.75], affamés 3.12 [0.19], Gini 0.43 [0.43], bonheur % 95.47 [96.61] ; relevés chômage > 20 % : 23 (9 graines) ; entrepreneur général actif au jour 3 000 : 1/10
+  C (10 parties, 10 au bout, 32 s) : chômage % 4.01 [4.06], indice 3.42 [3.48], indice j3000 3.63 [3.10], salaire 622.41 [608.55], sans-abri 0.01 [0.00], affamés 0.01 [0.00], Gini 0.28 [0.28], bonheur % 97.56 [97.60] ; relevés chômage > 20 % : 0 (0 graines) ; entrepreneur général actif au jour 3 000 : 0/10
+  B − A : chômage % +10.76 (10/10), indice +2.95 (10/10), indice j3000 +3.23 (10/10), salaire +440.00 (10/10), sans-abri +1.64 (9/10), affamés +3.12 (8/10), Gini +0.11 (10/10), bonheur % -2.13 (0/10)
+  C − A : chômage % -0.66 (3/10), indice +2.33 (10/10), indice j3000 +2.51 (10/10), salaire +420.70 (10/10), sans-abri +0.01 (1/10), affamés +0.01 (1/10), Gini -0.03 (1/10), bonheur % -0.04 (5/10)
+  B − C : chômage % +11.42 (10/10), indice +0.63 (7/10), indice j3000 +0.71 (6/10), salaire +19.30 (7/10), sans-abri +1.62 (8/10), affamés +3.11 (8/10), Gini +0.14 (10/10), bonheur % -2.09 (2/10)
+
+=== 1000 citoyens (moyenne des graines, jours 1 001-3 000 ; médiane entre crochets)
+  A (10 parties, 10 au bout, 111 s) : chômage % 5.60 [5.30], indice 1.17 [1.19], indice j3000 1.23 [1.28], salaire 214.92 [214.42], sans-abri 0.00 [0.00], affamés 0.00 [0.00], Gini 0.43 [0.43], bonheur % 97.69 [97.69] ; relevés chômage > 20 % : 0 (0 graines)
+  B (10 parties, 10 au bout, 147 s) : chômage % 11.59 [10.65], indice 3.09 [2.91], indice j3000 3.47 [3.25], salaire 665.95 [650.30], sans-abri 1.16 [0.06], affamés 0.35 [0.00], Gini 0.43 [0.39], bonheur % 97.31 [97.65] ; relevés chômage > 20 % : 8 (4 graines) ; entrepreneur général actif au jour 3 000 : 7/10
+  C (10 parties, 10 au bout, 156 s) : chômage % 3.20 [3.35], indice 2.64 [2.62], indice j3000 2.80 [2.80], salaire 531.90 [535.46], sans-abri 0.00 [0.00], affamés 0.00 [0.00], Gini 0.32 [0.32], bonheur % 97.73 [97.72] ; relevés chômage > 20 % : 0 (0 graines) ; entrepreneur général actif au jour 3 000 : 6/10
+  B − A : chômage % +5.99 (10/10), indice +1.92 (10/10), indice j3000 +2.24 (10/10), salaire +451.03 (10/10), sans-abri +1.16 (5/10), affamés +0.35 (3/10), Gini +0.00 (5/10), bonheur % -0.37 (2/10)
+  C − A : chômage % -2.40 (0/10), indice +1.47 (10/10), indice j3000 +1.57 (10/10), salaire +316.98 (10/10), sans-abri +0.00 (0/10), affamés +0.00 (0/10), Gini -0.11 (0/10), bonheur % +0.04 (7/10)
+  B − C : chômage % +8.40 (10/10), indice +0.45 (8/10), indice j3000 +0.67 (7/10), salaire +134.05 (9/10), sans-abri +1.16 (5/10), affamés +0.35 (3/10), Gini +0.11 (9/10), bonheur % -0.42 (3/10)
+
+=== 2500 citoyens (moyenne des graines, jours 1 001-3 000 ; médiane entre crochets)
+  A (10 parties, 10 au bout, 287 s) : chômage % 6.10 [6.12], indice 1.20 [1.18], indice j3000 1.24 [1.24], salaire 225.99 [225.66], sans-abri 0.00 [0.00], affamés 0.00 [0.00], Gini 0.53 [0.53], bonheur % 97.69 [97.68] ; relevés chômage > 20 % : 0 (0 graines)
+  B (10 parties, 10 au bout, 441 s) : chômage % 10.06 [9.43], indice 1.76 [1.73], indice j3000 1.59 [1.60], salaire 389.18 [403.18], sans-abri 0.35 [0.00], affamés 0.44 [0.00], Gini 0.59 [0.56], bonheur % 97.64 [97.73] ; relevés chômage > 20 % : 6 (4 graines) ; entrepreneur général actif au jour 3 000 : 9/10
+  C (10 parties, 10 au bout, 419 s) : chômage % 2.95 [3.06], indice 2.26 [2.27], indice j3000 2.39 [2.35], salaire 473.32 [479.85], sans-abri 0.00 [0.00], affamés 0.03 [0.00], Gini 0.35 [0.36], bonheur % 97.77 [97.77] ; relevés chômage > 20 % : 0 (0 graines) ; entrepreneur général actif au jour 3 000 : 10/10
+  B − A : chômage % +3.97 (10/10), indice +0.56 (10/10), indice j3000 +0.36 (9/10), salaire +163.20 (10/10), sans-abri +0.35 (2/10), affamés +0.44 (1/10), Gini +0.07 (6/10), bonheur % -0.05 (5/10)
+  C − A : chômage % -3.15 (0/10), indice +1.06 (10/10), indice j3000 +1.15 (10/10), salaire +247.33 (10/10), sans-abri +0.00 (0/10), affamés +0.03 (2/10), Gini -0.17 (0/10), bonheur % +0.08 (10/10)
+  B − C : chômage % +7.11 (10/10), indice -0.50 (1/10), indice j3000 -0.80 (1/10), salaire -84.13 (1/10), sans-abri +0.35 (2/10), affamés +0.41 (1/10), Gini +0.24 (10/10), bonheur % -0.12 (1/10)
+

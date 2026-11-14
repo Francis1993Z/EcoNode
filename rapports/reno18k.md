@@ -74,7 +74,31 @@ Graine 1 : jour 15 750 → 16 500, hypothèques 12,6 → 44,6 M$, indice 1,68 �
 153 sans-abri au jour 17 250. Graine 9 : jour 15 000 → 15 500, hypothèques 16,7 → 39,8 M$, indice 1,32 → 3,71, attente
 928 → 176 ; 44 sans-abri au jour 16 000.
 
-## 4. À faire
+## 4. Pourquoi l'entrepreneur général meurt (sondes du 14 novembre)
+
+Sondes `tool/entrepreneur.dart`, `tool/productivite.dart` et `tool/exportations.dart` (2 500 citoyens, filets coupés,
+graines 1, 6, 8, 11 et 14) ; sorties dans `rapports/donnees/reno18k/sondes/`.
+
+- **La demande arrive régulièrement.** Pendant les absences de l'entrepreneur, la liste d'attente grossit de 30 à 34
+  bâtiments par 250 jours (écart-type 4 à 8), ce qu'on attend d'un parc de départ étalé entre l'état 0,6 et l'état neuf
+  qui perd 1 % par an. Ce n'est pas un manque de variété dans l'usure.
+- **Mais elle est minuscule.** Environ 0,13 chantier par jour, soit 0,4 à 0,55 module par jour pour toute l'économie. Un
+  seul employé de l'entrepreneur en fait 0,5 par jour au taux de base, sans technologie ni machines.
+- **Toutes les fermetures sont des faillites** (« trésorerie sous 2 jours de salaires »). Dans leurs 90 derniers jours :
+  1 employé (le minimum), 0 à 0,2 module vendu par jour, recettes de 0 à 540 $ par jour contre des coûts de 130 à
+  550 $, effectif voulu de 0,1 à 0,9 employé.
+- **Pas la technologie.** Lots par employé rapportés au taux de base : × 1,0 à 1,6 pour l'entrepreneur (niveau
+  technologique 3 à 4), × 0,9 à 2,0 pour la briqueterie, × 1,0 à 1,4 pour les métiers, contre × 1,4 à 1,8 pour l'ensemble
+  des entreprises. L'utilisation des équipes est de 44 à 52 % pour l'entrepreneur et la briqueterie, 58 à 74 % pour les
+  métiers et 94 à 99 % pour l'ensemble.
+- **La filière est trop petite par nature.** Elle emploie 0,8 à 1,0 % des travailleurs (19 à 25 sur 2 300 à 2 465),
+  contre environ 7 % pour la construction au Canada. Au taux de base, un module demande environ 6 jours de travail
+  (2 jours de l'entrepreneur, 16 heures des métiers, les briques), un logement de 10 modules environ 60 et une
+  rénovation de 3 modules environ 18. Un logement neuf (10 modules à 3 000-6 000 $) coûte environ 2 à 4 mois de salaire.
+- **L'étranger n'achète rien** : frontières fermées dans ces parties ; même ouvertes, le prix à l'export des briques ne
+  couvrirait que 27 à 55 % de leur coût.
+
+## 5. À faire
 
 - Comprendre pourquoi l'entrepreneur général meurt une fois la première vague passée (demande qui retombe, prix, capital)
   et le garder en vie, ou faire revenir plus tôt un seul fondateur plutôt que seize d'un coup.
