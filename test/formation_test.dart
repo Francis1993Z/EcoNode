@@ -49,6 +49,8 @@ void main() {
         if (c.studyField >= 0) studied = true;
         if (c.employer == null || c.role < 0) continue;
         final f = s.firm(c.employer!)!;
+        // un fondateur prend le premier poste de son organigramme, quelle que soit sa qualification (comme sans le module)
+        if (f.founderId == c.id) continue;
         final role = roles[f.type]![c.role];
         expect(s.skillIn(c, fieldOf(f.type)) + 1e-9, greaterThanOrEqualTo(role.minSkill),
             reason: 'jour $d : ${c.name} tient « ${role.label} » chez ${f.name} sans le diplôme voulu');

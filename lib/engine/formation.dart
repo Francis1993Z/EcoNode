@@ -42,6 +42,7 @@ class FormationStats {
   int reconversions = 0; // diplômes dans une filière nouvelle pour un citoyen déjà diplômé ailleurs
   double studyDays = 0; // somme des jours de calendrier des programmes terminés
   int stalledDays = 0; // jours d'études perdus faute de cours (école pleine ou argent manquant)
+  int stalledFull = 0; // cours demandés et refusés : école publique pleine ou aucun cours en vente
   double tuitionStudents = 0; // part des cours payée par les élèves
   double tuitionState = 0; // part payée par l'État (cours achetés au marché)
   double loans = 0; // prêts étudiants accordés
@@ -81,14 +82,22 @@ extension SimFormation on Sim {
     return p.eduTechDays;
   }
 
-  /// Prix de référence d'un cours : le prix affiché de l'école (publique ou non) la moins chère, sinon le prix indicatif.
+  /// Prix de référence d'un cours. École publique : son coût à pleine cadence, le salaire moyen de ses employés ÷ les
+  /// cours qu'un employé donne par jour (son prix affiché est celui du plan de départ, figé, et une école dimensionnée
+  /// pour peu d'élèves y paraît hors de prix). Au marché : le meilleur prix, sinon le prix indicatif.
   double coursePrice() {
-    var best = double.infinity;
-    for (final f in sellersOf('cours')) {
-      final pr = f.price['cours'];
-      if (pr != null && pr > 0 && pr < best) best = pr;
+    if (publicGood('cours')) {
+      var w = 0.0, n = 0;
+      for (final f in sellersOf('cours')) {
+        if (!publicService(f) || f.workers.isEmpty) continue;
+        w += f.wage * f.workers.length;
+        n += f.workers.length;
+      }
+      final wage = n > 0 ? w / n : marketOffer(2);
+      return wage / templates['ecole']!.rate;
     }
-    return best.isFinite ? best : goods['cours']!.guess;
+    final q = quote('cours');
+    return q.isFinite ? q : goods['cours']!.guess;
   }
 
   // ------------------------------------------------------------------ le matin
@@ -196,6 +205,9 @@ extension SimFormation on Sim {
 
   // ------------------------------------------------------------------ la journée d'un citoyen (pendant la consommation)
 
+  /// Cours en retard au-delà desquels les études n'avancent plus.
+  static const double maxCourseBacklog = 3;
+
   void _studyFormation(Citizen c, double floor) {
     if (c.degrees.isEmpty) return; // arrivé aujourd'hui : diplôme demain matin
     if (c.studyField < 0) _maybeEnrol(c);
@@ -268,14 +280,15 @@ extension SimFormation on Sim {
       c.studySeeksWork = false;
     }
     final pace = employed ? 1 / p.eduNightFactor : 1.0;
-    if (c.studyCourses >= 1) {
-      if (_takeCourse(c, floor)) {
-        c.studyCourses -= 1;
-      } else {
-        formationStats.stalledDays++;
-      }
+    // cours dus : au plus deux par jour ; l'école produit selon la demande de la veille, un retard de moins de
+    // maxCourseBacklog cours se rattrape sans arrêter les études
+    for (var k = 0; k < 2 && c.studyCourses >= 1; k++) {
+      if (!_takeCourse(c, floor)) break;
+      c.studyCourses -= 1;
     }
-    if (c.studyCourses < 1) {
+    if (c.studyCourses >= maxCourseBacklog) {
+      formationStats.stalledDays++;
+    } else {
       c.studyCourses += pace * p.eduCoursesPerYear / 365;
       c.studyDone += pace;
     }
@@ -289,6 +302,7 @@ extension SimFormation on Sim {
       final copay = quantize((1 - p.eduStateShare) * coursePrice());
       if (c.money < copay + needCost) return false;
       if (!_takePublic('cours')) {
+        formationStats.stalledFull++;
         unmet['cours'] = (unmet['cours'] ?? 0) + 1; // l'école publique est pleine : son enveloppe le verra
         return false;
       }
@@ -299,6 +313,7 @@ extension SimFormation on Sim {
     }
     final pr = quote('cours');
     if (!pr.isFinite) {
+      formationStats.stalledFull++;
       unmet['cours'] = (unmet['cours'] ?? 0) + 1;
       return false;
     }

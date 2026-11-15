@@ -169,6 +169,7 @@ class FormationTab extends StatelessWidget {
           KV('Dont reconversions', '${st.reconversions}'),
           KV('Durée moyenne des études', st.graduations > 0 ? years(st.studyDays / st.graduations) : '—'),
           KV('Jours d’études perdus faute de cours', '${st.stalledDays}', color: st.stalledDays > 0 ? pal.warn : null),
+          KV('Cours refusés (école pleine)', '${st.stalledFull}'),
           KV('Frais payés par les élèves', money0(st.tuitionStudents)),
           KV('Frais payés par l’État (cours au marché)', money0(st.tuitionState)),
           KV('Prêts étudiants accordés', money0(st.loans)),
