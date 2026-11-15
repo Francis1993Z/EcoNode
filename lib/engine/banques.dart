@@ -177,8 +177,18 @@ extension SimBanking on Sim {
     for (final l in List<PersonalLoan>.of(c.loans)) {
       if (day > l.start && (day - l.start) % 30 == 0) {
         final interest = quantize(l.balance * l.rate / 12);
-        final principal = quantize(math.min(l.balance, math.max(0.0, l.payment - interest)));
-        _due(c, interest, principal, l.bankId, loan: l);
+        if (day < l.graceUntil) {
+          // prêt étudiant en report (Params.formation) : les intérêts s'ajoutent au solde, aucune échéance
+          if (interest > 0) {
+            l.balance = quantize(l.balance + interest);
+            _capitalize(interest, l.bankId);
+          }
+        } else {
+          // fin du report : mensualité constante sur la durée des prêts personnels
+          if (l.payment <= 0) l.payment = quantize(l.balance / _annuity(l.rate / 12, l.months));
+          final principal = quantize(math.min(l.balance, math.max(0.0, l.payment - interest)));
+          _due(c, interest, principal, l.bankId, loan: l);
+        }
       }
       if (l.balance <= eps) c.loans.remove(l);
     }
@@ -200,7 +210,10 @@ extension SimBanking on Sim {
       c.lastLate = day;
     }
     // faillite personnelle
-    final debt = c.consumerDebt;
+    var debt = c.consumerDebt;
+    for (final l in c.loans) {
+      if (day < l.graceUntil) debt -= l.balance; // prêt étudiant en report : pas encore exigible
+    }
     if (debt > 0) {
       if (c.arrearsSince != null && day - c.arrearsSince! >= p.bkArrearsDays) {
         _bankrupt(c, 'paiements impossibles depuis ${day - c.arrearsSince!} jours');
