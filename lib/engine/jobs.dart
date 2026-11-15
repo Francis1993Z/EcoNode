@@ -126,7 +126,7 @@ extension SimJobs on Sim {
     if (f.lockWage) return offer;
     final flex = p.hireFlexBase +
         p.hireFlexMax * (0.6 * math.min(1.0, f.unfilledDays / 10) + 0.4 * math.min(1.0, f.urgency));
-    final over = c.skill - roles[f.type]![r].minSkill;
+    final over = skillFor(c, f.type) - roles[f.type]![r].minSkill;
     var cap = offer * (1 + p.hireRange) * (1 + flex) * (1 + 0.05 * math.min(3.0, math.max(0.0, over)));
     final v = va ?? valueAddedPerWorker(f);
     if (v != null) cap = math.min(cap, offer * v / math.max(eps, f.wage));
@@ -196,13 +196,14 @@ extension SimJobs on Sim {
         left[r]++;
       }
       final team = [for (final id in f.workers) _cmap[id]!];
-      stableSort<Citizen>(team, (a, b) => b.skill.compareTo(a.skill));
+      stableSort<Citizen>(team, (a, b) => skillFor(b, f.type).compareTo(skillFor(a, f.type)));
       for (final c in team) {
+        final sk = skillFor(c, f.type); // Params.formation : la qualification dans la filière de l'entreprise
         int pick(bool quota) {
           var best = -1;
           for (var i = 0; i < rs.length; i++) {
             if (quota && left[i] <= 0) continue;
-            if (c.skill + eps < rs[i].minSkill || tenure(c) < rs[i].minTenure) continue;
+            if (sk + eps < rs[i].minSkill || tenure(c) < rs[i].minTenure) continue;
             if (best < 0 || rs[i].minSkill > rs[best].minSkill ||
                 (rs[i].minSkill == rs[best].minSkill && roleRel(f.type, i) > roleRel(f.type, best))) {
               best = i;
@@ -230,12 +231,17 @@ extension SimJobs on Sim {
 
   /// Candidat admissible le moins surqualifié, hors [skip] (le premier dans l'ordre du jour, à égalité) ; avec [fits],
   /// seulement parmi ceux qui s'y présentent.
-  Citizen? _pickCandidate(List<Citizen> pool, double req, Set<int> skip, [bool Function(Citizen)? fits]) {
+  Citizen? _pickCandidate(List<Citizen> pool, double req, Set<int> skip, String type, [bool Function(Citizen)? fits]) {
     Citizen? best;
+    var bestSkill = 0.0;
     for (var i = pool.length - 1; i >= 0; i--) {
       final c = pool[i];
-      if (c.skill + eps < req || skip.contains(c.id)) continue;
-      if ((best == null || c.skill <= best.skill) && (fits == null || fits(c))) best = c;
+      final s = skillFor(c, type); // Params.formation : la qualification dans la filière de l'entreprise
+      if (s + eps < req || skip.contains(c.id)) continue;
+      if ((best == null || s <= bestSkill) && (fits == null || fits(c))) {
+        best = c;
+        bestSkill = s;
+      }
     }
     return best;
   }
@@ -250,8 +256,10 @@ extension SimJobs on Sim {
     for (final id in f.workers) {
       final c = _cmap[id]!;
       if (c.role < 0 || c.role == r || roleRel(f.type, c.role) >= rel - 1e-12) continue;
-      if (c.skill + eps < role.minSkill || tenure(c) < role.minTenure) continue;
-      if (best == null || tenure(c) > tenure(best) || (tenure(c) == tenure(best) && c.skill > best.skill)) best = c;
+      if (skillFor(c, f.type) + eps < role.minSkill || tenure(c) < role.minTenure) continue;
+      if (best == null || tenure(c) > tenure(best) || (tenure(c) == tenure(best) && skillFor(c, f.type) > skillFor(best, f.type))) {
+        best = c;
+      }
     }
     if (best == null) return false;
     final offer = roleOffer(f, r);
@@ -273,7 +281,7 @@ extension SimJobs on Sim {
     // candidature ciblée (N18) : seuls se présentent les chômeurs dont le salaire de réserve tient sous le plafond
     final fits = p.directedSearch ? (Citizen c) => reservationWage(c) <= wageCap(f, r, c, va) + 1e-9 : null;
     for (var k = 0; k < p.maxInterviews; k++) {
-      final c = _pickCandidate(unemployed, role.minSkill, refused, fits);
+      final c = _pickCandidate(unemployed, role.minSkill, refused, f.type, fits);
       if (c == null) return false;
       final res = reservationWage(c);
       final cap = wageCap(f, r, c, va);
@@ -309,7 +317,7 @@ extension SimJobs on Sim {
         if (raised) _syncWage(f);
       }
     }
-    final unemployed = _ordered(citizens.where((c) => c.employer == null), Flux.embauche, (c) => c.id);
+    final unemployed = _ordered(citizens.where(seeksJob), Flux.embauche, (c) => c.id);
     // 2. tension par classe : postes ouverts (rôles des prochains postes) ÷ chômeurs admissibles
     final open = [0, 0, 0];
     for (final f in firms) {
@@ -384,7 +392,7 @@ extension SimJobs on Sim {
         for (final b in posting) {
           if (identical(b, cur) || b.vacancies <= 0) continue;
           final r = nextRole(b, internalOf(b.type));
-          if (r < 0 || c.skill + eps < roles[b.type]![r].minSkill) continue;
+          if (r < 0 || skillFor(c, b.type) + eps < roles[b.type]![r].minSkill) continue;
           final offer = roleOffer(b, r);
           final cap = wageCap(b, r, c, vaOf(b));
           final w = bargain(rangeLow(b, r), res, cap, bargainPower(c, theta[roles[b.type]![r].level]));

@@ -415,6 +415,30 @@ void applyParam(Params p, String k, String v) {
       p.maxInterviews = int.parse(v);
     case 'directedSearch': // candidature ciblée : seuls se présentent les chômeurs que le plafond couvre (N18)
       p.directedSearch = b();
+    case 'formation': // formation par filières : diplômes de filière, études de 2 et 4 ans (formation.dart)
+      p.formation = b();
+    case 'eduTechDays':
+      p.eduTechDays = int.parse(v);
+    case 'eduProDays':
+      p.eduProDays = int.parse(v);
+    case 'eduStateShare':
+      p.eduStateShare = double.parse(v);
+    case 'eduCoursesPerYear':
+      p.eduCoursesPerYear = double.parse(v);
+    case 'eduNightFactor':
+      p.eduNightFactor = double.parse(v);
+    case 'eduLoanRate':
+      p.eduLoanRate = double.parse(v);
+    case 'eduLoanDays':
+      p.eduLoanDays = double.parse(v);
+    case 'eduGraceDays':
+      p.eduGraceDays = int.parse(v);
+    case 'eduHorizon':
+      p.eduHorizon = int.parse(v);
+    case 'eduIdleDays':
+      p.eduIdleDays = int.parse(v);
+    case 'eduWorkBelow':
+      p.eduWorkBelow = double.parse(v);
     case 'renoTrigger': // module renovation : état sous lequel un propriétaire rénove
       p.renoTrigger = double.parse(v);
     case 'renoShare': // module renovation : part des modules du neuf que coûte une remise à neuf

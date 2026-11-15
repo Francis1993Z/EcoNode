@@ -311,6 +311,49 @@ const Set<String> renovationTypes = {
   'scierie', 'briqueterie', 'tuyauterie', 'cablerie', 'fusibles', 'charpentier', 'electricien', 'plombier', 'entrepreneur',
 };
 
+// ------------------------------------------------------------------ filières (module « formation »)
+
+/// Filières de formation : un diplôme est lié à une filière et à un niveau (technicien, professionnel). Onze filières,
+/// regroupées par métier et non par secteur d'activité (primaire, secondaire, tertiaire) : un médecin (santé) n'est pas
+/// un ingénieur pétrolier (mines), un comptable (gestion) n'est pas un charpentier (bâtiment). Choix de jeu.
+const List<String> fieldKeys = [
+  'agri', 'mines', 'procedes', 'electro', 'fabrication', 'alim', 'accueil', 'sante', 'educ', 'gestion', 'bati',
+];
+const Map<String, String> fieldLabels = {
+  'agri': 'Agriculture, pêche et forêt',
+  'mines': 'Mines et pétrole',
+  'procedes': 'Procédés : chimie et métallurgie',
+  'electro': 'Électronique et informatique',
+  'fabrication': 'Mécanique et fabrication',
+  'alim': 'Alimentation',
+  'accueil': 'Accueil, tourisme et médias',
+  'sante': 'Santé',
+  'educ': 'Éducation',
+  'gestion': 'Gestion, finance et immobilier',
+  'bati': 'Bâtiment',
+};
+
+/// Filière de chaque type d'entreprise ([fieldOf]).
+const Map<String, String> typeField = {
+  'ferme': 'agri', 'peche': 'agri', 'bucheron': 'agri',
+  'puits': 'mines', 'mineFer': 'mines', 'mineOr': 'mines', 'mineBauxite': 'mines', 'mineCuivre': 'mines',
+  'ingPetrole': 'mines',
+  'raffinerie': 'procedes', 'petrochimie': 'procedes', 'fonderie': 'procedes', 'aluminerie': 'procedes',
+  'electronique': 'electro', 'cpu': 'electro', 'ordinateurs': 'electro', 'ingCpu': 'electro',
+  'garage': 'fabrication', 'machinerie': 'fabrication', 'bijouterie': 'fabrication',
+  'boucherie': 'alim', 'boulangerie': 'alim', 'restaurant': 'alim',
+  'hotel': 'accueil', 'tourisme': 'accueil', 'divertissement': 'accueil', 'tele': 'accueil',
+  'hopital': 'sante',
+  'ecole': 'educ',
+  'comptable': 'gestion', 'marketing': 'gestion', 'immobilier': 'gestion',
+  'construction': 'bati', 'scierie': 'bati', 'briqueterie': 'bati', 'tuyauterie': 'bati', 'cablerie': 'bati',
+  'fusibles': 'bati', 'charpentier': 'bati', 'electricien': 'bati', 'plombier': 'bati', 'entrepreneur': 'bati',
+};
+
+/// Rang de la filière d'un type d'entreprise dans [fieldKeys].
+int fieldOf(String type) => _fieldRank[typeField[type]!]!;
+final Map<String, int> _fieldRank = {for (var i = 0; i < fieldKeys.length; i++) fieldKeys[i]: i};
+
 // ------------------------------------------------------------------ rôles en entreprise (module « jobs »)
 
 /// Un rôle dans l'organigramme d'un type d'entreprise. Le salaire offert pour un rôle est le salaire affiché de
@@ -1127,6 +1170,26 @@ class Params {
   double taxRate2 = 0.20;
   double taxRate3 = 0.35;
   double taxRate4 = 0.50;
+  // Formation par filières (formation, 2026-11-14, MODELE.md § 6.23). Un diplôme est lié à une filière (fieldKeys) et à un
+  // niveau (1 technicien, 2 professionnel). Un poste de classe 1 ou 2 exige le diplôme de la filière de l'entreprise, au
+  // bon niveau ; un poste de manœuvre (classe 0) reste ouvert à tous. Les cours ne montent plus la qualification d'un
+  // cran tous les 50 cours : un programme dure eduTechDays (technicien) ou eduProDays (professionnel, eduProDays −
+  // eduTechDays si le citoyen est déjà technicien de la même filière). Un chômeur étudie à temps plein ; un employé suit
+  // des cours du soir (durée × eduNightFactor). L'État paie eduStateShare du prix des cours ; le citoyen emprunte (prêt
+  // étudiant à taux réduit, intérêts capitalisés jusqu'à eduGraceDays après la fin des études) et ne cherche un emploi
+  // que s'il n'a plus de quoi vivre. Coupé : qualification unique et cours à 0,02 (comportement historique).
+  bool formation = false;
+  int eduTechDays = 730; // 2 ans de formation à temps plein
+  int eduProDays = 1460; // 4 ans
+  double eduStateShare = 0.5; // part du prix d'un cours payée par l'État (politique : réglable de 0 à 1)
+  double eduCoursesPerYear = 100; // cours achetés par année d'études à temps plein
+  double eduNightFactor = 2; // durée des études d'un travailleur (cours du soir) ÷ celle d'un étudiant à temps plein
+  double eduLoanRate = 0.03; // taux annuel du prêt étudiant (intérêts reportés jusqu'à la fin des études)
+  double eduLoanDays = 1000; // plafond du prêt étudiant, en jours de besoins de survie
+  int eduGraceDays = 180; // jours de report après la fin des études
+  int eduHorizon = 3650; // horizon de rentabilité d'un diplôme (jours)
+  int eduIdleDays = 30; // jours de chômage avant de songer à se reconvertir
+  double eduWorkBelow = 5; // un étudiant sans emploi qui a moins de ce nombre de jours de besoins cherche un emploi
 }
 
 // ------------------------------------------------------------------ interrupteurs de configuration
@@ -1734,6 +1797,19 @@ class Citizen extends Account {
     }
     return d;
   }
+  // Formation (Params.formation) : niveau du diplôme par filière (0 aucun, 1 technicien, 2 professionnel ; vide : module
+  // jamais actif) ; talent = partie fractionnaire de la qualification (aptitude propre au citoyen, dans toutes les
+  // filières) ; programme en cours (filière, niveau, jours d'études à temps plein à faire et faits, cours dus, jour
+  // d'inscription, cherche-t-il un emploi pendant ses études).
+  List<int> degrees = const [];
+  double talent = 0;
+  int studyField = -1;
+  int studyLevel = 0;
+  double studyNeed = 0;
+  double studyDone = 0;
+  double studyCourses = 0;
+  int studyStart = 0;
+  bool studySeeksWork = false;
   Citizen(this.id, this.name, super.money, this.skill, this.ambition);
 
   /// 0 manœuvre, 1 technicien, 2 professionnel.
@@ -1772,16 +1848,23 @@ class Bank {
   Bank(this.id, this.name);
 }
 
+/// Raison d'un prêt étudiant (module « formation »).
+const String studentLoanReason = 'prêt étudiant';
+
 /// Prêt personnel à terme : mensualités constantes (amortissement), tous les 30 jours depuis l'octroi.
 class PersonalLoan {
   final int bankId;
   double balance;
   final double rate; // annuel
   final int months;
-  final double payment; // mensualité
+  double payment; // mensualité (0 : à fixer à la fin du report)
   final int start;
   final String reason;
-  PersonalLoan(this.bankId, this.balance, this.rate, this.months, this.payment, this.start, this.reason);
+  int graceUntil; // prêt étudiant : jusqu'à ce jour, aucune échéance, les intérêts s'ajoutent au solde (0 : aucun report)
+  PersonalLoan(this.bankId, this.balance, this.rate, this.months, this.payment, this.start, this.reason,
+      {this.graceUntil = 0});
+
+  bool get student => reason == studentLoanReason;
 }
 
 class StateAccount extends Account {

@@ -813,6 +813,13 @@ class _CitizenViewState extends State<_CitizenView> {
         KV('Revenu hier', money(c.income)),
         KV('Dépenses hier', money(c.spend)),
         KV('Qualification', '${classLabels[c.level]} (${fmtNum(c.skill, 2)})'),
+        if (sim.params.formation && c.degrees.isNotEmpty) ...[
+          for (var f = 0; f < c.degrees.length; f++)
+            if (c.degrees[f] > 0) KV('Diplôme', '${classLabels[c.degrees[f]]} · ${fieldLabels[fieldKeys[f]]}'),
+          if (c.studyField >= 0)
+            KV('Études', '${classLabels[c.studyLevel].toLowerCase()} · ${fieldLabels[fieldKeys[c.studyField]]} · '
+                '${pct(c.studyDone / c.studyNeed)}${c.employer != null ? ' (cours du soir)' : ''}'),
+        ],
         KV('Ambition (envie de se former)', pct(c.ambition)),
         if (sim.modules.entrepreneurship) ..._founderTraits(context, widget.ctrl, c),
         KV('Bonheur', pct(c.happiness)),

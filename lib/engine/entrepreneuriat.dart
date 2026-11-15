@@ -127,9 +127,13 @@ extension SimEntrepreneurship on Sim {
       if (!wantsToFound(c) || c.ambition < p.entMinAmbition) continue;
       final tol = riskTolerance(c);
       if (tol < p.entMinTolerance) continue;
-      avail ??= [
-        for (var s = 0; s < 3; s++) citizens.where((x) => x.employer == null && x.skill + eps >= s).length
-      ];
+      // Params.formation : par filière (rang fieldOf × 3 + seuil) ; sinon, les mêmes trois seuils pour toutes
+      avail ??= params.formation
+          ? [
+              for (var f = 0; f < fieldKeys.length; f++)
+                for (var s = 0; s < 3; s++) citizens.where((x) => seeksJob(x) && skillIn(x, f) + eps >= s).length
+            ]
+          : [for (var s = 0; s < 3; s++) citizens.where((x) => x.employer == null && x.skill + eps >= s).length];
       _entFunnel('projet');
       final best = _bestProject(c, tol, buffer, avail);
       if (best == null) continue;
@@ -163,11 +167,13 @@ extension SimEntrepreneurship on Sim {
       if (p.revival) want = math.max(want, revivalWant(g)); // bien sans producteur actif : signal de renaissance
       final perWorker0 = t.rate * t.outputs[g]!;
       if (want < p.entryMinShare * perWorker0) continue; // pas de signal : pas de projet
-      if (c.skill + eps < t.skill) continue; // il travaillera dans son entreprise
+      final sk = skillFor(c, ty);
+      if (sk + eps < t.skill) continue; // il travaillera dans son entreprise
       final w = want / t.outputs[g]! / t.rate; // employés nécessaires à productivité nominale
       final team = w.ceil().clamp(1, 3).toInt();
       final batches = projectBatches(ty, want, team); // module renovation : au plus ce que l'équipe produit
-      if (avail[t.skill] - (c.employer == null && c.skill + eps >= t.skill ? 1 : 0) < team - 1) continue; // pas assez de chômeurs
+      final av = avail[params.formation ? fieldOf(ty) * 3 + t.skill : t.skill];
+      if (av - (seeksJob(c) && sk + eps >= t.skill ? 1 : 0) < team - 1) continue; // pas assez de chômeurs
       final wage = modules.jobs ? marketOffer(t.skill) * avgRoleRel(ty) : marketWage(t.skill);
       var inputCost = 0.0;
       for (final e in t.inputs.entries) {

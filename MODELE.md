@@ -435,6 +435,13 @@ pour que la dynamique observée soit celle des règles et non un artefact de dé
 | `adsShare`, `adsEffect` | 0,03, 0,6 | budget publicitaire ; hausse maximale de la dépense des ménages | choix de jeu |
 | `illness` | 0,004/j | chance de tomber malade | choix de jeu |
 | `eduRate`, `learnRate` | 0,25, 0,02 | chance de suivre un cours (× ambition) ; qualification gagnée par cours | choix de jeu |
+| `formation` | non (oui dans l'interface) | formation par filières (§ 6.23) | demande de Francis, 14 novembre 2026 |
+| `eduTechDays`, `eduProDays` | 730, 1 460 j | durée à temps plein d'une formation de technicien, de professionnel | demande de Francis : 2 et 4 ans |
+| `eduNightFactor` | 2 | durée des cours du soir d'un employé ÷ temps plein | choix de jeu |
+| `eduStateShare` | 0,5 | part du prix des cours payée par l'État (politique) | demande de Francis |
+| `eduCoursesPerYear` | 100 | cours par année d'études à temps plein | choix de jeu (≈ 2 500 $ par an au prix indicatif) |
+| `eduLoanRate`, `eduLoanDays`, `eduGraceDays` | 3 %/an, 1 000 j de besoins, 180 j | prêt étudiant : taux, plafond, report après le diplôme | demande de Francis (taux réduit, reporté) ; valeurs : choix de jeu |
+| `eduHorizon`, `eduIdleDays`, `eduWorkBelow` | 3 650 j, 30 j, 5 j de besoins | horizon de rentabilité d'un diplôme ; chômage avant une reconversion ; seuil où l'étudiant cherche un emploi | choix de jeu |
 | `computerLife` | 365 j | durée d'un ordinateur | choix de jeu |
 | `dividendFromRetained` | non | I1 : plafond = bénéfice lissé (non) ou bénéfices non répartis (oui) | lecture de la LCSA, art. 42 b ; variante mesurée au journal |
 | `publicCashDays` | 10 | I2 : trésorerie visée d'un établissement public, en jours de coût | règle d'embauche (8 jours) + 2 jours de marge |
@@ -893,6 +900,9 @@ qualification (pas de vieillissement, de retraite ni de relève), si bien qu'à 
 la qualification moyenne passe de 0,84 à 2,68 et les professionnels de 9 à 85 % de la population en 1 500 jours. Les
 goûts suivant la classe (§ 6.6), la consommation bascule des sorties (45 % des emplois au jour 100) vers les voyages
 (40 % au jour 1 500), avec une bosse de chômage (12 à 15 %) pendant la bascule.
+
+Avec la formation par filières (`Params.formation`, § 6.23), ces cours ne servent plus : la qualification se gagne par
+diplôme, au bout de 2 ou 4 ans d'études, dans une filière.
 
 ### 6.9 Ordinateurs (`sim.dart:_computer`)
 
@@ -1462,6 +1472,80 @@ Les relances meurent de faillite, faute de ventes. 150 relances sur 174 viennent
   de la règle disparaissent (jours-alerte critiques +9,5 avec filets).
 - Les deux ensemble ne font pas mieux que la demande au plan seule.
 
+### 6.23 Formation par filières (`Params.formation`, `formation.dart`)
+
+Demande de Francis (14 novembre 2026) : « c'est trop facile de s'éduquer ». Coupée dans le moteur (la référence ne
+change pas), active dans l'interface (onglet Formation). Mesures et choix : [`rapports/formation.md`](rapports/formation.md).
+
+**Avant** (§ 6.8, réglages de l'interface, 10 graines) : la première année, 0,75 montée de classe par habitant ; les
+professionnels passent de 7 % des employés au départ à 80 % la 4e année ; un citoyen change de filière d'emploi 1,3 à 2 fois par
+an et 42 à 45 % des employés travaillent hors de la filière de leur premier emploi.
+
+- **Filières** (`model.dart:fieldKeys`, `typeField`) : onze, regroupées par métier plutôt que par secteur : agriculture,
+  pêche et forêt ; mines et pétrole (ingénierie pétrolière comprise) ; procédés (raffinage, pétrochimie, fonderie,
+  aluminerie) ; électronique et informatique (ingénierie de CPU comprise) ; mécanique et fabrication (garage,
+  machinerie, bijouterie) ; alimentation (boucherie, boulangerie, restaurant) ; accueil, tourisme et médias ; santé ;
+  éducation ; gestion, finance et immobilier ; bâtiment (construction, matériaux, métiers, entrepreneur général).
+  Choix de Francis parmi trois granularités (une par type d'entreprise, onze, trois secteurs).
+- **Diplôme et qualification.** Un citoyen a un niveau de diplôme par filière (`Citizen.degrees` : 0, 1 technicien,
+  2 professionnel) et un talent (`talent`, la partie fractionnaire de sa qualification de départ). Sa qualification
+  dans une filière = diplôme + talent ; elle remplace la qualification unique dans l'embauche (les deux marchés du
+  travail), les promotions, la mobilité, le plafond de l'employeur, le rendement, l'entrepreneuriat et la création
+  d'entreprises. Sans le diplôme d'une filière, il n'y tient que les postes de manœuvre (rôles sous 1 : le salaire de
+  la classe 0) : un médecin ne devient pas ingénieur pétrolier, un comptable pas charpentier. Sa classe (goûts,
+  ordinateur, crédit) suit son meilleur diplôme.
+- **Départ.** Au premier matin où le paramètre est actif, chaque technicien ou professionnel reçoit le diplôme de son
+  niveau dans la filière de son employeur : chacun garde les postes à sa portée et l'économie de départ est la même
+  qu'avec le module coupé. Un sans-emploi qualifié reçoit le sien dans une filière tirée au sort, au prorata de la
+  pénurie + 0,3 + 0,05 × diplômés du niveau ; un nouvel arrivant (god mode) de même, au matin suivant. Il n'y a pas
+  encore de naissances : quand le cycle de vie viendra, un jeune choisira sa filière par la même règle d'inscription.
+- **Débouchés** (`_formationMorning`, chaque matin) : postes vacants par filière et par niveau (rôle du prochain poste ;
+  les postes d'encadrement, pourvus par promotion, ne comptent pas), lissés sur 30 jours ; disponibles = diplômés du
+  niveau ou au-dessus qui cherchent un emploi + étudiants inscrits ; pénurie = max(0 ; vacants − disponibles).
+- **Inscription** (`_maybeEnrol`, pendant la consommation). Le citoyen y songe avec la chance ambition × `eduRate` ; un
+  chômeur, seulement après `eduIdleDays` (30) jours sans emploi. Il retient les programmes (filière, niveau) en pénurie
+  dont l'offre moyenne de la classe dépasse sa paie actuelle (salaire, ou prestation), et dont le gain sur `eduHorizon`
+  (10 ans) moins la durée des études couvre sa part des cours et, pour un chômeur, les prestations perdues. Il en tire
+  un au sort, au prorata de pénurie × gain ; sa place réduit aussitôt la pénurie vue par les suivants du jour.
+- **Durées.** À temps plein : `eduTechDays` = 730 jours (2 ans, 1 an = 365 jours), `eduProDays` = 1 460 (4 ans) ;
+  professionnel pour un technicien de la même filière : la différence (730). Un chômeur étudie à temps plein ; un
+  employé suit des cours du soir : chaque jour compte pour 1 ÷ `eduNightFactor` (2), soit 4 et 8 ans. Changer de
+  filière, c'est refaire toute la formation de la nouvelle. Choix de Francis : « les deux, selon sa situation ».
+- **Cours.** `eduCoursesPerYear` (100) cours par année d'études à temps plein, un toutes les 3,65 journées d'études. À
+  l'école publique (I2), le cours est pris dans sa production gratuite et l'élève verse à l'État 1 − `eduStateShare`
+  du prix de référence : le coût d'un cours à pleine cadence, salaire moyen de l'école ÷ 12 cours par employé et par
+  jour (le prix affiché d'une école publique est celui du plan de départ, figé : une école dimensionnée pour peu
+  d'élèves y paraissait à 540 $ le cours). Au marché, l'élève l'achète et l'État lui rembourse `eduStateShare` (50 %,
+  une politique réglable), au-dessus du plancher du trésor. L'école produit selon la demande de la veille : l'élève
+  prend au plus deux cours par jour et les études continuent tant qu'il a moins de 3 cours de retard ; au-delà (école
+  pleine, argent), elles n'avancent pas ce jour-là. Chaque cours refusé compte dans la demande non servie (l'enveloppe
+  de l'école la voit).
+- **Vivre pendant les études** (choix de Francis : prêts étudiants à intérêt réduit, reportés à la fin des études ;
+  travail à temps partiel ou non selon l'épargne et les prêts). Un étudiant sans emploi n'est pas sur le marché du
+  travail (hors du chômage et de la population active, sans assurance-emploi ni aide sociale). Sous 10 jours de
+  besoins, il emprunte 30 jours de besoins (prêt étudiant `PersonalLoan.graceUntil`, taux `eduLoanRate` = 3 %,
+  plafond `eduLoanDays` = 1 000 jours de besoins, sans la cote de crédit ; règle prudentielle I4 comprise) : aucune
+  échéance pendant les études, les intérêts s'ajoutent au solde jusqu'à `eduGraceDays` (180) jours après le diplôme,
+  puis mensualités constantes sur `loanTermMonths`. Un prêt en report ne compte pas dans le test de faillite. Sous
+  `eduWorkBelow` (5) jours de besoins (prêt refusé ou plafonné), il cherche un emploi (et redevient chômeur, avec
+  prestations) ; embauché, il continue en cours du soir. Le temps partiel du modèle est un emploi à plein temps et des
+  études à mi-temps : l'emploi reste une tête entière (simplification).
+- **Diplôme** (`_graduate`) : le niveau est inscrit, la qualification générale suit, le report des prêts court jusqu'à
+  180 jours plus tard.
+- **God mode** : la formation accélérée donne un niveau de plus dans la filière de l'employeur (sinon la meilleure).
+- **Activation en cours de partie** : les diplômes de départ au matin suivant ; coupure : chacun retrouve sa
+  qualification générale (meilleur diplôme + talent), les études en cours restent figées.
+- **Aucun argent n'est créé** hors du crédit : cours, quote-part, remboursements de l'État passent par `transfer()` ;
+  le prêt étudiant crée des dépôts comme tout prêt personnel ; les invariants tiennent (test `formation_test.dart`).
+
+**Mesure** (10 graines appariées × 3 000 jours, réglages de l'interface, module coupé puis actif) : chômage des jours
+1 001-3 000 de 8,2 à 9,6 % à 240 citoyens (non concluant, 3 graines sur 10 plus bas), de 8,0 à 4,6 % à 1 000 (10 sur 10)
+et de 7,2 à 4,8 % à 2 500 (8 sur 10) ; moins d'années de crise à 1 000 et 2 500. Les montées de classe tombent de 0,18 à
+0,002-0,007 par habitant et par an ; la répartition des employés reste proche du départ (≈ 2/3 de manœuvres, 7-11 % de
+professionnels au lieu de 91 %). Aucune filière ne manque durablement de diplômés. 1 à 2 % de la population étudie
+(4,8 % à 240), presque toujours en cours du soir ; un diplôme prend 4 à 4,5 ans de calendrier. Créations d'entreprises
+−23,5 à 2 500 (10 sur 10) : un fondateur doit trouver des chômeurs diplômés de sa filière.
+
 ---
 
 ## 7. Vérification
@@ -1478,6 +1562,9 @@ Les relances meurent de faillite, faute de ventes. 150 relances sur 174 viennent
     maisons, rachat d'un immeuble saisi, chantier d'un immeuble, locataires rattachés, instantanés) ;
   - `emplois_test.dart` : module rôles et négociation (organigrammes, contrats cohérents chaque jour, bornes de la
     négociation, renouvellements, salaire minimum, activation en cours de partie, instantanés).
+  - `formation_test.dart` : formation par filières (coupée par défaut, diplômes de départ, postes qualifiés tenus par des
+    diplômés de la filière chaque jour, étudiants hors du marché du travail, activation en cours de partie, instantanés
+    avec études en cours et prêts en report).
 - **Protocole** (`tool/stabilite.dart`) : 30 graines × 1 500 jours, sans puis avec filets, chocs standard, comparaisons
   appariées avec intervalles bootstrap.
 - **Parité** (`tool/parite.dart`) : empreinte identique sur la VM et en JavaScript.

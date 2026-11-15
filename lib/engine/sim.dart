@@ -19,6 +19,7 @@ part 'produits.dart';
 part 'banques.dart';
 part 'douane.dart';
 part 'renaissance.dart';
+part 'formation.dart';
 
 /// mulberry32 (arithmétique 32 bits non signée) : même graine, même partie.
 class Mulberry32 {
@@ -647,6 +648,13 @@ class Sim {
   /// Crédit et banques (module banking) : les banques (vide : la Caisse seule), totaux des prêts aux particuliers, pertes
   /// lissées, et caches du jour (dette pondérée au début de la consommation, crédit accordé depuis).
   bool bankingActive = false;
+  /// Formation par filières (Params.formation, formation.dart) : diplômes de départ attribués (au premier matin où le
+  /// paramètre est actif), postes vacants lissés, diplômés disponibles et pénurie par filière et niveau, compteurs.
+  bool formationReady = false;
+  List<List<double>> fieldVacancies = const [];
+  List<List<double>> fieldSupply = const [];
+  List<List<double>> fieldShortage = const [];
+  FormationStats formationStats = FormationStats();
   /// Rénovation et métiers du bâtiment (module renovation) : actif pour toute la partie si le module (et celui des
   /// bâtiments) l'est au départ ; ses entreprises naissent avec le scénario. Biens et types d'entreprises en jeu : sans
   /// le module, ses biens et ses types n'existent pas pour le moteur (ni prix, ni statistiques, ni création), et les
@@ -846,6 +854,11 @@ class Sim {
     poorEma.clear();
     usedNames.clear();
     bankingActive = false;
+    formationReady = false;
+    fieldVacancies = const [];
+    fieldSupply = const [];
+    fieldShortage = const [];
+    formationStats = FormationStats();
     banks.clear();
     consumerLent = 0;
     consumerWrittenOff = 0;
@@ -1600,12 +1613,17 @@ class Sim {
   }
 
   /// Candidat admissible le moins surqualifié (garde les plus qualifiés pour les postes qui les exigent).
-  Citizen? _pickWorker(List<Citizen> pool, int req) {
+  Citizen? _pickWorker(List<Citizen> pool, int req, String type) {
     Citizen? best;
+    var bestSkill = 0.0;
     for (var i = pool.length - 1; i >= 0; i--) {
       final c = pool[i];
-      if (c.skill + eps < req) continue;
-      if (best == null || c.skill < best.skill) best = c;
+      final s = skillFor(c, type); // Params.formation : la qualification dans la filière de l'entreprise
+      if (s + eps < req) continue;
+      if (best == null || s < bestSkill) {
+        best = c;
+        bestSkill = s;
+      }
     }
     return best;
   }
@@ -1628,7 +1646,7 @@ class Sim {
     if (f != null) {
       // module jobs : la surqualification se mesure par rapport au rôle tenu
       final req = modules.jobs && c.role >= 0 ? roles[f.type]![c.role].minSkill : f.template.skill.toDouble();
-      e *= 1 + 0.05 * math.min(3.0, math.max(0.0, c.skill - req));
+      e *= 1 + 0.05 * math.min(3.0, math.max(0.0, skillFor(c, f.type) - req));
     }
     return e;
   }
@@ -2014,6 +2032,7 @@ class Sim {
     if (params.sellerSample > 0 || _availValid) _rebuildAvail(); // liste des vendeurs : reconstruite chaque matin
     if (modules.buildings) _buildingsMorning();
     if (p.leases || _tenants.isNotEmpty) _leaseMorning();
+    if (p.formation) _formationMorning(); // diplômes des nouveaux, débouchés par filière (formation.dart)
     _laborMarket();
     if (modules.entrepreneurship) _learnSectors();
     if (productsActive) _productsDay();
@@ -2069,12 +2088,12 @@ class Sim {
 
   /// Marché du travail sans le module jobs : un salaire unique affiché par entreprise.
   void _postedWageMarket() {
-    final unemployed = _ordered(citizens.where((c) => c.employer == null), Flux.embauche, (c) => c.id);
+    final unemployed = _ordered(citizens.where(seeksJob), Flux.embauche, (c) => c.id);
     final hiring = firms.where((f) => f.vacancies > 0).toList();
     stableSort<Firm>(hiring, (a, b) => b.wage.compareTo(a.wage));
     for (final f in hiring) {
       while (f.vacancies > 0) {
-        final c = _pickWorker(unemployed, f.template.skill);
+        final c = _pickWorker(unemployed, f.template.skill, f.type);
         if (c == null) break;
         unemployed.remove(c);
         _hire(f, c, 'marché du travail : candidat admissible le moins surqualifié');
@@ -2090,7 +2109,7 @@ class Sim {
         final cur = firm(c.employer!);
         Firm? best;
         for (final b in open) {
-          if (b.vacancies <= 0 || c.skill + eps < b.template.skill) continue;
+          if (b.vacancies <= 0 || skillFor(c, b.type) + eps < b.template.skill) continue;
           if (best == null || b.wage > best.wage) best = b;
         }
         if (cur != null && best != null && !identical(best, cur) && best.wage > cur.wage * 1.08 && cur.founderId != c.id) {
@@ -2103,11 +2122,12 @@ class Sim {
 
   /// Jours de chômage et prestations, après le marché du travail.
   void _jobDays() {
+    // Params.formation : un étudiant à temps plein n'est ni au chômage ni aux prestations
     for (final c in citizens) {
-      if (c.employer == null) c.daysUnemployed++;
+      if (seeksJob(c)) c.daysUnemployed++;
     }
     // assurance-emploi payée par l'État, au prorata si la caisse est vide
-    final idle = citizens.where((c) => c.employer == null).toList();
+    final idle = citizens.where(seeksJob).toList();
     state.benefitCut = 1;
     if (modules.insurance) {
       _insurance(idle);
@@ -2263,6 +2283,9 @@ class Sim {
 
   /// Variante A2 : part minimale du temps de travail (un jour par semaine).
   static const double minHours = 0.2;
+
+  /// Report d'un prêt étudiant tant que durent les études (formation.dart).
+  static const int studying = 1 << 30;
 
   /// Part du temps payée aujourd'hui : 1, sauf dans la variante A2 (temps partiel), où l'équipe n'est payée que pour
   /// la part de sa capacité du jour qu'elle a produite.
@@ -2617,7 +2640,7 @@ class Sim {
           rest.add(id);
           continue;
         }
-        c.skill = math.min(3.0, c.skill + params.learnRate);
+        if (!params.formation) c.skill = math.min(3.0, c.skill + params.learnRate); // formation.dart : diplômes
         _served(st, day - c.schoolSince!);
         c.schoolSince = null;
       }
@@ -2822,7 +2845,13 @@ class Sim {
       // 3. se soigner, s'équiper, se former
       _health(c, floor);
       _computer(c);
-      if (modules.education) _study(c, floor);
+      if (modules.education) {
+        if (p.formation && formationReady) {
+          _studyFormation(c, floor); // études par filière (formation.dart)
+        } else {
+          _study(c, floor);
+        }
+      }
       // 4. se faire plaisir avec une part de l'épargne au-delà du coussin
       _leisure(c);
       c.spend = before - c.money;
@@ -3644,7 +3673,7 @@ class Sim {
       inputCost += batches * e.value * bestPrice(e.key);
     }
     // une entreprise nouvelle embauche des chômeurs ; au plein emploi, elle ne ferait que débaucher ses voisines
-    final available = citizens.where((c) => c.employer == null && c.skill + eps >= t.skill).length;
+    final available = citizens.where((c) => seeksJob(c) && skillFor(c, ty) + eps >= t.skill).length;
     if (available < team) return 'main_oeuvre';
     // viabilité : au prix que le marché paie (borné au double du prix mondial), les ventes attendues doivent couvrir
     // l'équipe et ses intrants ; un marché trop petit pour un employé reste sans producteur
@@ -3778,7 +3807,9 @@ class Sim {
   void _decide() {
     final p = params;
     final n = citizens.length;
-    final unemp = n > 0 ? citizens.where((c) => c.employer == null).length / n : 0.0;
+    // Params.formation : les étudiants à temps plein sont hors de la population active
+    final active = p.formation ? n - citizens.where(studiesFullTime).length : n;
+    final unemp = active > 0 ? citizens.where(seeksJob).length / active : 0.0;
 
     // répartir la demande non servie entre les producteurs du bien
     for (final e in unmet.entries) {
@@ -4172,13 +4203,14 @@ class Sim {
   void _record() {
     final n = citizens.length;
     var mH = 0.0, mF = 0.0, wsum = 0.0, happy = 0.0;
-    var employed = 0;
+    var employed = 0, students = 0;
     final sat = <String, double>{for (final d in desires) d: 0.0};
     final classes = [0, 0, 0];
     for (final c in citizens) {
       mH += c.money;
       happy += c.happiness;
       classes[c.level]++;
+      if (studiesFullTime(c)) students++;
       for (final d in desires) {
         sat[d] = sat[d]! + c.sat[d]!;
       }
@@ -4231,7 +4263,7 @@ class Sim {
       mE: state.money,
       mB: bank.money,
       total: mH + mF + state.money + bank.money,
-      unemp: n > 0 ? (n - employed) / n : 0.0,
+      unemp: n - students > 0 ? (n - employed - students) / (n - students) : 0.0, // étudiants hors population active
       wage: employed > 0 ? wsum / employed : 0.0,
       prices: prices,
       gdp: householdSpend,
@@ -4351,8 +4383,13 @@ class Sim {
   /// Formation accélérée : le citoyen passe à la classe suivante.
   void godTrain(int citizenId) {
     final c = citizen(citizenId);
-    if (c == null || c.skill >= 3) return;
-    c.skill = math.min(3.0, c.skill.floorToDouble() + 1);
+    if (c == null) return;
+    if (params.formation) {
+      _godDiploma(c); // un niveau de diplôme de plus dans sa filière
+    } else {
+      if (c.skill >= 3) return;
+      c.skill = math.min(3.0, c.skill.floorToDouble() + 1);
+    }
     _log('god', '${c.name} devient ${classLabels[c.level].toLowerCase()}.');
   }
 

@@ -240,6 +240,18 @@ Map<String, Object?> _entParamsJson(Params p) {
     if (p.revivalHours != d.revivalHours) 'revivalHours': p.revivalHours,
     if (p.revivalFullCost != d.revivalFullCost) 'revivalFullCost': p.revivalFullCost,
     if (p.revivalPlannedDemand != d.revivalPlannedDemand) 'revivalPlannedDemand': p.revivalPlannedDemand,
+    if (p.formation != d.formation) 'formation': p.formation,
+    if (p.eduTechDays != d.eduTechDays) 'eduTechDays': p.eduTechDays,
+    if (p.eduProDays != d.eduProDays) 'eduProDays': p.eduProDays,
+    if (p.eduStateShare != d.eduStateShare) 'eduStateShare': _d(p.eduStateShare),
+    if (p.eduCoursesPerYear != d.eduCoursesPerYear) 'eduCoursesPerYear': _d(p.eduCoursesPerYear),
+    if (p.eduNightFactor != d.eduNightFactor) 'eduNightFactor': _d(p.eduNightFactor),
+    if (p.eduLoanRate != d.eduLoanRate) 'eduLoanRate': _d(p.eduLoanRate),
+    if (p.eduLoanDays != d.eduLoanDays) 'eduLoanDays': _d(p.eduLoanDays),
+    if (p.eduGraceDays != d.eduGraceDays) 'eduGraceDays': p.eduGraceDays,
+    if (p.eduHorizon != d.eduHorizon) 'eduHorizon': p.eduHorizon,
+    if (p.eduIdleDays != d.eduIdleDays) 'eduIdleDays': p.eduIdleDays,
+    if (p.eduWorkBelow != d.eduWorkBelow) 'eduWorkBelow': _d(p.eduWorkBelow),
   };
 }
 
@@ -436,7 +448,19 @@ Params _paramsFrom(Map j) => Params()
   ..taxRate1 = _rdOr(j['taxRate1'], 0.10)
   ..taxRate2 = _rdOr(j['taxRate2'], 0.20)
   ..taxRate3 = _rdOr(j['taxRate3'], 0.35)
-  ..taxRate4 = _rdOr(j['taxRate4'], 0.50);
+  ..taxRate4 = _rdOr(j['taxRate4'], 0.50)
+  ..formation = (j['formation'] as bool?) ?? false
+  ..eduTechDays = (j['eduTechDays'] as num?)?.toInt() ?? 730
+  ..eduProDays = (j['eduProDays'] as num?)?.toInt() ?? 1460
+  ..eduStateShare = _rdOr(j['eduStateShare'], 0.5)
+  ..eduCoursesPerYear = _rdOr(j['eduCoursesPerYear'], 100)
+  ..eduNightFactor = _rdOr(j['eduNightFactor'], 2)
+  ..eduLoanRate = _rdOr(j['eduLoanRate'], 0.03)
+  ..eduLoanDays = _rdOr(j['eduLoanDays'], 1000)
+  ..eduGraceDays = (j['eduGraceDays'] as num?)?.toInt() ?? 180
+  ..eduHorizon = (j['eduHorizon'] as num?)?.toInt() ?? 3650
+  ..eduIdleDays = (j['eduIdleDays'] as num?)?.toInt() ?? 30
+  ..eduWorkBelow = _rdOr(j['eduWorkBelow'], 5);
 
 List<Object?> _bankObjJson(Bank b) => [
       b.id, b.name, b.ownerId, _d(b.equity), _d(b.capital), _d(b.interbank), _d(b.loanSpread), _d(b.cardSpread),
@@ -480,7 +504,8 @@ bool _hasCredit(Citizen c) =>
 
 Map<String, Object?> _creditJson(Citizen c) => {
       'loans': [
-        for (final l in c.loans) [l.bankId, _d(l.balance), _d(l.rate), l.months, _d(l.payment), l.start, l.reason]
+        for (final l in c.loans)
+          [l.bankId, _d(l.balance), _d(l.rate), l.months, _d(l.payment), l.start, l.reason, if (l.graceUntil != 0) l.graceUntil]
       ],
       'card': _d(c.card),
       'cardLimit': _d(c.cardLimit),
@@ -499,7 +524,8 @@ Map<String, Object?> _creditJson(Citizen c) => {
 void _creditFrom(Citizen c, Map j) {
   for (final l in j['loans'] as List) {
     final x = l as List;
-    c.loans.add(PersonalLoan(x[0] as int, _rd(x[1]), _rd(x[2]), x[3] as int, _rd(x[4]), x[5] as int, x[6] as String));
+    c.loans.add(PersonalLoan(x[0] as int, _rd(x[1]), _rd(x[2]), x[3] as int, _rd(x[4]), x[5] as int, x[6] as String,
+        graceUntil: x.length > 7 ? x[7] as int : 0));
   }
   c
     ..card = _rd(j['card'])
@@ -588,6 +614,12 @@ Map<String, Object?> _citizenJson(Citizen c) => {
         'known': {for (final e in c.known.entries) e.key: {for (final k in e.value.entries) '${k.key}': k.value}},
       if (c.lastChoice.isNotEmpty) 'lastChoice': c.lastChoice,
       if (_hasCredit(c)) 'credit': _creditJson(c),
+      // Params.formation : diplômes, talent et programme en cours
+      if (c.degrees.isNotEmpty) 'degrees': c.degrees,
+      if (c.degrees.isNotEmpty) 'talent': _d(c.talent),
+      if (c.studyField >= 0)
+        'study': [c.studyField, c.studyLevel, _d(c.studyNeed), _d(c.studyDone), _d(c.studyCourses), c.studyStart,
+          c.studySeeksWork],
     };
 
 Citizen _citizenFrom(Map j) {
@@ -627,6 +659,21 @@ Citizen _citizenFrom(Map j) {
   }
   if (j['lastChoice'] != null) c.lastChoice.addAll(_rim(j['lastChoice']));
   if (j['credit'] != null) _creditFrom(c, j['credit'] as Map);
+  if (j['degrees'] != null) {
+    c.degrees = [for (final x in j['degrees'] as List) x as int];
+    c.talent = _rdOr(j['talent'], 0);
+  }
+  final st = j['study'] as List?;
+  if (st != null) {
+    c
+      ..studyField = st[0] as int
+      ..studyLevel = st[1] as int
+      ..studyNeed = _rd(st[2])
+      ..studyDone = _rd(st[3])
+      ..studyCourses = _rd(st[4])
+      ..studyStart = st[5] as int
+      ..studySeeksWork = st[6] as bool;
+  }
   return c;
 }
 
@@ -1055,6 +1102,8 @@ extension SimSnapshot on Sim {
         if (products.isNotEmpty) 'products': [for (final p in products.values) _productJson(p)],
         if (poorEma.isNotEmpty) 'poorEma': _dm(poorEma),
         if (bankingActive) 'bankingActive': true,
+        if (formationReady) 'formationReady': true,
+        if (formationReady) 'fieldVacancies': [for (final r in fieldVacancies) [for (final x in r) _d(x)]],
         if (banks.isNotEmpty) 'banks': [for (final b in banks) _bankObjJson(b)],
         if (stateBank != 0) 'stateBank': stateBank,
         if (bankCountHist.isNotEmpty) 'bankCountHist': bankCountHist,
@@ -1218,6 +1267,13 @@ extension SimSnapshot on Sim {
       ..addAll({for (final e in ((j['foundedByYear'] as Map?) ?? const {}).entries) int.parse(e.key as String): e.value as int});
     productsActive = (j['productsActive'] as bool?) ?? false;
     bankingActive = (j['bankingActive'] as bool?) ?? false;
+    formationReady = (j['formationReady'] as bool?) ?? false;
+    final fv = j['fieldVacancies'] as List?;
+    fieldVacancies = fv == null ? const [] : [for (final r in fv) [for (final x in r as List) _rd(x)]];
+    final nf = fieldKeys.length;
+    fieldSupply = formationReady ? [for (var i = 0; i < nf; i++) List<double>.filled(3, 0)] : const [];
+    fieldShortage = formationReady ? [for (var i = 0; i < nf; i++) List<double>.filled(3, 0)] : const [];
+    formationStats = FormationStats();
     banks
       ..clear()
       ..addAll([for (final l in (j['banks'] as List?) ?? const []) _bankObjFrom(l as List)]);
