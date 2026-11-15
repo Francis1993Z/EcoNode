@@ -11,6 +11,7 @@ import 'format.dart';
 import 'god_tab.dart';
 import 'tax_tab.dart';
 import 'graph.dart';
+import 'education_view.dart';
 import 'entreprises_tab.dart';
 import 'formation_tab.dart';
 import 'housing.dart';
@@ -200,7 +201,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 final panelW = (w * 0.38).clamp(300.0, 460.0).toDouble();
                 final kb = MediaQuery.of(context).viewInsets.bottom;
                 return Row(children: [
-                  Expanded(child: ctrl.citizenView ? CitizenExplorer(ctrl) : GraphView(ctrl: ctrl)),
+                  Expanded(
+                      child: switch (ctrl.mainView) {
+                    MainView.citizens => CitizenExplorer(ctrl),
+                    MainView.education => EducationView(ctrl),
+                    MainView.graph => GraphView(ctrl: ctrl),
+                  }),
                   if (ctrl.panelOpen) ...[
                     VerticalDivider(width: 1, color: pal.rule),
                     SizedBox(
@@ -297,6 +303,11 @@ class TopBar extends StatelessWidget {
               tooltip: ctrl.citizenView ? 'Revenir au graphe des entreprises' : 'Explorateur de citoyens',
               onPressed: ctrl.toggleCitizenView,
               icon: Icon(ctrl.citizenView ? Icons.account_tree_outlined : Icons.groups_outlined),
+            ),
+            IconButton(
+              tooltip: ctrl.educationView ? 'Revenir au graphe des entreprises' : 'Éducation des citoyens (tableau)',
+              onPressed: ctrl.toggleEducationView,
+              icon: Icon(ctrl.educationView ? Icons.account_tree_outlined : Icons.school_outlined),
             ),
             IconButton(
               tooltip: ctrl.panelOpen ? 'Masquer le panneau' : 'Afficher le panneau',

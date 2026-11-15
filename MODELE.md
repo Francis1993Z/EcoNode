@@ -1533,6 +1533,10 @@ an et 42 à 45 % des employés travaillent hors de la filière de leur premier e
 - **Diplôme** (`_graduate`) : le niveau est inscrit, la qualification générale suit, le report des prêts court jusqu'à
   180 jours plus tard.
 - **God mode** : la formation accélérée donne un niveau de plus dans la filière de l'employeur (sinon la meilleure).
+- **Interface** : onglet Formation (réglages, diplômés et étudiants par filière) et vue « Éducation des citoyens »
+  (bouton chapeau de la barre du haut, `lib/ui/education_view.dart`) : une ligne par citoyen (emploi, meilleur diplôme et
+  filière, formation en cours, rythme, jours restants, progression), filtres par filière, niveau et « en formation
+  seulement », tri par colonne, un clic ouvre sa fiche ; en tête, la répartition du niveau d'éducation. Lecture seule.
 - **Activation en cours de partie** : les diplômes de départ au matin suivant ; coupure : chacun retrouve sa
   qualification générale (meilleur diplôme + talent), les études en cours restent figées.
 - **Aucun argent n'est créé** hors du crédit : cours, quote-part, remboursements de l'État passent par `transfer()` ;

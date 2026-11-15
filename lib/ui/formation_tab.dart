@@ -133,6 +133,14 @@ class FormationTab extends StatelessWidget {
               onChanged: (v) => upd(() => p.eduCoursesPerYear = (v / 5).round() * 5)),
         ],
       ]),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => ctrl.setMainView(MainView.education),
+          icon: const Icon(Icons.table_rows_outlined, size: 18),
+          label: const Text('Tableau des citoyens : niveau d’éducation et formation'),
+        ),
+      ),
       if (stock != null)
         Section('Diplômés et étudiants par filière', [
           row(['Filière', 'Tech.', 'Prof.', 'Étud. tech.', 'Étud. prof.', 'Pénurie'], head: true),

@@ -22,6 +22,9 @@ class Selection {
   int get hashCode => Object.hash(kind, id);
 }
 
+/// Vues de la zone principale.
+enum MainView { graph, citizens, education }
+
 /// Onglets du panneau latéral.
 class Tabs {
   static const inspector = 0;
@@ -53,7 +56,10 @@ class SimController extends ChangeNotifier {
   bool bundleEdges = true; // flux regroupés en troncs entre colonnes éloignées
   bool panelOpen = true;
   int panelTab = Tabs.inspector;
-  bool citizenView = false; // vue principale : l'explorateur de citoyens au lieu du graphe
+  /// Vue principale : le graphe des entreprises, l'explorateur de citoyens ou le tableau de l'éducation.
+  MainView mainView = MainView.graph;
+  bool get citizenView => mainView == MainView.citizens;
+  bool get educationView => mainView == MainView.education;
 
   /// Calque du graphe : un bien (ou [kMoneyLayer]) mis en avant, les autres flux estompés ; null = tous.
   String? layer;
@@ -200,8 +206,12 @@ class SimController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleCitizenView() {
-    citizenView = !citizenView;
+  void toggleCitizenView() => setMainView(citizenView ? MainView.graph : MainView.citizens);
+
+  void toggleEducationView() => setMainView(educationView ? MainView.graph : MainView.education);
+
+  void setMainView(MainView v) {
+    mainView = v;
     notifyListeners();
   }
 

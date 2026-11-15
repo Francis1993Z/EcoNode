@@ -4,6 +4,7 @@
 
 import 'package:econodes/engine/model.dart';
 import 'package:econodes/engine/sim.dart';
+import 'package:econodes/ui/education_view.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'instantane_test.dart' show sameContinuation;
@@ -88,5 +89,26 @@ void main() {
     s.step();
     expect(s.formationReady, isTrue);
     expect(s.citizens.every((c) => c.degrees.length == fieldKeys.length), isTrue);
+  });
+
+  test('tableau de l’éducation : une ligne par citoyen, lue sans rien changer à la partie', () {
+    final a = Sim(seed: 9, params: court());
+    final b = Sim(seed: 9, params: court());
+    for (var d = 1; d <= 200; d++) {
+      a.step();
+      b.step();
+      if (d % 50 == 0) {
+        final rows = educationRows(a);
+        expect(rows.length, a.citizens.length);
+        expect(rows.where((r) => r.studying).length, a.citizens.where((c) => c.studyField >= 0).length);
+        for (final r in rows) {
+          final c = a.citizen(r.id)!;
+          expect(r.level, a.topDegree(c));
+          if (r.studying) expect(r.progress, inInclusiveRange(0, 1));
+        }
+      }
+    }
+    expect(a.history.last.cpi, b.history.last.cpi);
+    expect(a.citizens.map((c) => c.money).toList(), b.citizens.map((c) => c.money).toList());
   });
 }
