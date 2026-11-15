@@ -1,6 +1,6 @@
 part of 'sim.dart';
 
-// Formation par filières (Params.formation, 2026-11-14). Voir MODELE.md § 6.24 et rapports/formation.md.
+// Formation par filières (Params.formation, 2026-11-14). Voir MODELE.md § 6.23 et rapports/formation.md.
 //
 // - Diplômes. Un citoyen a un niveau de diplôme par filière (fieldKeys) : 0 aucun, 1 technicien, 2 professionnel. Sa
 //   qualification dans une filière = diplôme de la filière + talent (la partie fractionnaire de sa qualification de
@@ -119,7 +119,8 @@ extension SimFormation on Sim {
         for (var i = 0; i < f.vacancies; i++) {
           final r = nextSeat(f.type, counts);
           counts[r]++;
-          vac[fl][roles[f.type]![r].level]++;
+          // un poste d'encadrement se pourvoit par promotion interne : il ne fait pas de place à un nouveau diplômé
+          if (!roles[f.type]![r].internal) vac[fl][roles[f.type]![r].level]++;
         }
       } else {
         vac[fl][f.template.skill] += f.vacancies;
@@ -242,6 +243,10 @@ extension SimFormation on Sim {
     c.studyCourses = 0;
     c.studyStart = day;
     c.studySeeksWork = false;
+    // la place est prise dès aujourd'hui : les suivants du jour voient la pénurie réduite d'autant
+    for (var k = 1; k <= l; k++) {
+      fieldShortage[f][k] = math.max(0.0, fieldShortage[f][k] - 1);
+    }
     if (employed) {
       formationStats.enrolNight++;
     } else {
@@ -283,14 +288,21 @@ extension SimFormation on Sim {
     if (publicGood('cours')) {
       final copay = quantize((1 - p.eduStateShare) * coursePrice());
       if (c.money < copay + needCost) return false;
-      if (!_takePublic('cours')) return false;
+      if (!_takePublic('cours')) {
+        unmet['cours'] = (unmet['cours'] ?? 0) + 1; // l'école publique est pleine : son enveloppe le verra
+        return false;
+      }
       final a = transfer(c, state, copay);
       formationStats.tuitionStudents += a;
       if (a > 0) _flow('M', 'E', '\$frais de scolarité', 1, a);
       return true;
     }
     final pr = quote('cours');
-    if (!pr.isFinite || c.money < pr + needCost) return false;
+    if (!pr.isFinite) {
+      unmet['cours'] = (unmet['cours'] ?? 0) + 1;
+      return false;
+    }
+    if (c.money < pr + needCost) return false;
     final r = buy(c, 'M', 'cours', 1, c.money - needCost, true, forCitizen: c);
     if (r.qty < 1) return false;
     final room = math.max(0.0, state.money - floor);

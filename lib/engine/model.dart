@@ -1170,7 +1170,7 @@ class Params {
   double taxRate2 = 0.20;
   double taxRate3 = 0.35;
   double taxRate4 = 0.50;
-  // Formation par filières (formation, 2026-11-14, MODELE.md § 6.24). Un diplôme est lié à une filière (fieldKeys) et à un
+  // Formation par filières (formation, 2026-11-14, MODELE.md § 6.23). Un diplôme est lié à une filière (fieldKeys) et à un
   // niveau (1 technicien, 2 professionnel). Un poste de classe 1 ou 2 exige le diplôme de la filière de l'entreprise, au
   // bon niveau ; un poste de manœuvre (classe 0) reste ouvert à tous. Les cours ne montent plus la qualification d'un
   // cran tous les 50 cours : un programme dure eduTechDays (technicien) ou eduProDays (professionnel, eduProDays −

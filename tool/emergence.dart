@@ -44,6 +44,7 @@ Params parametresInterface(int population) => Params()
   ..planFreshSolve = true
   ..ownersAtStart = true
   ..buildingTypes = true
+  ..formation = true
   ..reservePerCitizen = 2000
   ..prodEntryMargin = 0.05
   ..spreadTakeovers = true

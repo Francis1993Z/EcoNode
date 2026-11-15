@@ -12,6 +12,7 @@ import 'god_tab.dart';
 import 'tax_tab.dart';
 import 'graph.dart';
 import 'entreprises_tab.dart';
+import 'formation_tab.dart';
 import 'housing.dart';
 import 'inspector.dart';
 import 'palette.dart';
@@ -404,6 +405,9 @@ class SidePanel extends StatelessWidget {
         break;
       case Tabs.firms:
         body = FirmsTab(ctrl);
+        break;
+      case Tabs.formation:
+        body = FormationTab(ctrl);
         break;
       default:
         body = InspectorTab(ctrl);

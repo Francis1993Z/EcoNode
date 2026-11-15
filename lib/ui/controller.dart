@@ -34,9 +34,10 @@ class Tabs {
   static const taxes = 7;
   static const parc = 8;
   static const firms = 9;
+  static const formation = 10;
   static const labels = [
     'Inspecteur', 'Diagnostic', 'God mode', 'Économie', 'Journal', 'Modèle', 'Immobilier', 'Impôts', 'Parc',
-    'Entreprises'
+    'Entreprises', 'Formation'
   ];
 }
 
@@ -108,6 +109,7 @@ class SimController extends ChangeNotifier {
               ..spreadTakeovers = true // filet de renflouement : le racheteur n'est plus toujours le plus riche (N16)
               ..progressiveTax = true // impôt progressif sur le revenu du jour (onglet Impôts)
               ..buildingTypes = true // maisons, duplex et immeubles (onglet Parc)
+              ..formation = true // diplômes par filière, études de 2 et 4 ans (onglet Formation)
               ..walletAtTarget = true // démarrage à l'équilibre (anomalie N6)
               ..planFromHouseholds = true
               ..spreadHealth = true
@@ -272,7 +274,8 @@ class SimController extends ChangeNotifier {
           ..prodEntryMargin = 0.05
           ..spreadTakeovers = true
           ..progressiveTax = true
-          ..buildingTypes = true,
+          ..buildingTypes = true
+          ..formation = true,
         modules: sim.modules.copy(),
         safeguards: sim.safeguards.copy());
     housing.clear();
