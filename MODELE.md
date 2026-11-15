@@ -1478,7 +1478,7 @@ Demande de Francis (14 novembre 2026) : « c'est trop facile de s'éduquer ». C
 change pas), active dans l'interface (onglet Formation). Mesures et choix : [`rapports/formation.md`](rapports/formation.md).
 
 **Avant** (§ 6.8, réglages de l'interface, 10 graines) : la première année, 0,75 montée de classe par habitant ; les
-professionnels passent de 18 à 80 % de la population en 3 ans ; un citoyen change de filière d'emploi 1,3 à 2 fois par
+professionnels passent de 7 % des employés au départ à 80 % la 4e année ; un citoyen change de filière d'emploi 1,3 à 2 fois par
 an et 42 à 45 % des employés travaillent hors de la filière de leur premier emploi.
 
 - **Filières** (`model.dart:fieldKeys`, `typeField`) : onze, regroupées par métier plutôt que par secteur : agriculture,
@@ -1537,6 +1537,14 @@ an et 42 à 45 % des employés travaillent hors de la filière de leur premier e
   qualification générale (meilleur diplôme + talent), les études en cours restent figées.
 - **Aucun argent n'est créé** hors du crédit : cours, quote-part, remboursements de l'État passent par `transfer()` ;
   le prêt étudiant crée des dépôts comme tout prêt personnel ; les invariants tiennent (test `formation_test.dart`).
+
+**Mesure** (10 graines appariées × 3 000 jours, réglages de l'interface, module coupé puis actif) : chômage des jours
+1 001-3 000 de 8,2 à 9,6 % à 240 citoyens (non concluant, 3 graines sur 10 plus bas), de 8,0 à 4,6 % à 1 000 (10 sur 10)
+et de 7,2 à 4,8 % à 2 500 (8 sur 10) ; moins d'années de crise à 1 000 et 2 500. Les montées de classe tombent de 0,18 à
+0,002-0,007 par habitant et par an ; la répartition des employés reste proche du départ (≈ 2/3 de manœuvres, 7-11 % de
+professionnels au lieu de 91 %). Aucune filière ne manque durablement de diplômés. 1 à 2 % de la population étudie
+(4,8 % à 240), presque toujours en cours du soir ; un diplôme prend 4 à 4,5 ans de calendrier. Créations d'entreprises
+−23,5 à 2 500 (10 sur 10) : un fondateur doit trouver des chômeurs diplômés de sa filière.
 
 ---
 
